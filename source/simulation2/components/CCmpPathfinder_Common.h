@@ -371,7 +371,7 @@ public:
 	 * so that bended paths can become straight if there's nothing in between
 	 * (this happens because A* is 8-direction, and the map isn't actually a grid).
 	 */
-	void ImprovePathWaypoints(Path& path);
+	void ImprovePathWaypoints(Path& path, pass_class_t passClass);
 	
 	virtual u32 ComputePathAsync(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, entity_id_t notify);
 

@@ -932,7 +932,11 @@ void CCmpUnitMotion::Move(fixed dt)
 #endif
 
 #if DISABLE_SHORT_PATHFINDER
-			CFixedVector2D target(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
+			CFixedVector2D target;
+			if (m_ShortPath.m_Waypoints.empty())
+				target = CFixedVector2D(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
+			else
+				target = CFixedVector2D(m_ShortPath.m_Waypoints.back().x, m_ShortPath.m_Waypoints.back().z);
 #else
 			CFixedVector2D target(m_ShortPath.m_Waypoints.back().x, m_ShortPath.m_Waypoints.back().z);
 #endif
@@ -953,7 +957,10 @@ void CCmpUnitMotion::Move(fixed dt)
 					timeLeft = timeLeft - (offsetLength / maxSpeed);
 
 #if DISABLE_SHORT_PATHFINDER
-					m_LongPath.m_Waypoints.pop_back();
+					if (m_ShortPath.m_Waypoints.empty())
+						m_LongPath.m_Waypoints.pop_back();
+					else
+						m_ShortPath.m_Waypoints.pop_back();
 #else
 					m_ShortPath.m_Waypoints.pop_back();
 #endif
@@ -1006,10 +1013,27 @@ void CCmpUnitMotion::Move(fixed dt)
 			// TODO: if the target has UnitMotion and is higher priority,
 			// we should wait a little bit.
 			
-			m_CurSpeed = zero;
-			RequestLongPath(pos, m_FinalGoal);
-			m_PathState = PATHSTATE_WAITING_REQUESTING_LONG;
-
+			// TODO: so that's when we want to slide, right?
+			while (!m_LongPath.m_Waypoints.empty())
+			{
+				CFixedVector2D waypoint(m_LongPath.m_Waypoints.back().x,m_LongPath.m_Waypoints.back().z);
+				m_LongPath.m_Waypoints.pop_back();
+				if (m_LongPath.m_Waypoints.empty() || (pos-waypoint).CompareLength(fixed::FromInt(15)) == 1)
+				{
+					if ((pos-waypoint).CompareLength(fixed::FromInt(25)) == 1)
+					{
+						waypoint = waypoint-pos;
+						waypoint.Normalize(fixed::FromInt(25));
+						waypoint += pos;
+					}
+					PathGoal goal = { PathGoal::POINT, waypoint.X, waypoint.Y };
+					RequestShortPath(pos, goal, false);
+					m_PathState = PATHSTATE_WAITING_REQUESTING_SHORT;
+					break;
+				}
+ 			}
+			// TODO: check where the collision was and move slightly.
+			
 			return;
 		}
 

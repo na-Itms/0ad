@@ -838,7 +838,7 @@ void CCmpPathfinder::NormalizePathWaypoints(Path& path)
 	path.m_Waypoints.swap(newWaypoints);
 }
 
-void CCmpPathfinder::ImprovePathWaypoints(Path& path)
+void CCmpPathfinder::ImprovePathWaypoints(Path& path, pass_class_t passClass)
 {
 	if (path.m_Waypoints.size() < 2)
 		return;
@@ -850,7 +850,7 @@ void CCmpPathfinder::ImprovePathWaypoints(Path& path)
 	if (!cmpObstructionManager)
 		return;
 	
-	NullObstructionFilter filter;
+	StationaryOnlyObstructionFilter filter;
 	CFixedVector2D prev(waypoints[0].x, waypoints[0].z);
 	newWaypoints.push_back(waypoints.front());
 	for (size_t k = 1; k < waypoints.size()-1; ++k)
@@ -865,7 +865,7 @@ void CCmpPathfinder::ImprovePathWaypoints(Path& path)
 		}
 		
 		// TODO: add proper width.
-		if (cmpObstructionManager->TestLine(filter, ahead.X, ahead.Y, prev.X, prev.Y, fixed::FromInt(1)))
+		if (!CheckMovement(filter, prev.X, prev.Y, ahead.X, ahead.Y, fixed::FromInt(4), passClass))
 		{
 			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
 			newWaypoints.push_back(waypoints[k]);
