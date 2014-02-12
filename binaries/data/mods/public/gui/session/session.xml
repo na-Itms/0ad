@@ -141,6 +141,11 @@
 		<object size="100%-16 176 100% 192" type="button" style="ModernTickBox">
 			<action on="Press">Engine.PostNetworkCommand({"type": "promote", "entities": g_Selection.toList()});</action>
 		</object>
+
+	    <object size="0 192 100%-18 208" type="text" style="devCommandsText">Pathfinder reachability</object>
+	    <object size="100%-16 192 100% 208" type="checkbox" style="StoneCrossBox">
+		<action on="Press">Engine.GuiInterfaceCall("SetPathfinderHierDebugOverlay", this.checked);</action>
+	    </object>
 	</object>
 
 	<!-- ================================  ================================ -->

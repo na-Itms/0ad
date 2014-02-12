@@ -95,6 +95,8 @@ public:
 	 */
 	void FindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass);
 
+	void SetDebugOverlay(bool enabled);
+
 private:
 	static const u8 CHUNK_SIZE = 64; // number of navcells per side
 
@@ -360,12 +362,26 @@ CCmpPathfinder_Hier::CCmpPathfinder_Hier(CCmpPathfinder& pathfinder) :
 	m_Pathfinder(pathfinder)
 {
 	m_DebugOverlay = NULL;
-//	m_DebugOverlay = new PathfinderHierOverlay(*this);
 }
 
 CCmpPathfinder_Hier::~CCmpPathfinder_Hier()
 {
 	SAFE_DELETE(m_DebugOverlay);
+}
+
+void CCmpPathfinder_Hier::SetDebugOverlay(bool enabled)
+{
+	if (enabled && !m_DebugOverlay)
+	{
+		m_DebugOverlay = new PathfinderHierOverlay(*this);
+		m_DebugOverlayLines.clear();
+		AddDebugEdges(m_Pathfinder.GetPassabilityClass("default"));
+	}
+	else if (!enabled && m_DebugOverlay)
+	{
+		SAFE_DELETE(m_DebugOverlay);
+		m_DebugOverlayLines.clear();
+	}
 }
 
 void CCmpPathfinder_Hier::Init(const std::vector<PathfinderPassability>& passClasses, Grid<NavcellData>* grid)
@@ -396,7 +412,7 @@ void CCmpPathfinder_Hier::Init(const std::vector<PathfinderPassability>& passCla
 		}
 
 		// Construct the search graph over the regions
-		
+
 		EdgesMap& edges = m_Edges[passClass];
 
 		for (int cj = 0; cj < m_ChunksH; ++cj)
@@ -674,6 +690,11 @@ void CCmpPathfinder::PathfinderHierDeinit()
 void CCmpPathfinder::PathfinderHierReload()
 {
 	m_PathfinderHier->Init(m_PassClasses, m_Grid);
+}
+
+void CCmpPathfinder::SetHierDebugOverlay(bool enabled)
+{
+	m_PathfinderHier->SetDebugOverlay(enabled);
 }
 
 void CCmpPathfinder::PathfinderHierRenderSubmit(SceneCollector& collector)

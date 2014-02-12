@@ -143,7 +143,7 @@ private:
 };
 
 typedef u16 NavcellData; // 1 bit per passability class (up to PASS_CLASS_BITS)
-const int PASS_CLASS_BITS = 16;
+static const int PASS_CLASS_BITS = 16;
 #define IS_PASSABLE(item, classmask) (((item) & (classmask)) == 0)
 #define PASS_CLASS_MASK_FROM_INDEX(id) ((pass_class_t)(1u << (id)))
 
@@ -377,6 +377,8 @@ public:
 
 	virtual void SetDebugOverlay(bool enabled);
 
+	virtual void SetHierDebugOverlay(bool enabled);
+
 	virtual void GetDebugData(u32& steps, double& time, Grid<u8>& grid);
 
 	virtual void GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid);
@@ -385,9 +387,7 @@ public:
 
 	virtual bool CheckMovement(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t x1, entity_pos_t z1, entity_pos_t r, pass_class_t passClass);
 
-	virtual ICmpObstruction::EFoundationCheck CheckUnitPlacement(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t r, pass_class_t passClass);
-
-virtual ICmpObstruction::EFoundationCheck CheckUnitPlacement(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t r, pass_class_t passClass, bool onlyCenterPoint);
+	virtual ICmpObstruction::EFoundationCheck CheckUnitPlacement(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t r, pass_class_t passClass, bool onlyCenterPoint);
 
 	virtual ICmpObstruction::EFoundationCheck CheckBuildingPlacement(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t a, entity_pos_t w, entity_pos_t h, entity_id_t id, pass_class_t passClass);
 

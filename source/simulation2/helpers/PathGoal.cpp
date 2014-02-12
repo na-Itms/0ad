@@ -98,8 +98,8 @@ bool PathGoal::NavcellContainsGoal(int i, int j) const
 	case POINT:
 	{
 		// Only accept a single navcell
-		int gi = (x / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero();
-		int gj = (z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero();
+		int gi = (x >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
+		int gj = (z >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
 		return gi == i && gj == j;
 	}
 	case CIRCLE:
@@ -135,8 +135,8 @@ bool PathGoal::NavcellRectContainsGoal(int i0, int j0, int i1, int j1, int* gi, 
 	case POINT:
 	{
 		// Calculate the navcell that contains the point goal
-		int i = (x / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero();
-		int j = (z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero();
+		int i = (x >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
+		int j = (z >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
 		// If that goal navcell is in the given range, return it
 		if (imin <= i && i <= imax && jmin <= j && j <= jmax)
 		{
@@ -201,16 +201,13 @@ bool PathGoal::NavcellRectContainsGoal(int i0, int j0, int i1, int j1, int* gi, 
 		return false;
 	}
 	case INVERTED_CIRCLE:
+	case INVERTED_SQUARE:
 	{
+		// Haven't bothered implementing these, since they're not needed by the
+		// current pathfinder design
+		debug_warn(L"PathGoal::NavcellRectContainsGoal doesn't support inverted shapes");
 		return false;
 	}
-	case INVERTED_SQUARE:
-		{
-			// Haven't bothered implementing these, since they're not needed by the
-			// current pathfinder design
-			debug_warn(L"PathGoal::NavcellRectContainsGoal doesn't support inverted shapes");
-			return false;
-		}
 	default:
 	{
 		debug_warn(L"invalid type");
@@ -240,11 +237,6 @@ bool PathGoal::RectContainsGoal(entity_pos_t x0, entity_pos_t z0, entity_pos_t x
 		return Geometry::PointIsInSquare(CFixedVector2D(nx - x, nz - z), u, v, CFixedVector2D(hw, hh));
 	}
 	case INVERTED_CIRCLE:
-	{
-		entity_pos_t nx = Clamp(x, x0, x1);
-		entity_pos_t nz = Clamp(z, z0, z1);
-		return (CFixedVector2D(nx, nz) - CFixedVector2D(x, z)).CompareLength(hw) > 0;
-	}
 	case INVERTED_SQUARE:
 	{
 		// Haven't bothered implementing these, since they're not needed by the

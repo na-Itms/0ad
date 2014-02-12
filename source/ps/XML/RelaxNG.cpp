@@ -41,6 +41,7 @@ public:
 
 	RelaxNGSchema(const std::string& grammar)
 	{
+		TIMER(L"PARSE GRAMMAR");
 		xmlRelaxNGParserCtxtPtr ctxt = xmlRelaxNGNewMemParserCtxt(grammar.c_str(), (int)grammar.size());
 		m_Schema = xmlRelaxNGParse(ctxt);
 		xmlRelaxNGFreeParserCtxt(ctxt);

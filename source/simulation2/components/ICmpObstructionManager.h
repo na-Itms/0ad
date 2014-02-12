@@ -70,6 +70,8 @@ public:
 	 * Size of a navcell in metres ( = TERRAIN_TILE_SIZE / NAVCELLS_PER_TILE)
 	 */
 	static const fixed NAVCELL_SIZE;
+	static const int NAVCELL_SIZE_INT = 1;
+	static const int NAVCELL_SIZE_LOG2 = 0;
 
 	/**
 	 * External identifiers for shapes.

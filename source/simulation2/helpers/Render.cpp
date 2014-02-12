@@ -82,9 +82,9 @@ static void ConstructCircleOrClosedArc(
 	float water = 0.f;
 	if (floating)
 	{
-		CmpPtr<ICmpWaterManager> cmpWaterMan(context, SYSTEM_ENTITY);
-		if (cmpWaterMan)
-			water = cmpWaterMan->GetExactWaterLevel(x, z);
+		CmpPtr<ICmpWaterManager> cmpWaterManager(context, SYSTEM_ENTITY);
+		if (cmpWaterManager)
+			water = cmpWaterManager->GetExactWaterLevel(x, z);
 	}
 
 	// Adapt the circle resolution to look reasonable for small and largeish radiuses

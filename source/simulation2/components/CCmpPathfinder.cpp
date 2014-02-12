@@ -444,7 +444,7 @@ void CCmpPathfinder::ComputeTerrainPassabilityGrid(const Grid<u16>& shoreGrid)
 			fixed slope = terrain.GetSlopeFixed(itile, jtile);
 
 			// Get world-space coordinates from shoreGrid (which uses terrain tiles)
-			fixed shoredist = fixed::FromInt(shoreGrid.get(itile, jtile)) * (int)TERRAIN_TILE_SIZE;
+			fixed shoredist = fixed::FromInt(shoreGrid.get(itile, jtile)).MultiplyClamp(TERRAIN_TILE_SIZE);
 
 			// Compute the passability for every class for this cell:
 
@@ -688,12 +688,6 @@ void CCmpPathfinder::ProcessSameTurnMoves()
 }
 
 //////////////////////////////////////////////////////////
-
-ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckUnitPlacement(const IObstructionTestFilter& filter,
-	entity_pos_t x, entity_pos_t z, entity_pos_t r,	pass_class_t passClass)
-{
-	return CCmpPathfinder::CheckUnitPlacement(filter, x, z, r, passClass, false);
-}
 
 ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckUnitPlacement(const IObstructionTestFilter& filter,
 	entity_pos_t x, entity_pos_t z, entity_pos_t r,	pass_class_t passClass, bool onlyCenterPoint)

@@ -25,7 +25,7 @@
 #include "renderer/TerrainOverlay.h"
 #include "simulation2/helpers/PriorityQueue.h"
 
-#define PATHFIND_STATS 1
+#define PATHFIND_STATS 0
 
 #define USE_JUMPPOINT_CACHE 1
 
@@ -504,8 +504,8 @@ static void ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg, Pathfind
 
 	PathfindTileJPS& n = state.tiles->get(i, j);
 
- 	if (n.IsClosed())
- 		return;
+	if (n.IsClosed())
+		return;
 
 	PathCost dg;
 	if (pi == i)
@@ -819,7 +819,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 #endif
 
 	PROFILE3("ComputePathJPS");
-	TIMER(L"ComputePathJPS");
+	//TIMER(L"ComputePathJPS");
 	double time = timer_Time();
 
 	// Convert the start coordinates to tile indexes
@@ -966,14 +966,27 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 
 			// XXX - check passability?
 
-			ProcessNeighbour(i, j, (u16)(i-1), (u16)(j-1), g, state);
-			ProcessNeighbour(i, j, (u16)(i+1), (u16)(j-1), g, state);
-			ProcessNeighbour(i, j, (u16)(i-1), (u16)(j+1), g, state);
-			ProcessNeighbour(i, j, (u16)(i+1), (u16)(j+1), g, state);
-			ProcessNeighbour(i, j, (u16)(i-1), j, g, state);
-			ProcessNeighbour(i, j, (u16)(i+1), j, g, state);
-			ProcessNeighbour(i, j, i, (u16)(j-1), g, state);
-			ProcessNeighbour(i, j, i, (u16)(j+1), g, state);
+			bool passl = IS_PASSABLE(state.terrain->get(i-1, j), state.passClass);
+			bool passr = IS_PASSABLE(state.terrain->get(i+1, j), state.passClass);
+			bool passd = IS_PASSABLE(state.terrain->get(i, j-1), state.passClass);
+			bool passu = IS_PASSABLE(state.terrain->get(i, j+1), state.passClass);
+
+			if (passl && passd)
+				ProcessNeighbour(i, j, i-1, j-1, g, state);
+			if (passr && passd)
+				ProcessNeighbour(i, j, i+1, j-1, g, state);
+			if (passl && passu)
+				ProcessNeighbour(i, j, i-1, j+1, g, state);
+			if (passr && passu)
+				ProcessNeighbour(i, j, i+1, j+1, g, state);
+			if (passl)
+				ProcessNeighbour(i, j, i-1, j, g, state);
+			if (passr)
+				ProcessNeighbour(i, j, i+1, j, g, state);
+			if (passd)
+				ProcessNeighbour(i, j, i, j-1, g, state);
+			if (passu)
+				ProcessNeighbour(i, j, i, j+1, g, state);
 		}
 	}
 
