@@ -48,15 +48,14 @@
 
 class CCmpTerritoryManager;
 
-class TerritoryOverlay : public TerrainOverlay
+class TerritoryOverlay : public TerrainTextureOverlay
 {
 	NONCOPYABLE(TerritoryOverlay);
 public:
 	CCmpTerritoryManager& m_TerritoryManager;
 
 	TerritoryOverlay(CCmpTerritoryManager& manager);
-	virtual void StartRender();
-	virtual void ProcessTile(ssize_t i, ssize_t j);
+	virtual void BuildTextureRGBA(u8* data, size_t w, size_t h);
 };
 
 class CCmpTerritoryManager : public ICmpTerritoryManager
@@ -271,6 +270,24 @@ public:
 
 REGISTER_COMPONENT_TYPE(TerritoryManager)
 
+/**
+ * Compute the tile indexes on the grid nearest to a given point
+ */
+static void NearestTerritoryTile(entity_pos_t x, entity_pos_t z, int& i, int& j, int w, int h)
+{
+	i = clamp((x / (ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity(), 0, w-1);
+	j = clamp((z / (ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity(), 0, h-1);
+}
+
+/**
+ * Returns the position of the center of the given tile
+ */
+static void TerritoryTileCenter(int i, int j, entity_pos_t& x, entity_pos_t& z)
+{
+	x = entity_pos_t::FromInt(i*2 + 1).Multiply(ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / 2);
+	z = entity_pos_t::FromInt(j*2 + 1).Multiply(ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / 2);
+}
+
 /*
 We compute the territory influence of an entity with a kind of best-first search,
 storing an 'open' list of tiles that have not yet been processed,
@@ -281,7 +298,7 @@ adjusted by terrain movement cost), and repeating until all tiles are processed.
 
 typedef PriorityQueueHeap<std::pair<u16, u16>, u32, std::greater<u32> > OpenQueue;
 
-static void ProcessNeighbour(u32 falloff, u16 i, u16 j, u32 pg, bool diagonal,
+static void ProcessNeighbour(u32 falloff, int i, int j, u32 pg, bool diagonal,
 		Grid<u32>& grid, OpenQueue& queue, const Grid<u8>& costGrid)
 {
 	u32 dg = falloff * costGrid.get(i, j);
@@ -296,38 +313,38 @@ static void ProcessNeighbour(u32 falloff, u16 i, u16 j, u32 pg, bool diagonal,
 	u32 g = pg - dg; // cost to this tile = cost to predecessor - falloff from predecessor
 
 	grid.set(i, j, g);
-	OpenQueue::Item tile = { std::make_pair(i, j), g };
+	OpenQueue::Item tile = { std::make_pair((u16)i, (u16)j), g };
 	queue.push(tile);
 }
 
 static void FloodFill(Grid<u32>& grid, Grid<u8>& costGrid, OpenQueue& openTiles, u32 falloff)
 {
-	u16 tilesW = grid.m_W;
-	u16 tilesH = grid.m_H;
+	int tilesW = grid.m_W;
+	int tilesH = grid.m_H;
 
 	while (!openTiles.empty())
 	{
 		OpenQueue::Item tile = openTiles.pop();
 
 		// Process neighbours (if they're not off the edge of the map)
-		u16 x = tile.id.first;
-		u16 z = tile.id.second;
+		int x = tile.id.first;
+		int z = tile.id.second;
 		if (x > 0)
-			ProcessNeighbour(falloff, (u16)(x-1), z, tile.rank, false, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x-1, z, tile.rank, false, grid, openTiles, costGrid);
 		if (x < tilesW-1)
-			ProcessNeighbour(falloff, (u16)(x+1), z, tile.rank, false, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x+1, z, tile.rank, false, grid, openTiles, costGrid);
 		if (z > 0)
-			ProcessNeighbour(falloff, x, (u16)(z-1), tile.rank, false, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x, z-1, tile.rank, false, grid, openTiles, costGrid);
 		if (z < tilesH-1)
-			ProcessNeighbour(falloff, x, (u16)(z+1), tile.rank, false, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x, z+1, tile.rank, false, grid, openTiles, costGrid);
 		if (x > 0 && z > 0)
-			ProcessNeighbour(falloff, (u16)(x-1), (u16)(z-1), tile.rank, true, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x-1, z-1, tile.rank, true, grid, openTiles, costGrid);
 		if (x > 0 && z < tilesH-1)
-			ProcessNeighbour(falloff, (u16)(x-1), (u16)(z+1), tile.rank, true, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x-1, z+1, tile.rank, true, grid, openTiles, costGrid);
 		if (x < tilesW-1 && z > 0)
-			ProcessNeighbour(falloff, (u16)(x+1), (u16)(z-1), tile.rank, true, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x+1, z-1, tile.rank, true, grid, openTiles, costGrid);
 		if (x < tilesW-1 && z < tilesH-1)
-			ProcessNeighbour(falloff, (u16)(x+1), (u16)(z+1), tile.rank, true, grid, openTiles, costGrid);
+			ProcessNeighbour(falloff, x+1, z+1, tile.rank, true, grid, openTiles, costGrid);
 	}
 }
 
@@ -345,31 +362,67 @@ void CCmpTerritoryManager::CalculateTerritories()
 	if (!cmpTerrain->IsLoaded())
 		return;
 
-	u16 tilesW = cmpTerrain->GetTilesPerSide();
-	u16 tilesH = cmpTerrain->GetTilesPerSide();
-
-	m_Territories = new Grid<u8>(tilesW, tilesH);
-
-	// Compute terrain-passability-dependent costs per tile
-	Grid<u8> influenceGrid(tilesW, tilesH);
-
 	CmpPtr<ICmpPathfinder> cmpPathfinder(GetSystemEntity());
-	ICmpPathfinder::pass_class_t passClassDefault = cmpPathfinder->GetPassabilityClass("default");
+	ICmpPathfinder::pass_class_t passClassDefault = cmpPathfinder->GetPassabilityClass("territory");
 	ICmpPathfinder::pass_class_t passClassUnrestricted = cmpPathfinder->GetPassabilityClass("unrestricted");
 
 	const Grid<u16>& passGrid = cmpPathfinder->GetPassabilityGrid();
-	for (u16 j = 0; j < tilesH; ++j)
+
+	// Downsample the passability data to count the number of impassable
+	// navcells per territory tile
+	// (TODO: do we really want to average the passability per territory tile,
+	// instead of doing min/max/etc?)
+
+	int tilesW = passGrid.m_W / NAVCELLS_PER_TERRITORY_TILE;
+	int tilesH = passGrid.m_H / NAVCELLS_PER_TERRITORY_TILE;
+
+	m_Territories = new Grid<u8>(tilesW, tilesH);
+
+	// Downsample passability grid horizontally first
+	Grid<u16> tempPassGrid(passGrid.m_W / NAVCELLS_PER_TERRITORY_TILE, passGrid.m_H);
+
+	cassert(NAVCELLS_PER_TERRITORY_TILE < 16); // else we might overflow the counters
+
+	for (int j = 0; j < tempPassGrid.m_H; ++j)
 	{
-		for (u16 i = 0; i < tilesW; ++i)
+		for (int i = 0; i < tempPassGrid.m_W; ++i)
 		{
-			u16 g = passGrid.get(i, j);
+			u32 count = 0;
+			for (u16 di = 0; di < NAVCELLS_PER_TERRITORY_TILE; ++di)
+			{
+				u16 g = passGrid.get(i*NAVCELLS_PER_TERRITORY_TILE + di, j);
+				if (g & passClassUnrestricted)
+					count += 65536; // off the world; force maximum cost
+				else if (g & passClassDefault)
+					count += 1;
+			}
+			tempPassGrid.set(i, j, std::min((u32)65535, count)); // clamp to avoid overflow
+		}
+	}
+
+	// Compute terrain-passability-dependent costs per tile
+
+	Grid<u8> influenceGrid(tilesW, tilesH);
+	for (int j = 0; j < tilesH; ++j)
+	{
+		for (int i = 0; i < tilesW; ++i)
+		{
+			// Downsample vertically
+			u32 count = 0;
+			for (int dj = 0; dj < NAVCELLS_PER_TERRITORY_TILE; ++dj)
+				count += tempPassGrid.get(i, j*NAVCELLS_PER_TERRITORY_TILE + dj);
+
 			u8 cost;
-			if (g & passClassUnrestricted)
-				cost = 255; // off the world; use maximum cost
-			else if (g & passClassDefault)
-				cost = m_ImpassableCost;
+			if (count >= 65535)
+			{
+				cost = 255; // at least partially off the world; use maximum cost
+			}
 			else
-				cost = 1;
+			{
+				// Compute average cost of the cells within this tile
+				u32 totalCells = NAVCELLS_PER_TERRITORY_TILE*NAVCELLS_PER_TERRITORY_TILE;
+				cost = (m_ImpassableCost*count + 1*(totalCells-count)) / totalCells;
+			}
 			influenceGrid.set(i, j, cost);
 		}
 	}
@@ -432,12 +485,12 @@ void CCmpTerritoryManager::CalculateTerritories()
 
 			CmpPtr<ICmpPosition> cmpPosition(GetSimContext(), *eit);
 			CFixedVector2D pos = cmpPosition->GetPosition2D();
-			u16 i = (u16)clamp((pos.X / (int)TERRAIN_TILE_SIZE).ToInt_RoundToNegInfinity(), 0, tilesW-1);
-			u16 j = (u16)clamp((pos.Y / (int)TERRAIN_TILE_SIZE).ToInt_RoundToNegInfinity(), 0, tilesH-1);
+			int i, j;
+			NearestTerritoryTile(pos.X, pos.Y, i, j, tilesW, tilesH);
 
 			CmpPtr<ICmpTerritoryInfluence> cmpTerritoryInfluence(GetSimContext(), *eit);
 			u32 weight = cmpTerritoryInfluence->GetWeight();
-			u32 radius = cmpTerritoryInfluence->GetRadius() / TERRAIN_TILE_SIZE;
+			u32 radius = (fixed::FromInt(cmpTerritoryInfluence->GetRadius()) / (ICmpObstructionManager::NAVCELL_SIZE * NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity();
 			u32 falloff = weight / radius; // earlier check for GetRadius() == 0 prevents divide-by-zero
 
 			// TODO: we should have some maximum value on weight, to avoid overflow
@@ -460,9 +513,9 @@ void CCmpTerritoryManager::CalculateTerritories()
 	}
 
 	// Set m_Territories to the player ID with the highest influence for each tile
-	for (u16 j = 0; j < tilesH; ++j)
+	for (int j = 0; j < tilesH; ++j)
 	{
-		for (u16 i = 0; i < tilesW; ++i)
+		for (int i = 0; i < tilesW; ++i)
 		{
 			u32 bestWeight = 0;
 			for (size_t k = 0; k < playerGrids.size(); ++k)
@@ -487,8 +540,8 @@ void CCmpTerritoryManager::CalculateTerritories()
 		CmpPtr<ICmpPosition> cmpPosition(GetSimContext(), *it);
 
 		CFixedVector2D pos = cmpPosition->GetPosition2D();
-		u16 i = (u16)clamp((pos.X / (int)TERRAIN_TILE_SIZE).ToInt_RoundToNegInfinity(), 0, tilesW-1);
-		u16 j = (u16)clamp((pos.Y / (int)TERRAIN_TILE_SIZE).ToInt_RoundToNegInfinity(), 0, tilesH-1);
+		int i, j;
+		NearestTerritoryTile(pos.X, pos.Y, i, j, tilesW, tilesH);
 
 		u8 owner = (u8)cmpOwnership->GetOwner();
 
@@ -500,12 +553,12 @@ void CCmpTerritoryManager::CalculateTerritories()
 
 		Grid<u8>& grid = *m_Territories;
 
-		u16 maxi = (u16)(grid.m_W-1);
-		u16 maxj = (u16)(grid.m_H-1);
+		int maxi = grid.m_W-1;
+		int maxj = grid.m_H-1;
 
 		std::vector<std::pair<u16, u16> > tileStack;
 
-#define MARK_AND_PUSH(i, j) STMT(grid.set(i, j, owner | TERRITORY_CONNECTED_MASK); tileStack.push_back(std::make_pair(i, j)); )
+#define MARK_AND_PUSH(i, j) STMT(grid.set(i, j, owner | TERRITORY_CONNECTED_MASK); tileStack.push_back(std::make_pair((u16)(i), (u16)(j))); )
 
 		MARK_AND_PUSH(i, j);
 		while (!tileStack.empty())
@@ -537,27 +590,6 @@ void CCmpTerritoryManager::CalculateTerritories()
 	}
 }
 
-/**
- * Compute the tile indexes on the grid nearest to a given point
- */
-static void NearestTile(entity_pos_t x, entity_pos_t z, u16& i, u16& j, u16 w, u16 h)
-{
-	i = (u16)clamp((x / (int)TERRAIN_TILE_SIZE).ToInt_RoundToZero(), 0, w-1);
-	j = (u16)clamp((z / (int)TERRAIN_TILE_SIZE).ToInt_RoundToZero(), 0, h-1);
-}
-
-/**
- * Returns the position of the center of the given tile
- */
-static void TileCenter(u16 i, u16 j, entity_pos_t& x, entity_pos_t& z)
-{
-	x = entity_pos_t::FromInt(i*(int)TERRAIN_TILE_SIZE + (int)TERRAIN_TILE_SIZE/2);
-	z = entity_pos_t::FromInt(j*(int)TERRAIN_TILE_SIZE + (int)TERRAIN_TILE_SIZE/2);
-}
-
-// TODO: would be nice not to duplicate those two functions from CCmpObstructionManager.cpp
-
-
 void CCmpTerritoryManager::RasteriseInfluences(CComponentManager::InterfaceList& infls, Grid<u8>& grid)
 {
 	for (CComponentManager::InterfaceList::iterator it = infls.begin(); it != infls.end(); ++it)
@@ -579,15 +611,15 @@ void CCmpTerritoryManager::RasteriseInfluences(CComponentManager::InterfaceList&
 		CFixedVector2D halfSize(square.hw, square.hh);
 		CFixedVector2D halfBound = Geometry::GetHalfBoundingBox(square.u, square.v, halfSize);
 
-		u16 i0, j0, i1, j1;
-		NearestTile(square.x - halfBound.X, square.z - halfBound.Y, i0, j0, grid.m_W, grid.m_H);
-		NearestTile(square.x + halfBound.X, square.z + halfBound.Y, i1, j1, grid.m_W, grid.m_H);
-		for (u16 j = j0; j <= j1; ++j)
+		int i0, j0, i1, j1;
+		NearestTerritoryTile(square.x - halfBound.X, square.z - halfBound.Y, i0, j0, grid.m_W, grid.m_H);
+		NearestTerritoryTile(square.x + halfBound.X, square.z + halfBound.Y, i1, j1, grid.m_W, grid.m_H);
+		for (int j = j0; j <= j1; ++j)
 		{
-			for (u16 i = i0; i <= i1; ++i)
+			for (int i = i0; i <= i1; ++i)
 			{
 				entity_pos_t x, z;
-				TileCenter(i, j, x, z);
+				TerritoryTileCenter(i, j, x, z);
 				if (Geometry::PointIsInSquare(CFixedVector2D(x - square.x, z - square.z), square.u, square.v, halfSize))
 					grid.set(i, j, (u8)cost);
 			}
@@ -714,52 +746,49 @@ void CCmpTerritoryManager::RenderSubmit(SceneCollector& collector)
 
 player_id_t CCmpTerritoryManager::GetOwner(entity_pos_t x, entity_pos_t z)
 {
-	u16 i, j;
 	CalculateTerritories();
 	if (!m_Territories)
 		return 0;
 
-	NearestTile(x, z, i, j, m_Territories->m_W, m_Territories->m_H);
+	int i, j;
+	NearestTerritoryTile(x, z, i, j, m_Territories->m_W, m_Territories->m_H);
 	return m_Territories->get(i, j) & TERRITORY_PLAYER_MASK;
 }
 
 bool CCmpTerritoryManager::IsConnected(entity_pos_t x, entity_pos_t z)
 {
-	u16 i, j;
 	CalculateTerritories();
 	if (!m_Territories)
 		return false;
 
-	NearestTile(x, z, i, j, m_Territories->m_W, m_Territories->m_H);
+	int i, j;
+	NearestTerritoryTile(x, z, i, j, m_Territories->m_W, m_Territories->m_H);
 	return (m_Territories->get(i, j) & TERRITORY_CONNECTED_MASK) != 0;
 }
 
-TerritoryOverlay::TerritoryOverlay(CCmpTerritoryManager& manager)
-	: TerrainOverlay(manager.GetSimContext()), m_TerritoryManager(manager)
-{ }
-
-void TerritoryOverlay::StartRender()
+TerritoryOverlay::TerritoryOverlay(CCmpTerritoryManager& manager) :
+	TerrainTextureOverlay((float)ICmpObstructionManager::NAVCELLS_PER_TILE / ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE),
+	m_TerritoryManager(manager)
 {
-	m_TerritoryManager.CalculateTerritories();
 }
 
-void TerritoryOverlay::ProcessTile(ssize_t i, ssize_t j)
+void TerritoryOverlay::BuildTextureRGBA(u8* data, size_t w, size_t h)
 {
-	if (!m_TerritoryManager.m_Territories)
-		return;
+	m_TerritoryManager.CalculateTerritories();
 
-	u8 id = (m_TerritoryManager.m_Territories->get((int) i, (int) j) & ICmpTerritoryManager::TERRITORY_PLAYER_MASK);
-
-	float a = 0.2f;
-	switch (id)
+	for (size_t j = 0; j < h; ++j)
 	{
-	case 0:  break;
-	case 1:  RenderTile(CColor(1, 0, 0, a), false); break;
-	case 2:  RenderTile(CColor(0, 1, 0, a), false); break;
-	case 3:  RenderTile(CColor(0, 0, 1, a), false); break;
-	case 4:  RenderTile(CColor(1, 1, 0, a), false); break;
-	case 5:  RenderTile(CColor(0, 1, 1, a), false); break;
-	case 6:  RenderTile(CColor(1, 0, 1, a), false); break;
-	default: RenderTile(CColor(1, 1, 1, a), false); break;
+		for (size_t i = 0; i < w; ++i)
+		{
+			SColor4ub color;
+
+			u8 id = (m_TerritoryManager.m_Territories->get((int)i, (int)j) & ICmpTerritoryManager::TERRITORY_PLAYER_MASK);
+			color = GetColor(id, 64);
+
+			*data++ = color.R;
+			*data++ = color.G;
+			*data++ = color.B;
+			*data++ = color.A;
+		}
 	}
 }

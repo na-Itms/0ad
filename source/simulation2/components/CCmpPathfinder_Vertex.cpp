@@ -101,10 +101,16 @@ struct Vertex
 };
 
 // Obstruction edges (paths will not cross any of these).
-// When used in the 'edges' list, defines the two points of the edge.
-// When used in the 'edgesAA' list, defines the opposing corners of an axis-aligned square
-// (from which four individual edges can be trivially computed), requiring p0 <= p1
+// Defines the two points of the edge.
 struct Edge
+{
+	CFixedVector2D p0, p1;
+};
+
+// Axis-aligned obstruction squares (paths will not cross any of these).
+// Defines the opposing corners of an axis-aligned square
+// (from which four individual edges can be trivially computed), requiring p0 <= p1
+struct Square
 {
 	CFixedVector2D p0, p1;
 };
@@ -284,18 +290,19 @@ inline static bool CheckVisibilityTop(CFixedVector2D a, CFixedVector2D b, const 
 }
 
 
-static CFixedVector2D NearestPointOnGoal(CFixedVector2D pos, const CCmpPathfinder::Goal& goal)
+static CFixedVector2D NearestPointOnGoal(CFixedVector2D pos, const PathGoal& goal)
 {
 	CFixedVector2D g(goal.x, goal.z);
 
 	switch (goal.type)
 	{
-	case CCmpPathfinder::Goal::POINT:
+	case PathGoal::POINT:
 	{
 		return g;
 	}
 
- 	case CCmpPathfinder::Goal::CIRCLE:
+	case PathGoal::CIRCLE:
+	case PathGoal::INVERTED_CIRCLE:
 	{
 		CFixedVector2D d = pos - g;
 		if (d.IsZero())
@@ -304,7 +311,8 @@ static CFixedVector2D NearestPointOnGoal(CFixedVector2D pos, const CCmpPathfinde
 		return g + d;
 	}
 
-	case CCmpPathfinder::Goal::SQUARE:
+	case PathGoal::SQUARE:
+	case PathGoal::INVERTED_SQUARE:
 	{
 		CFixedVector2D halfSize(goal.hw, goal.hh);
 		CFixedVector2D d = pos - g;
@@ -317,7 +325,7 @@ static CFixedVector2D NearestPointOnGoal(CFixedVector2D pos, const CCmpPathfinde
 	}
 }
 
-CFixedVector2D CCmpPathfinder::GetNearestPointOnGoal(CFixedVector2D pos, const CCmpPathfinder::Goal& goal)
+CFixedVector2D CCmpPathfinder::GetNearestPointOnGoal(CFixedVector2D pos, const PathGoal& goal)
 {
 	return NearestPointOnGoal(pos, goal);
 	// (It's intentional that we don't put the implementation inside this
@@ -327,165 +335,286 @@ CFixedVector2D CCmpPathfinder::GetNearestPointOnGoal(CFixedVector2D pos, const C
 
 typedef PriorityQueueHeap<u16, fixed> PriorityQueue;
 
-struct TileEdge
-{
-	u16 i, j;
-	enum { TOP, BOTTOM, LEFT, RIGHT } dir;
-};
-
-static void AddTerrainEdges(std::vector<Edge>& edgesAA, std::vector<Vertex>& vertexes,
-	u16 i0, u16 j0, u16 i1, u16 j1, fixed r,
-	ICmpPathfinder::pass_class_t passClass, const Grid<TerrainTile>& terrain)
+/**
+ * Add edges and vertexes to represent the boundaries between passable and impassable
+ * navcells (for impassable terrain and for static obstruction shapes).
+ * Navcells i0 <= i <= i1, j0 <= j <= j1 will be considered.
+ */
+static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& vertexes,
+	int i0, int j0, int i1, int j1,
+	ICmpPathfinder::pass_class_t passClass, const Grid<NavcellData>& grid)
 {
 	PROFILE("AddTerrainEdges");
 
-	std::vector<TileEdge> tileEdges;
+	// Clamp the coordinates so we won't attempt to sample outside of the grid.
+	// (This assumes the outermost ring of navcells (which are always impassable)
+	// won't have a boundary with any passable navcells. TODO: is that definitely
+	// safe enough?)
 
-	// Find all edges between tiles of differently passability statuses
-	for (u16 j = j0; j <= j1; ++j)
+	i0 = clamp(i0, 1, grid.m_W-2);
+	j0 = clamp(j0, 1, grid.m_H-2);
+	i1 = clamp(i1, 1, grid.m_W-2);
+	j1 = clamp(j1, 1, grid.m_H-2);
+
+	for (int j = j0; j <= j1; ++j)
 	{
-		for (u16 i = i0; i <= i1; ++i)
+		for (int i = i0; i <= i1; ++i)
 		{
-			if (!IS_TERRAIN_PASSABLE(terrain.get(i, j), passClass))
+			if (IS_PASSABLE(grid.get(i, j), passClass))
+				continue;
+
+			if (IS_PASSABLE(grid.get(i+1, j), passClass) && IS_PASSABLE(grid.get(i, j+1), passClass) && IS_PASSABLE(grid.get(i+1, j+1), passClass))
 			{
-				bool any = false; // whether we're adding any edges of this tile
+				Vertex vert;
+				vert.status = Vertex::UNEXPLORED;
+				vert.quadOutward = QUADRANT_ALL;
+				vert.quadInward = QUADRANT_BL;
+				vert.p = CFixedVector2D(fixed::FromInt(i+1)+EDGE_EXPAND_DELTA, fixed::FromInt(j+1)+EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vertexes.push_back(vert);
+			}
 
-				if (j > 0 && IS_TERRAIN_PASSABLE(terrain.get(i, j-1), passClass))
-				{
-					TileEdge e = { i, j, TileEdge::BOTTOM };
-					tileEdges.push_back(e);
-					any = true;
-				}
+			if (IS_PASSABLE(grid.get(i-1, j), passClass) && IS_PASSABLE(grid.get(i, j+1), passClass) && IS_PASSABLE(grid.get(i-1, j+1), passClass))
+			{
+				Vertex vert;
+				vert.status = Vertex::UNEXPLORED;
+				vert.quadOutward = QUADRANT_ALL;
+				vert.quadInward = QUADRANT_BR;
+				vert.p = CFixedVector2D(fixed::FromInt(i)-EDGE_EXPAND_DELTA, fixed::FromInt(j+1)+EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vertexes.push_back(vert);
+			}
 
-				if (j < terrain.m_H-1 && IS_TERRAIN_PASSABLE(terrain.get(i, j+1), passClass))
-				{
-					TileEdge e = { i, j, TileEdge::TOP };
-					tileEdges.push_back(e);
-					any = true;
-				}
+			if (IS_PASSABLE(grid.get(i+1, j), passClass) && IS_PASSABLE(grid.get(i, j-1), passClass) && IS_PASSABLE(grid.get(i+1, j-1), passClass))
+			{
+				Vertex vert;
+				vert.status = Vertex::UNEXPLORED;
+				vert.quadOutward = QUADRANT_ALL;
+				vert.quadInward = QUADRANT_TL;
+				vert.p = CFixedVector2D(fixed::FromInt(i+1)+EDGE_EXPAND_DELTA, fixed::FromInt(j)-EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vertexes.push_back(vert);
+			}
 
-				if (i > 0 && IS_TERRAIN_PASSABLE(terrain.get(i-1, j), passClass))
-				{
-					TileEdge e = { i, j, TileEdge::LEFT };
-					tileEdges.push_back(e);
-					any = true;
-				}
+			if (IS_PASSABLE(grid.get(i-1, j), passClass) && IS_PASSABLE(grid.get(i, j-1), passClass) && IS_PASSABLE(grid.get(i-1, j-1), passClass))
+			{
+				Vertex vert;
+				vert.status = Vertex::UNEXPLORED;
+				vert.quadOutward = QUADRANT_ALL;
+				vert.quadInward = QUADRANT_TR;
+				vert.p = CFixedVector2D(fixed::FromInt(i)-EDGE_EXPAND_DELTA, fixed::FromInt(j)-EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vertexes.push_back(vert);
+			}
+		}
+	}
 
-				if (i < terrain.m_W-1 && IS_TERRAIN_PASSABLE(terrain.get(i+1, j), passClass))
-				{
-					TileEdge e = { i, j, TileEdge::RIGHT };
-					tileEdges.push_back(e);
-					any = true;
-				}
+	// XXX rewrite this stuff
 
-				// If we want to add any edge, then add the whole square to the axis-aligned-edges list.
-				// (The inner edges are redundant but it's easier than trying to split the squares apart.)
-				if (any)
+	for (int j = j0; j < j1; ++j)
+	{
+		std::vector<u16> segmentsR;
+		std::vector<u16> segmentsL;
+
+		for (int i = i0; i <= i1; ++i)
+		{
+			bool a = IS_PASSABLE(grid.get(i, j+1), passClass);
+			bool b = IS_PASSABLE(grid.get(i, j), passClass);
+			if (a && !b)
+				segmentsL.push_back(i);
+			if (b && !a)
+				segmentsR.push_back(i);
+		}
+
+		if (!segmentsR.empty())
+		{
+			segmentsR.push_back(0); // sentinel value to simplify the loop
+			u16 ia = segmentsR[0];
+			u16 ib = ia + 1;
+			for (size_t n = 1; n < segmentsR.size(); ++n)
+			{
+				if (segmentsR[n] == ib)
+					++ib;
+				else
 				{
-					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(i * (int)TERRAIN_TILE_SIZE) - r, fixed::FromInt(j * (int)TERRAIN_TILE_SIZE) - r);
-					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt((i+1) * (int)TERRAIN_TILE_SIZE) + r, fixed::FromInt((j+1) * (int)TERRAIN_TILE_SIZE) + r);
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(ia), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(ib), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
 					Edge e = { v0, v1 };
-					edgesAA.push_back(e);
+					edges.push_back(e);
+
+					ia = segmentsR[n];
+					ib = ia + 1;
+				}
+			}
+		}
+
+		if (!segmentsL.empty())
+		{
+			segmentsL.push_back(0); // sentinel value to simplify the loop
+			u16 ia = segmentsL[0];
+			u16 ib = ia + 1;
+			for (size_t n = 1; n < segmentsL.size(); ++n)
+			{
+				if (segmentsL[n] == ib)
+					++ib;
+				else
+				{
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(ib), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(ia), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					Edge e = { v0, v1 };
+					edges.push_back(e);
+
+					ia = segmentsL[n];
+					ib = ia + 1;
 				}
 			}
 		}
 	}
 
-	// TODO: maybe we should precompute these terrain edges since they'll rarely change?
-
-	// TODO: for efficiency (minimising the A* search space), we should coalesce adjoining edges
-
-	// Add all the tile outer edges to the search vertex lists
-	for (size_t n = 0; n < tileEdges.size(); ++n)
+	for (int i = i0; i < i1; ++i)
 	{
-		u16 i = tileEdges[n].i;
-		u16 j = tileEdges[n].j;
-		CFixedVector2D v0, v1;
-		Vertex vert;
-		vert.status = Vertex::UNEXPLORED;
-		vert.quadOutward = QUADRANT_ALL;
+		std::vector<u16> segmentsU;
+		std::vector<u16> segmentsD;
 
-		switch (tileEdges[n].dir)
+		for (int j = j0; j <= j1; ++j)
 		{
-		case TileEdge::BOTTOM:
-		{
-			v0 = CFixedVector2D(fixed::FromInt(i * (int)TERRAIN_TILE_SIZE) - r, fixed::FromInt(j * (int)TERRAIN_TILE_SIZE) - r);
-			v1 = CFixedVector2D(fixed::FromInt((i+1) * (int)TERRAIN_TILE_SIZE) + r, fixed::FromInt(j * (int)TERRAIN_TILE_SIZE) - r);
-			vert.p.X = v0.X - EDGE_EXPAND_DELTA; vert.p.Y = v0.Y - EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_TR; vertexes.push_back(vert);
-			vert.p.X = v1.X + EDGE_EXPAND_DELTA; vert.p.Y = v1.Y - EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_TL; vertexes.push_back(vert);
-			break;
+			bool a = IS_PASSABLE(grid.get(i+1, j), passClass);
+			bool b = IS_PASSABLE(grid.get(i, j), passClass);
+			if (a && !b)
+				segmentsU.push_back(j);
+			if (b && !a)
+				segmentsD.push_back(j);
 		}
-		case TileEdge::TOP:
+
+		if (!segmentsU.empty())
 		{
-			v0 = CFixedVector2D(fixed::FromInt((i+1) * (int)TERRAIN_TILE_SIZE) + r, fixed::FromInt((j+1) * (int)TERRAIN_TILE_SIZE) + r);
-			v1 = CFixedVector2D(fixed::FromInt(i * (int)TERRAIN_TILE_SIZE) - r, fixed::FromInt((j+1) * (int)TERRAIN_TILE_SIZE) + r);
-			vert.p.X = v0.X + EDGE_EXPAND_DELTA; vert.p.Y = v0.Y + EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_BL; vertexes.push_back(vert);
-			vert.p.X = v1.X - EDGE_EXPAND_DELTA; vert.p.Y = v1.Y + EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_BR; vertexes.push_back(vert);
-			break;
+			segmentsU.push_back(0); // sentinel value to simplify the loop
+			u16 ja = segmentsU[0];
+			u16 jb = ja + 1;
+			for (size_t n = 1; n < segmentsU.size(); ++n)
+			{
+				if (segmentsU[n] == jb)
+					++jb;
+				else
+				{
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(ja)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(jb)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					Edge e = { v0, v1 };
+					edges.push_back(e);
+
+					ja = segmentsU[n];
+					jb = ja + 1;
+				}
+			}
 		}
-		case TileEdge::LEFT:
+
+		if (!segmentsD.empty())
 		{
-			v0 = CFixedVector2D(fixed::FromInt(i * (int)TERRAIN_TILE_SIZE) - r, fixed::FromInt((j+1) * (int)TERRAIN_TILE_SIZE) + r);
-			v1 = CFixedVector2D(fixed::FromInt(i * (int)TERRAIN_TILE_SIZE) - r, fixed::FromInt(j * (int)TERRAIN_TILE_SIZE) - r);
-			vert.p.X = v0.X - EDGE_EXPAND_DELTA; vert.p.Y = v0.Y + EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_BR; vertexes.push_back(vert);
-			vert.p.X = v1.X - EDGE_EXPAND_DELTA; vert.p.Y = v1.Y - EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_TR; vertexes.push_back(vert);
-			break;
-		}
-		case TileEdge::RIGHT:
-		{
-			v0 = CFixedVector2D(fixed::FromInt((i+1) * (int)TERRAIN_TILE_SIZE) + r, fixed::FromInt(j * (int)TERRAIN_TILE_SIZE) - r);
-			v1 = CFixedVector2D(fixed::FromInt((i+1) * (int)TERRAIN_TILE_SIZE) + r, fixed::FromInt((j+1) * (int)TERRAIN_TILE_SIZE) + r);
-			vert.p.X = v0.X + EDGE_EXPAND_DELTA; vert.p.Y = v0.Y - EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_TL; vertexes.push_back(vert);
-			vert.p.X = v1.X + EDGE_EXPAND_DELTA; vert.p.Y = v1.Y + EDGE_EXPAND_DELTA; vert.quadInward = QUADRANT_BL; vertexes.push_back(vert);
-			break;
-		}
+			segmentsD.push_back(0); // sentinel value to simplify the loop
+			u16 ja = segmentsD[0];
+			u16 jb = ja + 1;
+			for (size_t n = 1; n < segmentsD.size(); ++n)
+			{
+				if (segmentsD[n] == jb)
+					++jb;
+				else
+				{
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(jb)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(ja)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					Edge e = { v0, v1 };
+					edges.push_back(e);
+
+					ja = segmentsD[n];
+					jb = ja + 1;
+				}
+			}
 		}
 	}
 }
 
 static void SplitAAEdges(CFixedVector2D a,
-		const std::vector<Edge>& edgesAA,
+		const std::vector<Edge>& edges,
+		const std::vector<Square>& squares,
+		std::vector<Edge>& edgesUnaligned,
 		std::vector<EdgeAA>& edgesLeft, std::vector<EdgeAA>& edgesRight,
 		std::vector<EdgeAA>& edgesBottom, std::vector<EdgeAA>& edgesTop)
 {
-	edgesLeft.reserve(edgesAA.size());
-	edgesRight.reserve(edgesAA.size());
-	edgesBottom.reserve(edgesAA.size());
-	edgesTop.reserve(edgesAA.size());
+	edgesLeft.reserve(squares.size());
+	edgesRight.reserve(squares.size());
+	edgesBottom.reserve(squares.size());
+	edgesTop.reserve(squares.size());
 
-	for (size_t i = 0; i < edgesAA.size(); ++i)
+	for (size_t i = 0; i < squares.size(); ++i)
 	{
-		if (a.X <= edgesAA[i].p0.X)
+		if (a.X <= squares[i].p0.X)
 		{
-			EdgeAA e = { edgesAA[i].p0, edgesAA[i].p1.Y };
+			EdgeAA e = { squares[i].p0, squares[i].p1.Y };
 			edgesLeft.push_back(e);
 		}
-		if (a.X >= edgesAA[i].p1.X)
+		if (a.X >= squares[i].p1.X)
 		{
-			EdgeAA e = { edgesAA[i].p1, edgesAA[i].p0.Y };
+			EdgeAA e = { squares[i].p1, squares[i].p0.Y };
 			edgesRight.push_back(e);
 		}
-		if (a.Y <= edgesAA[i].p0.Y)
+		if (a.Y <= squares[i].p0.Y)
 		{
-			EdgeAA e = { edgesAA[i].p0, edgesAA[i].p1.X };
+			EdgeAA e = { squares[i].p0, squares[i].p1.X };
 			edgesBottom.push_back(e);
 		}
-		if (a.Y >= edgesAA[i].p1.Y)
+		if (a.Y >= squares[i].p1.Y)
 		{
-			EdgeAA e = { edgesAA[i].p1, edgesAA[i].p0.X };
+			EdgeAA e = { squares[i].p1, squares[i].p0.X };
 			edgesTop.push_back(e);
+		}
+	}
+
+	for (size_t i = 0; i < edges.size(); ++i)
+	{
+		if (edges[i].p0.X == edges[i].p1.X)
+		{
+			if (edges[i].p1.Y < edges[i].p0.Y)
+			{
+				if (!(a.X <= edges[i].p0.X))
+					continue;
+				EdgeAA e = { edges[i].p1, edges[i].p0.Y };
+				edgesLeft.push_back(e);
+			}
+			else
+			{
+				if (!(a.X >= edges[i].p0.X))
+					continue;
+				EdgeAA e = { edges[i].p1, edges[i].p0.Y };
+				edgesRight.push_back(e);
+			}
+		}
+		else if (edges[i].p0.Y == edges[i].p1.Y)
+		{
+			if (edges[i].p0.X < edges[i].p1.X)
+			{
+				if (!(a.Y <= edges[i].p0.Y))
+					continue;
+				EdgeAA e = { edges[i].p0, edges[i].p1.X };
+				edgesBottom.push_back(e);
+			}
+			else
+			{
+				if (!(a.Y >= edges[i].p0.Y))
+					continue;
+				EdgeAA e = { edges[i].p0, edges[i].p1.X };
+				edgesTop.push_back(e);
+			}
+		}
+		else
+		{
+			edgesUnaligned.push_back(edges[i]);
 		}
 	}
 }
 
 /**
- * Functor for sorting edges by approximate proximity to a fixed point.
+ * Functor for sorting edge-squares by approximate proximity to a fixed point.
  */
-struct EdgeSort
+struct SquareSort
 {
 	CFixedVector2D src;
-	EdgeSort(CFixedVector2D src) : src(src) { }
-	bool operator()(const Edge& a, const Edge& b)
+	SquareSort(CFixedVector2D src) : src(src) { }
+	bool operator()(const Square& a, const Square& b)
 	{
 		if ((a.p0 - src).CompareLength(b.p0 - src) < 0)
 			return true;
@@ -495,12 +624,12 @@ struct EdgeSort
 
 void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	entity_pos_t x0, entity_pos_t z0, entity_pos_t r,
-	entity_pos_t range, const Goal& goal, pass_class_t passClass, Path& path)
+	entity_pos_t range, const PathGoal& goal, pass_class_t passClass, Path& path)
 {
 	UpdateGrid(); // TODO: only need to bother updating if the terrain changed
 
 	PROFILE3("ComputeShortPath");
-//	ScopeTimer UID__(L"ComputeShortPath");
+	TIMER(L"ComputeShortPath");
 
 	m_DebugOverlayShortPathLines.clear();
 
@@ -511,17 +640,19 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 		m_DebugOverlayShortPathLines.back().m_Color = CColor(1, 0, 0, 1);
 		switch (goal.type)
 		{
-		case CCmpPathfinder::Goal::POINT:
+		case PathGoal::POINT:
 		{
 			SimRender::ConstructCircleOnGround(GetSimContext(), goal.x.ToFloat(), goal.z.ToFloat(), 0.2f, m_DebugOverlayShortPathLines.back(), true);
 			break;
 		}
-		case CCmpPathfinder::Goal::CIRCLE:
+		case PathGoal::CIRCLE:
+		case PathGoal::INVERTED_CIRCLE:
 		{
 			SimRender::ConstructCircleOnGround(GetSimContext(), goal.x.ToFloat(), goal.z.ToFloat(), goal.hw.ToFloat(), m_DebugOverlayShortPathLines.back(), true);
 			break;
 		}
-		case CCmpPathfinder::Goal::SQUARE:
+		case PathGoal::SQUARE:
+		case PathGoal::INVERTED_SQUARE:
 		{
 			float a = atan2f(goal.v.X.ToFloat(), goal.v.Y.ToFloat());
 			SimRender::ConstructSquareOnGround(GetSimContext(), goal.x.ToFloat(), goal.z.ToFloat(), goal.hw.ToFloat()*2, goal.hh.ToFloat()*2, a, m_DebugOverlayShortPathLines.back(), true);
@@ -533,7 +664,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	// List of collision edges - paths must never cross these.
 	// (Edges are one-sided so intersections are fine in one direction, but not the other direction.)
 	std::vector<Edge> edges;
-	std::vector<Edge> edgesAA; // axis-aligned squares
+	std::vector<Square> edgeSquares; // axis-aligned squares; equivalent to 4 edges
 
 	// Create impassable edges at the max-range boundary, so we can't escape the region
 	// where we're meant to be searching
@@ -574,9 +705,9 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	// Add terrain obstructions
 	{
 		u16 i0, j0, i1, j1;
-		NearestTile(rangeXMin, rangeZMin, i0, j0);
-		NearestTile(rangeXMax, rangeZMax, i1, j1);
-		AddTerrainEdges(edgesAA, vertexes, i0, j0, i1, j1, r, passClass, *m_Grid);
+		NearestNavcell(rangeXMin, rangeZMin, i0, j0);
+		NearestNavcell(rangeXMax, rangeZMax, i1, j1);
+		AddTerrainEdges(edges, vertexes, i0, j0, i1, j1, passClass, *m_Grid);
 	}
 
 	// Find all the obstruction squares that might affect us
@@ -586,7 +717,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 
 	// Resize arrays to reduce reallocations
 	vertexes.reserve(vertexes.size() + squares.size()*4);
-	edgesAA.reserve(edgesAA.size() + squares.size()); // (assume most squares are AA)
+	edgeSquares.reserve(edgeSquares.size() + squares.size()); // (assume most squares are AA)
 
 	// Convert each obstruction square into collision edges and search graph vertexes
 	for (size_t i = 0; i < squares.size(); ++i)
@@ -615,7 +746,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 
 		// Add the edges:
 
-		CFixedVector2D h0(squares[i].hw + r, squares[i].hh + r);
+		CFixedVector2D h0(squares[i].hw + r,   squares[i].hh + r);
 		CFixedVector2D h1(squares[i].hw + r, -(squares[i].hh + r));
 
 		CFixedVector2D ev0(center.X - h0.Dot(u), center.Y + h0.Dot(v));
@@ -624,8 +755,8 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 		CFixedVector2D ev3(center.X + h1.Dot(u), center.Y - h1.Dot(v));
 		if (aa)
 		{
-			Edge e = { ev1, ev3 };
-			edgesAA.push_back(e);
+			Square e = { ev1, ev3 };
+			edgeSquares.push_back(e);
 		}
 		else
 		{
@@ -645,36 +776,75 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 
 	ENSURE(vertexes.size() < 65536); // we store array indexes as u16
 
+	// Render the debug overlay
 	if (m_DebugOverlay)
 	{
-		// Render the obstruction edges
+#define PUSH_POINT(p) xz.push_back(p.X.ToFloat()); xz.push_back(p.Y.ToFloat());
+		// Render the vertexes as little Pac-Man shapes to indicate quadrant direction
+		for (size_t i = 0; i < vertexes.size(); ++i)
+		{
+			m_DebugOverlayShortPathLines.push_back(SOverlayLine());
+			m_DebugOverlayShortPathLines.back().m_Color = CColor(1, 1, 0, 1);
+
+			float x = vertexes[i].p.X.ToFloat();
+			float z = vertexes[i].p.Y.ToFloat();
+
+			float a0 = 0, a1 = 0;
+			// Get arc start/end angles depending on quadrant (if any)
+			if      (vertexes[i].quadInward == QUADRANT_BL) { a0 = -0.25f; a1 = 0.50f; }
+			else if (vertexes[i].quadInward == QUADRANT_TR) { a0 =  0.25f; a1 = 1.00f; }
+			else if (vertexes[i].quadInward == QUADRANT_TL) { a0 = -0.50f; a1 = 0.25f; }
+			else if (vertexes[i].quadInward == QUADRANT_BR) { a0 =  0.00f; a1 = 0.75f; }
+
+			if (a0 == a1)
+				SimRender::ConstructCircleOnGround(GetSimContext(), x, z, 0.5f,
+					m_DebugOverlayShortPathLines.back(), true);
+			else
+				SimRender::ConstructClosedArcOnGround(GetSimContext(), x, z, 0.5f,
+					a0 * ((float)M_PI*2.0f), a1 * ((float)M_PI*2.0f),
+					m_DebugOverlayShortPathLines.back(), true);
+		}
+
+		// Render the edges
 		for (size_t i = 0; i < edges.size(); ++i)
 		{
 			m_DebugOverlayShortPathLines.push_back(SOverlayLine());
 			m_DebugOverlayShortPathLines.back().m_Color = CColor(0, 1, 1, 1);
 			std::vector<float> xz;
-			xz.push_back(edges[i].p0.X.ToFloat());
-			xz.push_back(edges[i].p0.Y.ToFloat());
-			xz.push_back(edges[i].p1.X.ToFloat());
-			xz.push_back(edges[i].p1.Y.ToFloat());
+			PUSH_POINT(edges[i].p0);
+			PUSH_POINT(edges[i].p1);
+
+			// Add an arrowhead to indicate the direction
+			CFixedVector2D d = edges[i].p1 - edges[i].p0;
+			d.Normalize(fixed::FromInt(1)/8);
+			CFixedVector2D p2 = edges[i].p1 - d*2;
+			CFixedVector2D p3 = p2 + d.Perpendicular();
+			CFixedVector2D p4 = p2 - d.Perpendicular();
+			PUSH_POINT(p3);
+			PUSH_POINT(p4);
+			PUSH_POINT(edges[i].p1);
+
 			SimRender::ConstructLineOnGround(GetSimContext(), xz, m_DebugOverlayShortPathLines.back(), true);
 		}
+#undef PUSH_POINT
 
-		for (size_t i = 0; i < edgesAA.size(); ++i)
+		// Render the axis-aligned squares
+		for (size_t i = 0; i < edgeSquares.size(); ++i)
 		{
 			m_DebugOverlayShortPathLines.push_back(SOverlayLine());
 			m_DebugOverlayShortPathLines.back().m_Color = CColor(0, 1, 1, 1);
 			std::vector<float> xz;
-			xz.push_back(edgesAA[i].p0.X.ToFloat());
-			xz.push_back(edgesAA[i].p0.Y.ToFloat());
-			xz.push_back(edgesAA[i].p0.X.ToFloat());
-			xz.push_back(edgesAA[i].p1.Y.ToFloat());
-			xz.push_back(edgesAA[i].p1.X.ToFloat());
-			xz.push_back(edgesAA[i].p1.Y.ToFloat());
-			xz.push_back(edgesAA[i].p1.X.ToFloat());
-			xz.push_back(edgesAA[i].p0.Y.ToFloat());
-			xz.push_back(edgesAA[i].p0.X.ToFloat());
-			xz.push_back(edgesAA[i].p0.Y.ToFloat());
+			Square s = edgeSquares[i];
+			xz.push_back(s.p0.X.ToFloat());
+			xz.push_back(s.p0.Y.ToFloat());
+			xz.push_back(s.p0.X.ToFloat());
+			xz.push_back(s.p1.Y.ToFloat());
+			xz.push_back(s.p1.X.ToFloat());
+			xz.push_back(s.p1.Y.ToFloat());
+			xz.push_back(s.p1.X.ToFloat());
+			xz.push_back(s.p0.Y.ToFloat());
+			xz.push_back(s.p0.X.ToFloat());
+			xz.push_back(s.p0.Y.ToFloat());
 			SimRender::ConstructLineOnGround(GetSimContext(), xz, m_DebugOverlayShortPathLines.back(), true);
 		}
 	}
@@ -714,13 +884,15 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 
 		// Sort the edges so ones nearer this vertex are checked first by CheckVisibility,
 		// since they're more likely to block the rays
-		std::sort(edgesAA.begin(), edgesAA.end(), EdgeSort(vertexes[curr.id].p));
+		std::sort(edgeSquares.begin(), edgeSquares.end(), SquareSort(vertexes[curr.id].p));
 
+		std::vector<Edge> edgesUnaligned;
 		std::vector<EdgeAA> edgesLeft;
 		std::vector<EdgeAA> edgesRight;
 		std::vector<EdgeAA> edgesBottom;
 		std::vector<EdgeAA> edgesTop;
-		SplitAAEdges(vertexes[curr.id].p, edgesAA, edgesLeft, edgesRight, edgesBottom, edgesTop);
+		SplitAAEdges(vertexes[curr.id].p, edges, edgeSquares, edgesUnaligned, edgesLeft, edgesRight, edgesBottom, edgesTop);
+		//debug_printf(L"edges: e=%d aa=%d; u=%d l=%d r=%d b=%d t=%d\n", edges.size(), edgeSquares.size(), edgesUnaligned.size(), edgesLeft.size(), edgesRight.size(), edgesBottom.size(), edgesTop.size());
 
 		// Check the lines to every other vertex
 		for (size_t n = 0; n < vertexes.size(); ++n)
@@ -768,7 +940,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 				CheckVisibilityRight(vertexes[curr.id].p, npos, edgesRight) &&
 				CheckVisibilityBottom(vertexes[curr.id].p, npos, edgesBottom) &&
 				CheckVisibilityTop(vertexes[curr.id].p, npos, edgesTop) &&
-				CheckVisibility(vertexes[curr.id].p, npos, edges);
+				CheckVisibility(vertexes[curr.id].p, npos, edgesUnaligned);
 
 			/*
 			// Render the edges that we examine
@@ -792,7 +964,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 					// Add it to the open list:
 					vertexes[n].status = Vertex::OPEN;
 					vertexes[n].g = g;
-					vertexes[n].h = DistanceToGoal(npos, goal);
+					vertexes[n].h = goal.DistanceToPoint(npos);
 					vertexes[n].pred = curr.id;
 
 					// If this is an axis-aligned shape, the path must continue in the same quadrant
@@ -823,6 +995,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 						continue;
 
 					// Otherwise, we have a better path, so replace the old one with the new cost/parent
+					fixed gprev = vertexes[n].g;
 					vertexes[n].g = g;
 					vertexes[n].pred = curr.id;
 
@@ -834,7 +1007,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 					if (n == GOAL_VERTEX_ID)
 						vertexes[n].p = npos; // remember the new best goal position
 
-					open.promote((u16)n, g + vertexes[n].h);
+					open.promote((u16)n, gprev + vertexes[n].h, g + vertexes[n].h);
 				}
 			}
 		}
@@ -854,6 +1027,8 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 	entity_pos_t x0, entity_pos_t z0, entity_pos_t x1, entity_pos_t z1, entity_pos_t r,
 	pass_class_t passClass)
 {
+	// Test against dynamic obstructions first
+
 	CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSystemEntity());
 	if (!cmpObstructionManager)
 		return false;
@@ -861,34 +1036,95 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 	if (cmpObstructionManager->TestLine(filter, x0, z0, x1, z1, r))
 		return false;
 
-	// Test against terrain:
+	// Test against the passability grid.
+	// This should ignore r, and just check that the line (x0,z0)-(x1,z1)
+	// does not intersect any impassable navcells.
+	// We shouldn't allow lines between diagonally-adjacent navcells.
+	// It doesn't matter whether we allow lines precisely along the edge
+	// of an impassable navcell.
 
-	// (TODO: this could probably be a tiny bit faster by not reusing all the vertex computation code)
+	// To rasterise the line:
+	// If the line is (e.g.) aiming up-right, then we start at the navcell
+	// containing the start point and the line must either end in that navcell
+	// or else exit along the top edge or the right edge (or through the top-right corner,
+	// which we'll arbitrary treat as the horizontal edge).
+	// So we jump into the adjacent navcell across that edge, and continue.
+
+	// To handle the special case of units that are stuck on impassable cells,
+	// we allow them to move from an impassable to a passable cell (but not
+	// vice versa).
 
 	UpdateGrid();
 
-	std::vector<Edge> edgesAA;
-	std::vector<Vertex> vertexes;
-
 	u16 i0, j0, i1, j1;
-	NearestTile(std::min(x0, x1) - r, std::min(z0, z1) - r, i0, j0);
-	NearestTile(std::max(x0, x1) + r, std::max(z0, z1) + r, i1, j1);
-	AddTerrainEdges(edgesAA, vertexes, i0, j0, i1, j1, r, passClass, *m_Grid);
+	NearestNavcell(x0, z0, i0, j0);
+	NearestNavcell(x1, z1, i1, j1);
 
-	CFixedVector2D a(x0, z0);
-	CFixedVector2D b(x1, z1);
+	// Find which direction the line heads in
+	int di = (i0 < i1 ? +1 : i1 < i0 ? -1 : 0);
+	int dj = (j0 < j1 ? +1 : j1 < j0 ? -1 : 0);
 
-	std::vector<EdgeAA> edgesLeft;
-	std::vector<EdgeAA> edgesRight;
-	std::vector<EdgeAA> edgesBottom;
-	std::vector<EdgeAA> edgesTop;
-	SplitAAEdges(a, edgesAA, edgesLeft, edgesRight, edgesBottom, edgesTop);
+	u16 i = i0;
+	u16 j = j0;
 
-	bool visible =
-		CheckVisibilityLeft(a, b, edgesLeft) &&
-		CheckVisibilityRight(a, b, edgesRight) &&
-		CheckVisibilityBottom(a, b, edgesBottom) &&
-		CheckVisibilityTop(a, b, edgesTop);
+// 	debug_printf(L"(%f,%f)..(%f,%f) [%d,%d]..[%d,%d]\n", x0.ToFloat(), z0.ToFloat(), x1.ToFloat(), z1.ToFloat(), i0, j0, i1, j1);
 
-	return visible;
+	bool currentlyOnImpassable = !IS_PASSABLE(m_Grid->get(i0, j0), passClass);
+
+	while (true)
+	{
+		// Fail if we're moving onto an impassable navcell
+		bool passable = IS_PASSABLE(m_Grid->get(i, j), passClass);
+		if (passable)
+			currentlyOnImpassable = false;
+		else if (!currentlyOnImpassable)
+			return false;
+
+		// Succeed if we're at the target
+		if (i == i1 && j == j1)
+			return true;
+
+		// If we can only move horizontally/vertically, then just move in that direction
+		if (di == 0)
+		{
+			j += dj;
+			continue;
+		}
+		else if (dj == 0)
+		{
+			i += di;
+			continue;
+		}
+
+		// Otherwise we need to check which cell to move into:
+
+		// Check whether the line intersects the horizontal (top/bottom) edge of
+		// the current navcell.
+		// Horizontal edge is (i, j + (dj>0?1:0)) .. (i + 1, j + (dj>0?1:0))
+		// Since we already know the line is moving from this navcell into a different
+		// navcell, we simply need to test that the edge's endpoints are not both on the
+		// same side of the line.
+
+		entity_pos_t xia = entity_pos_t::FromInt(i).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+		entity_pos_t xib = entity_pos_t::FromInt(i+1).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+		entity_pos_t zj = entity_pos_t::FromInt(j + (dj+1)/2).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+
+		CFixedVector2D perp = CFixedVector2D(x1 - x0, z1 - z0).Perpendicular();
+		entity_pos_t dota = (CFixedVector2D(xia, zj) - CFixedVector2D(x0, z0)).Dot(perp);
+		entity_pos_t dotb = (CFixedVector2D(xib, zj) - CFixedVector2D(x0, z0)).Dot(perp);
+
+// 		debug_printf(L"(%f,%f)-(%f,%f) :: %f %f\n", xia.ToFloat(), zj.ToFloat(), xib.ToFloat(), zj.ToFloat(), dota.ToFloat(), dotb.ToFloat());
+
+		if ((dota < entity_pos_t::Zero() && dotb < entity_pos_t::Zero()) ||
+		    (dota > entity_pos_t::Zero() && dotb > entity_pos_t::Zero()))
+		{
+			// Horizontal edge is fully on one side of the line, so the line doesn't
+			// intersect it, so we should move across the vertical edge instead
+			i += di;
+		}
+		else
+		{
+			j += dj;
+		}
+	}
 }

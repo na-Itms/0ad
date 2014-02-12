@@ -1,4 +1,4 @@
-/* Copyright (C) 2010 Wildfire Games.
+/* Copyright (C) 2012 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -30,19 +30,13 @@
 #include "renderer/TerrainOverlay.h"
 #include "simulation2/helpers/PriorityQueue.h"
 
-typedef PriorityQueueHeap<std::pair<u16, u16>, u32> PriorityQueue;
+#define PATHFIND_STATS 1
 
-#define PATHFIND_STATS 0
-
-#define USE_DIAGONAL_MOVEMENT 1
-
-// Heuristic cost to move between adjacent tiles.
-// This should be similar to DEFAULT_MOVE_COST.
-const u32 g_CostPerTile = 256;
+typedef PriorityQueueHeap<TileID, PathCost> PriorityQueue;
 
 /**
  * Tile data for A* computation.
- * (We store an array of one of these per terrain tile, so it ought to be optimised for size)
+ * (We store an array of one of these per terrain navcell, so it ought to be optimized for size)
  */
 struct PathfindTile
 {
@@ -63,24 +57,26 @@ public:
 	u16 GetPredI(u16 i) { return (u16)(i + dpi); }
 	u16 GetPredJ(u16 j) { return (u16)(j + dpj); }
 	// Set the pi,pj coords of predecessor, given i,j coords of this tile
-	void SetPred(u16 pi_, u16 pj_, u16 i, u16 j)
+	void SetPred(u16 pi, u16 pj, u16 i, u16 j)
 	{
-		dpi = (i8)((int)pi_ - (int)i);
-		dpj = (i8)((int)pj_ - (int)j);
 #if PATHFIND_DEBUG
 		// predecessor must be adjacent
-		ENSURE(pi_-i == -1 || pi_-i == 0 || pi_-i == 1);
-		ENSURE(pj_-j == -1 || pj_-j == 0 || pj_-j == 1);
+		ENSURE(pi-i == -1 || pi-i == 0 || pi-i == 1);
+		ENSURE(pj-j == -1 || pj-j == 0 || pj-j == 1);
 #endif
+		dpi = (i8)((int)pi - (int)i);
+		dpj = (i8)((int)pj - (int)j);
 	}
 
-private:
-	u8 status; // this only needs 2 bits
-	i8 dpi, dpj; // these only really need 2 bits in total
-public:
-	u32 cost; // g (cost to this tile)
-	u32 h; // h (heuristic cost to goal) (TODO: is it really better for performance to store this instead of recomputing?)
+	PathCost GetCost() const { return g; }
+	void SetCost(PathCost cost) { g = cost; }
 
+private:
+	i8 dpi, dpj; // values are in {-1, 0, 1}, pointing to an adjacent tile
+	u8 status; // this only needs 2 bits
+	PathCost g; // cost to reach this tile
+
+public:
 #if PATHFIND_DEBUG
 	u32 GetStep() { return step; }
 	void SetStep(u32 s) { step = s; }
@@ -97,50 +93,92 @@ private:
  * Terrain overlay for pathfinder debugging.
  * Renders a representation of the most recent pathfinding operation.
  */
-class PathfinderOverlay : public TerrainOverlay
+class PathfinderOverlay : public TerrainTextureOverlay
 {
-	NONCOPYABLE(PathfinderOverlay);
 public:
 	CCmpPathfinder& m_Pathfinder;
 
-	PathfinderOverlay(CCmpPathfinder& pathfinder)
-		: TerrainOverlay(pathfinder.GetSimContext()), m_Pathfinder(pathfinder)
+	PathfinderOverlay(CCmpPathfinder& pathfinder) :
+		TerrainTextureOverlay(ICmpObstructionManager::NAVCELLS_PER_TILE), m_Pathfinder(pathfinder)
 	{
 	}
 
-	virtual void StartRender()
+	virtual void BuildTextureRGBA(u8* data, size_t w, size_t h)
 	{
+		// Ensure m_Pathfinder.m_Grid is up-to-date
 		m_Pathfinder.UpdateGrid();
-	}
 
-	virtual void ProcessTile(ssize_t i, ssize_t j)
-	{
-		if (m_Pathfinder.m_Grid && !IS_PASSABLE(m_Pathfinder.m_Grid->get((int)i, (int)j), m_Pathfinder.m_DebugPassClass))
-			RenderTile(CColor(1, 0, 0, 0.6f), false);
+		// Grab the debug data for the most recently generated path
+		u32 steps;
+		double time;
+		Grid<u8> debugGrid;
+		if (m_Pathfinder.m_DebugGridJPS)
+			m_Pathfinder.GetDebugDataJPS(steps, time, debugGrid);
+		else if (m_Pathfinder.m_DebugGrid)
+			m_Pathfinder.GetDebugData(steps, time, debugGrid);
 
-		if (m_Pathfinder.m_DebugGrid)
+		// Render navcell passability
+		u8* p = data;
+		for (size_t j = 0; j < h; ++j)
 		{
-			PathfindTile& n = m_Pathfinder.m_DebugGrid->get((int)i, (int)j);
+			for (size_t i = 0; i < w; ++i)
+			{
+				SColor4ub color(0, 0, 0, 0);
+				if (!IS_PASSABLE(m_Pathfinder.m_Grid->get((int)i, (int)j), m_Pathfinder.m_DebugPassClass))
+					color = SColor4ub(255, 0, 0, 127);
 
-			float c = clamp((float)n.GetStep() / (float)m_Pathfinder.m_DebugSteps, 0.f, 1.f);
+				if (debugGrid.m_W && debugGrid.m_H)
+				{
+					u8 n = debugGrid.get((int)i, (int)j);
 
-			if (n.IsOpen())
-				RenderTile(CColor(1, 1, c, 0.6f), false);
-			else if (n.IsClosed())
-				RenderTile(CColor(0, 1, c, 0.6f), false);
+					if (n == 1)
+						color = SColor4ub(255, 255, 0, 127);
+					else if (n == 2)
+						color = SColor4ub(0, 255, 0, 127);
+
+					if (m_Pathfinder.m_DebugGoal.NavcellContainsGoal(i, j))
+						color = SColor4ub(0, 0, 255, 127);
+				}
+
+				*p++ = color.R;
+				*p++ = color.G;
+				*p++ = color.B;
+				*p++ = color.A;
+			}
 		}
-	}
 
-	virtual void EndRender()
-	{
-		if (m_Pathfinder.m_DebugPath)
+		// Render the most recently generated path
+		if (m_Pathfinder.m_DebugPath && !m_Pathfinder.m_DebugPath->m_Waypoints.empty())
 		{
-			std::vector<ICmpPathfinder::Waypoint>& wp = m_Pathfinder.m_DebugPath->m_Waypoints;
-			for (size_t n = 0; n < wp.size(); ++n)
+			std::vector<ICmpPathfinder::Waypoint>& waypoints = m_Pathfinder.m_DebugPath->m_Waypoints;
+			u16 ip = 0, jp = 0;
+			for (size_t k = 0; k < waypoints.size(); ++k)
 			{
 				u16 i, j;
-				m_Pathfinder.NearestTile(wp[n].x, wp[n].z, i, j);
-				RenderTileOutline(CColor(1, 1, 1, 1), 2, false, i, j);
+				m_Pathfinder.NearestNavcell(waypoints[k].x, waypoints[k].z, i, j);
+				if (k == 0)
+				{
+					ip = i;
+					jp = j;
+				}
+				else
+				{
+					bool firstCell = true;
+					do
+					{
+						if (data[(jp*w + ip)*4+3] == 0)
+						{
+							data[(jp*w + ip)*4+0] = 0xFF;
+							data[(jp*w + ip)*4+1] = 0xFF;
+							data[(jp*w + ip)*4+2] = 0xFF;
+							data[(jp*w + ip)*4+3] = firstCell ? 0xA0 : 0x60;
+						}
+						ip = ip < i ? ip+1 : ip > i ? ip-1 : ip;
+						jp = jp < j ? jp+1 : jp > j ? jp-1 : jp;
+						firstCell = false;
+					}
+					while (ip != i || jp != j);
+				}
 			}
 		}
 	}
@@ -159,50 +197,46 @@ void CCmpPathfinder::SetDebugOverlay(bool enabled)
 	}
 }
 
-void CCmpPathfinder::SetDebugPath(entity_pos_t x0, entity_pos_t z0, const Goal& goal, pass_class_t passClass, cost_class_t costClass)
+void CCmpPathfinder::SetDebugPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass)
 {
 	if (!m_DebugOverlay)
 		return;
 
-	delete m_DebugGrid;
-	m_DebugGrid = NULL;
+	SAFE_DELETE(m_DebugGrid);
 	delete m_DebugPath;
 	m_DebugPath = new Path();
-	ComputePath(x0, z0, goal, passClass, costClass, *m_DebugPath);
+#if PATHFIND_USE_JPS
+	ComputePathJPS(x0, z0, goal, passClass, *m_DebugPath);
+#else
+	ComputePath(x0, z0, goal, passClass, *m_DebugPath);
+#endif
 	m_DebugPassClass = passClass;
 }
 
 void CCmpPathfinder::ResetDebugPath()
 {
-	delete m_DebugGrid;
-	m_DebugGrid = NULL;
-	delete m_DebugPath;
-	m_DebugPath = NULL;
+	SAFE_DELETE(m_DebugGrid);
+	SAFE_DELETE(m_DebugPath);
 }
 
 
 //////////////////////////////////////////////////////////
-
 
 struct PathfinderState
 {
 	u32 steps; // number of algorithm iterations
 
 	u16 iGoal, jGoal; // goal tile
-	u16 rGoal; // radius of goal (around tile center)
 
 	ICmpPathfinder::pass_class_t passClass;
-	std::vector<u32> moveCosts;
 
 	PriorityQueue open;
 	// (there's no explicit closed list; it's encoded in PathfindTile)
 
 	PathfindTileGrid* tiles;
-	Grid<TerrainTile>* terrain;
+	Grid<NavcellData>* terrain;
 
-	bool ignoreImpassable; // allows us to escape if stuck in patches of impassability
-
-	u32 hBest; // heuristic of closest discovered tile to goal
+	PathCost hBest; // heuristic of closest discovered tile to goal
 	u16 iBest, jBest; // closest tile
 
 #if PATHFIND_STATS
@@ -215,104 +249,58 @@ struct PathfinderState
 #endif
 };
 
-static bool AtGoal(u16 i, u16 j, const ICmpPathfinder::Goal& goal)
-{
-	// Allow tiles slightly more than sqrt(2) from the actual goal,
-	// i.e. adjacent diagonally to the target tile
-	fixed tolerance = entity_pos_t::FromInt(TERRAIN_TILE_SIZE*3/2);
-
-	entity_pos_t x, z;
-	CCmpPathfinder::TileCenter(i, j, x, z);
-	fixed dist = CCmpPathfinder::DistanceToGoal(CFixedVector2D(x, z), goal);
-	return (dist < tolerance);
-}
-
-// Calculate heuristic cost from tile i,j to destination
+// Calculate heuristic cost from tile i,j to goal
 // (This ought to be an underestimate for correctness)
-static u32 CalculateHeuristic(u16 i, u16 j, u16 iGoal, u16 jGoal, u16 rGoal)
+static PathCost CalculateHeuristic(int i, int j, int iGoal, int jGoal)
 {
-#if USE_DIAGONAL_MOVEMENT
-	CFixedVector2D pos (fixed::FromInt(i), fixed::FromInt(j));
-	CFixedVector2D goal (fixed::FromInt(iGoal), fixed::FromInt(jGoal));
-	fixed dist = (pos - goal).Length();
-	// TODO: the heuristic could match the costs better - it's not really Euclidean movement
-
-	fixed rdist = dist - fixed::FromInt(rGoal);
-	rdist = rdist.Absolute();
-
-	// To avoid overflows on large distances we have to convert to int before multiplying
-	// by the full tile cost, which means we lose some accuracy over short distances,
-	// so do a partial multiplication here.
-	// (This will overflow if sqrt(2)*tilesPerSide*premul >= 32768, so
-	// premul=32 means max tilesPerSide=724)
-	const int premul = 32;
-	cassert(g_CostPerTile % premul == 0);
-	return (rdist * premul).ToInt_RoundToZero() * (g_CostPerTile / premul);
-
-#else
-	return (abs((int)i - (int)iGoal) + abs((int)j - (int)jGoal)) * g_CostPerTile;
-#endif
-}
-
-// Calculate movement cost from predecessor tile pi,pj to tile i,j
-static u32 CalculateCostDelta(u16 pi, u16 pj, u16 i, u16 j, PathfindTileGrid* tempGrid, u32 tileCost)
-{
-	u32 dg = tileCost;
-
-#if USE_DIAGONAL_MOVEMENT
-	// XXX: Probably a terrible hack:
-	// For simplicity, we only consider horizontally/vertically adjacent neighbours, but
-	// units can move along arbitrary lines. That results in ugly square paths, so we want
-	// to prefer diagonal paths.
-	// Instead of solving this nicely, I'll just special-case 45-degree and 30-degree lines
-	// by checking the three predecessor tiles (which'll be in the closed set and therefore
-	// likely to be reasonably stable) and reducing the cost, and use a Euclidean heuristic.
-	// At least this makes paths look a bit nicer for now...
-
-	PathfindTile& p = tempGrid->get(pi, pj);
-	u16 ppi = p.GetPredI(pi);
-	u16 ppj = p.GetPredJ(pj);
-	if (ppi != i && ppj != j)
-		dg = (dg << 16) / 92682; // dg*sqrt(2)/2
-	else
-	{
-		PathfindTile& pp = tempGrid->get(ppi, ppj);
-		int di = abs(i - pp.GetPredI(ppi));
-		int dj = abs(j - pp.GetPredJ(ppj));
-		if ((di == 1 && dj == 2) || (di == 2 && dj == 1))
-			dg = (dg << 16) / 79742; // dg*(sqrt(5)-sqrt(2))
-	}
-#endif
-
-	return dg;
+	int di = abs(i - iGoal);
+	int dj = abs(j - jGoal);
+	int diag = std::min(di, dj);
+	return PathCost(di-diag + dj-diag, diag);
 }
 
 // Do the A* processing for a neighbour tile i,j.
-static void ProcessNeighbour(u16 pi, u16 pj, u16 i, u16 j, u32 pg, PathfinderState& state)
+static void ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg, PathfinderState& state)
 {
 #if PATHFIND_STATS
 	state.numProcessed++;
 #endif
 
-	// Reject impassable tiles
-	TerrainTile tileTag = state.terrain->get(i, j);
-	if (!IS_PASSABLE(tileTag, state.passClass) && !state.ignoreImpassable)
+	PathfindTile& n = state.tiles->get(i, j);
+
+	if (n.IsClosed())
 		return;
 
-	u32 dg = CalculateCostDelta(pi, pj, i, j, state.tiles, state.moveCosts.at(GET_COST_CLASS(tileTag)));
+	// Reject impassable tiles
+	if (!IS_PASSABLE(state.terrain->get(i, j), state.passClass))
+		return;
+	// Also, diagonal moves are only allowed if the adjacent tiles
+	// are also unobstructed
+	if (pi != i && pj != j)
+	{
+		if (!IS_PASSABLE(state.terrain->get(pi, j), state.passClass))
+			return;
+		if (!IS_PASSABLE(state.terrain->get(i, pj), state.passClass))
+			return;
+	}
 
-	u32 g = pg + dg; // cost to this tile = cost to predecessor + delta from predecessor
+	PathCost dg;
+	if (pi == i || pj == j)
+		dg = PathCost::horizvert(1);
+	else
+		dg = PathCost::diag(1);
 
-	PathfindTile& n = state.tiles->get(i, j);
+	PathCost g = pg + dg; // cost to this tile = cost to predecessor + delta from predecessor
+
+	PathCost h = CalculateHeuristic(i, j, state.iGoal, state.jGoal);
 
 	// If this is a new tile, compute the heuristic distance
 	if (n.IsUnexplored())
 	{
-		n.h = CalculateHeuristic(i, j, state.iGoal, state.jGoal, state.rGoal);
 		// Remember the best tile we've seen so far, in case we never actually reach the target
-		if (n.h < state.hBest)
+		if (h < state.hBest)
 		{
-			state.hBest = n.h;
+			state.hBest = h;
 			state.iBest = i;
 			state.jBest = j;
 		}
@@ -321,7 +309,7 @@ static void ProcessNeighbour(u16 pi, u16 pj, u16 i, u16 j, u32 pg, PathfinderSta
 	{
 		// If we've already seen this tile, and the new path to this tile does not have a
 		// better cost, then stop now
-		if (g >= n.cost)
+		if (g >= n.GetCost())
 			return;
 
 		// Otherwise, we have a better path.
@@ -330,98 +318,99 @@ static void ProcessNeighbour(u16 pi, u16 pj, u16 i, u16 j, u32 pg, PathfinderSta
 		if (n.IsOpen())
 		{
 			// This is a better path, so replace the old one with the new cost/parent
-			n.cost = g;
+			PathCost gprev = n.GetCost();
+			n.SetCost(g);
 			n.SetPred(pi, pj, i, j);
 			n.SetStep(state.steps);
-			state.open.promote(std::make_pair(i, j), g + n.h);
+			state.open.promote(TileID(i, j), gprev + h, g + h);
 #if PATHFIND_STATS
 			state.numImproveOpen++;
 #endif
 			return;
 		}
 
+#if PATHFIND_STATS
 		// If we've already found the 'best' path to this tile:
 		if (n.IsClosed())
 		{
 			// This is a better path (possible when we use inadmissible heuristics), so reopen it
-#if PATHFIND_STATS
+			// by falling through
 			state.numImproveClosed++;
-#endif
-			// (fall through)
 		}
+#endif
 	}
 
 	// Add it to the open list:
 	n.SetStatusOpen();
-	n.cost = g;
+	n.SetCost(g);
 	n.SetPred(pi, pj, i, j);
 	n.SetStep(state.steps);
-	PriorityQueue::Item t = { std::make_pair(i, j), g + n.h };
+	PriorityQueue::Item t = { TileID(i, j), g + h };
 	state.open.push(t);
 #if PATHFIND_STATS
 	state.numAddToOpen++;
 #endif
 }
 
-void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const Goal& goal, pass_class_t passClass, cost_class_t costClass, Path& path)
+void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, Path& path)
 {
 	UpdateGrid();
 
 	PROFILE3("ComputePath");
+	TIMER(L"ComputePath");
+	double time = timer_Time();
 
 	PathfinderState state = { 0 };
 
 	// Convert the start/end coordinates to tile indexes
 	u16 i0, j0;
-	NearestTile(x0, z0, i0, j0);
-	NearestTile(goal.x, goal.z, state.iGoal, state.jGoal);
+	NearestNavcell(x0, z0, i0, j0);
+
+	// To be consistent with the JPS pathfinder (which requires passable source navcell),
+	// and to let us guarantee the goal is reachable from the source, we switch to
+	// the escape-from-impassability mode if currently on an impassable navcell
+	if (!IS_PASSABLE(m_Grid->get(i0, j0), passClass))
+	{
+		ComputePathOffImpassable(i0, j0, passClass, path);
+		return;
+	}
+
+	// Adjust the goal so that it's reachable from the source navcell
+	PathGoal goal = origGoal;
+	PathfinderHierMakeGoalReachable(i0, j0, goal, passClass);
 
 	// If we're already at the goal tile, then move directly to the exact goal coordinates
-	if (AtGoal(i0, j0, goal))
+	// XXX: this seems bogus for non-point goals, it should be the point on the current cell nearest the goal
+	if (goal.NavcellContainsGoal(i0, j0))
 	{
 		Waypoint w = { goal.x, goal.z };
 		path.m_Waypoints.push_back(w);
 		return;
 	}
 
-	// If the target is a circle, we want to aim for the edge of it (so e.g. if we're inside
-	// a large circle then the heuristics will aim us directly outwards);
-	// otherwise just aim at the center point. (We'll never try moving outwards to a square shape.)
-	if (goal.type == Goal::CIRCLE)
-		state.rGoal = (u16)(goal.hw / (int)TERRAIN_TILE_SIZE).ToInt_RoundToZero();
-	else
-		state.rGoal = 0;
+	// Store the navcell at the goal center, for A* heuristics
+	NearestNavcell(goal.x, goal.z, state.iGoal, state.jGoal);
 
 	state.passClass = passClass;
-	state.moveCosts = m_MoveCosts.at(costClass);
 
 	state.steps = 0;
 
-	state.tiles = new PathfindTileGrid(m_MapSize, m_MapSize);
+	state.tiles = new PathfindTileGrid(m_Grid->m_W, m_Grid->m_H);
 	state.terrain = m_Grid;
 
 	state.iBest = i0;
 	state.jBest = j0;
-	state.hBest = CalculateHeuristic(i0, j0, state.iGoal, state.jGoal, state.rGoal);
+	state.hBest = CalculateHeuristic(i0, j0, state.iGoal, state.jGoal);
 
-	PriorityQueue::Item start = { std::make_pair(i0, j0), 0 };
+	PriorityQueue::Item start = { TileID(i0, j0), PathCost() };
 	state.open.push(start);
 	state.tiles->get(i0, j0).SetStatusOpen();
 	state.tiles->get(i0, j0).SetPred(i0, j0, i0, j0);
-	state.tiles->get(i0, j0).cost = 0;
-
-	// To prevent units getting very stuck, if they start on an impassable tile
-	// surrounded entirely by impassable tiles, we ignore the impassability
-	state.ignoreImpassable = !IS_PASSABLE(state.terrain->get(i0, j0), state.passClass);
+	state.tiles->get(i0, j0).SetCost(PathCost());
 
 	while (1)
 	{
 		++state.steps;
-
-		// Hack to avoid spending ages computing giant paths, particularly when
-		// the destination is unreachable
-		if (state.steps > 40000)
-			break;
 
 		// If we ran out of tiles to examine, give up
 		if (state.open.empty())
@@ -433,42 +422,30 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const Goal& g
 
 		// Move best tile from open to closed
 		PriorityQueue::Item curr = state.open.pop();
-		u16 i = curr.id.first;
-		u16 j = curr.id.second;
+		u16 i = curr.id.i();
+		u16 j = curr.id.j();
 		state.tiles->get(i, j).SetStatusClosed();
 
 		// If we've reached the destination, stop
-		if (AtGoal(i, j, goal))
+		if (goal.NavcellContainsGoal(i, j))
 		{
 			state.iBest = i;
 			state.jBest = j;
-			state.hBest = 0;
+			state.hBest = PathCost();
 			break;
 		}
 
-		// As soon as we find an escape route from the impassable terrain,
-		// take it and forbid any further use of impassable tiles
-		if (state.ignoreImpassable)
-		{
-			if (i > 0 && IS_PASSABLE(state.terrain->get(i-1, j), state.passClass))
-				state.ignoreImpassable = false;
-			else if (i < m_MapSize-1 && IS_PASSABLE(state.terrain->get(i+1, j), state.passClass))
-				state.ignoreImpassable = false;
-			else if (j > 0 && IS_PASSABLE(state.terrain->get(i, j-1), state.passClass))
-				state.ignoreImpassable = false;
-			else if (j < m_MapSize-1 && IS_PASSABLE(state.terrain->get(i, j+1), state.passClass))
-				state.ignoreImpassable = false;
-		}
+		PathCost g = state.tiles->get(i, j).GetCost();
 
-		u32 g = state.tiles->get(i, j).cost;
-		if (i > 0)
-			ProcessNeighbour(i, j, (u16)(i-1), j, g, state);
-		if (i < m_MapSize-1)
-			ProcessNeighbour(i, j, (u16)(i+1), j, g, state);
-		if (j > 0)
-			ProcessNeighbour(i, j, i, (u16)(j-1), g, state);
-		if (j < m_MapSize-1)
-			ProcessNeighbour(i, j, i, (u16)(j+1), g, state);
+		// Try all 8 neighbors
+		ProcessNeighbour(i, j, i-1, j-1, g, state);
+		ProcessNeighbour(i, j, i+1, j-1, g, state);
+		ProcessNeighbour(i, j, i-1, j+1, g, state);
+		ProcessNeighbour(i, j, i+1, j+1, g, state);
+		ProcessNeighbour(i, j, i-1, j, g, state);
+		ProcessNeighbour(i, j, i+1, j, g, state);
+		ProcessNeighbour(i, j, i, j-1, g, state);
+		ProcessNeighbour(i, j, i, j+1, g, state);
 	}
 
 	// Reconstruct the path (in reverse)
@@ -477,7 +454,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const Goal& g
 	{
 		PathfindTile& n = state.tiles->get(ip, jp);
 		entity_pos_t x, z;
-		TileCenter(ip, jp, x, z);
+		NavcellCenter(ip, jp, x, z);
 		Waypoint w = { x, z };
 		path.m_Waypoints.push_back(w);
 
@@ -486,10 +463,14 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const Goal& g
 		jp = n.GetPredJ(jp);
 	}
 
+	NormalizePathWaypoints(path);
+
 	// Save this grid for debug display
+	m_DebugTime = timer_Time() - time;
 	delete m_DebugGrid;
 	m_DebugGrid = state.tiles;
 	m_DebugSteps = state.steps;
+	m_DebugGoal = goal;
 
 	PROFILE2_ATTR("from: (%d, %d)", i0, j0);
 	PROFILE2_ATTR("to: (%d, %d)", state.iGoal, state.jGoal);
@@ -497,6 +478,25 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const Goal& g
 	PROFILE2_ATTR("steps: %u", state.steps);
 
 #if PATHFIND_STATS
-	printf("PATHFINDER: steps=%d avgo=%d proc=%d impc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveClosed, state.numImproveOpen, state.numAddToOpen);
+	debug_printf(L"PATHFINDER: steps=%d avgo=%d proc=%d impc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveClosed, state.numImproveOpen, state.numAddToOpen);
 #endif
+}
+
+void CCmpPathfinder::GetDebugData(u32& steps, double& time, Grid<u8>& grid)
+{
+	steps = m_DebugSteps;
+	time = m_DebugTime;
+
+	if (!m_DebugGrid)
+		return;
+
+	grid = Grid<u8>(m_DebugGrid->m_W, m_DebugGrid->m_H);
+	for (u16 j = 0; j < grid.m_H; ++j)
+	{
+		for (u16 i = 0; i < grid.m_W; ++i)
+		{
+			PathfindTile t = m_DebugGrid->get(i, j);
+			grid.set(i, j, (t.IsOpen() ? 1 : 0) | (t.IsClosed() ? 2 : 0));
+		}
+	}
 }

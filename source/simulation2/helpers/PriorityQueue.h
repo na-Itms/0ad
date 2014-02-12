@@ -32,14 +32,13 @@
 template <typename Item, typename CMP>
 struct QueueItemPriority
 {
-	bool operator()(const Item& a, const Item& b)
+	bool operator()(const Item& a, const Item& b) const
 	{
 		if (CMP()(b.rank, a.rank)) // higher costs are lower priority
 			return true;
 		if (CMP()(a.rank, b.rank))
 			return false;
 		// Need to tie-break to get a consistent ordering
-		// TODO: Should probably tie-break on g or h or something, but don't bother for now
 		if (a.id < b.id)
 			return true;
 		if (b.id < a.id)
@@ -73,19 +72,10 @@ public:
 		push_heap(m_Heap.begin(), m_Heap.end(), QueueItemPriority<Item, CMP>());
 	}
 
-	Item* find(ID id)
+	void promote(ID id, R UNUSED(oldrank), R newrank)
 	{
-		for (size_t n = 0; n < m_Heap.size(); ++n)
-		{
-			if (m_Heap[n].id == id)
-				return &m_Heap[n];
-		}
-		return NULL;
-	}
-
-	void promote(ID id, R newrank)
-	{
-		for (size_t n = 0; n < m_Heap.size(); ++n)
+		// Loop backwards since it seems a little faster in practice
+		for (ssize_t n = m_Heap.size() - 1; n >= 0; --n)
 		{
 			if (m_Heap[n].id == id)
 			{
@@ -104,7 +94,7 @@ public:
 #if PRIORITYQUEUE_DEBUG
 		ENSURE(m_Heap.size());
 #endif
-		Item r = m_Heap.front();
+		Item r = m_Heap[0];
 		pop_heap(m_Heap.begin(), m_Heap.end(), QueueItemPriority<Item, CMP>());
 		m_Heap.pop_back();
 		return r;
@@ -155,7 +145,7 @@ public:
 		return NULL;
 	}
 
-	void promote(ID id, R newrank)
+	void promote(ID id, R UNUSED(oldrank), R newrank)
 	{
 		find(id)->rank = newrank;
 	}

@@ -69,7 +69,7 @@ class CCmpRallyPointRenderer : public ICmpRallyPointRenderer
 {
 	// import some types for less verbosity
 	typedef ICmpPathfinder::Path Path;
-	typedef ICmpPathfinder::Goal Goal;
+	typedef PathGoal Goal;
 	typedef ICmpPathfinder::Waypoint Waypoint;
 	typedef ICmpRangeManager::CLosQuerier CLosQuerier;
 	typedef SOverlayTexturedLine::LineCapType LineCapType;
@@ -114,7 +114,6 @@ protected:
 	std::wstring m_LineTexturePath;
 	std::wstring m_LineTextureMaskPath;
 	std::string m_LinePassabilityClass; ///< Pathfinder passability class to use for computing the (long-range) marker line path.
-	std::string m_LineCostClass; ///< Pathfinder cost class to use for computing the (long-range) marker line path.
 
 	CTexturePtr m_Texture;
 	CTexturePtr m_TextureMask;
@@ -140,7 +139,6 @@ public:
 				"<LineEndCap>square</LineEndCap>"
 				"<LineColour r='20' g='128' b='240'></LineColour>"
 				"<LineDashColour r='158' g='11' b='15'></LineDashColour>"
-				"<LineCostClass>default</LineCostClass>"
 				"<LinePassabilityClass>default</LinePassabilityClass>"
 			"</a:example>"
 			"<element name='MarkerTemplate' a:help='Template name for the rally point marker entity (typically a waypoint flag actor)'>"
@@ -194,9 +192,6 @@ public:
 				"</choice>"
 			"</element>"
 			"<element name='LinePassabilityClass' a:help='The pathfinder passability class to use for computing the rally point marker line path'>"
-				"<text />"
-			"</element>"
-			"<element name='LineCostClass' a:help='The pathfinder cost class to use for computing the rally point marker line path'>"
 				"<text />"
 			"</element>";
 	}
@@ -477,7 +472,6 @@ void CCmpRallyPointRenderer::Init(const CParamNode& paramNode)
 	m_LineTextureMaskPath = paramNode.GetChild("LineTextureMask").ToString();
 	m_LineStartCapType = SOverlayTexturedLine::StrToLineCapType(paramNode.GetChild("LineStartCap").ToString());
 	m_LineEndCapType = SOverlayTexturedLine::StrToLineCapType(paramNode.GetChild("LineEndCap").ToString());
-	m_LineCostClass = paramNode.GetChild("LineCostClass").ToUTF8();
 	m_LinePassabilityClass = paramNode.GetChild("LinePassabilityClass").ToUTF8();
 
 	// ---------------------------------------------------------------------------------------------
@@ -647,7 +641,6 @@ void CCmpRallyPointRenderer::RecomputeRallyPointPath(size_t index, CmpPtr<ICmpPo
 		pathStartY,
 		goal,
 		cmpPathfinder->GetPassabilityClass(m_LinePassabilityClass),
-		cmpPathfinder->GetCostClass(m_LineCostClass),
 		path
 	);
 

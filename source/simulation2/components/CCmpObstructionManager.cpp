@@ -22,6 +22,7 @@
 
 #include "simulation2/MessageTypes.h"
 #include "simulation2/helpers/Geometry.h"
+#include "simulation2/helpers/Rasterize.h"
 #include "simulation2/helpers/Render.h"
 #include "simulation2/helpers/Spatial.h"
 #include "simulation2/serialization/SerializeTemplates.h"
@@ -435,9 +436,9 @@ public:
 	virtual bool TestStaticShape(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t a, entity_pos_t w, entity_pos_t h, std::vector<entity_id_t>* out);
 	virtual bool TestUnitShape(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t r, std::vector<entity_id_t>* out);
 
-	virtual bool Rasterise(Grid<u8>& grid);
+	virtual void Rasterize(Grid<u16>& grid, entity_pos_t expand, ICmpObstructionManager::flags_t requireMask, u16 setMask);
 	virtual void GetObstructionsInRange(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t x1, entity_pos_t z1, std::vector<ObstructionSquare>& squares);
-	virtual bool FindMostImportantObstruction(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t r, ObstructionSquare& square);
+	virtual void GetUnitsOnObstruction(const ObstructionSquare& square, std::vector<entity_id_t>& out);
 
 	virtual void SetPassabilityCircular(bool enabled)
 	{
@@ -508,13 +509,15 @@ private:
 		m_DebugOverlayDirty = true;
 	}
 
-	/**
-	 * Test whether a Rasterise()d grid is dirty and needs updating
-	 */
-	template<typename T>
-	bool IsDirty(const Grid<T>& grid)
+	virtual bool NeedUpdate(size_t* dirtyID)
 	{
-		return grid.m_DirtyID < m_DirtyID;
+		ENSURE(*dirtyID <= m_DirtyID);
+		if (*dirtyID != m_DirtyID)
+		{
+			*dirtyID = m_DirtyID;
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -708,93 +711,48 @@ bool CCmpObstructionManager::TestUnitShape(const IObstructionTestFilter& filter,
 }
 
 /**
- * Compute the tile indexes on the grid nearest to a given point
+ * Compute the navcell indexes on the grid nearest to a given point
  */
-static void NearestTile(entity_pos_t x, entity_pos_t z, u16& i, u16& j, u16 w, u16 h)
+static void NearestNavcell(entity_pos_t x, entity_pos_t z, u16& i, u16& j, u16 w, u16 h)
 {
-	i = (u16)clamp((x / (int)TERRAIN_TILE_SIZE).ToInt_RoundToZero(), 0, w-1);
-	j = (u16)clamp((z / (int)TERRAIN_TILE_SIZE).ToInt_RoundToZero(), 0, h-1);
+	i = (u16)clamp((x / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero(), 0, w-1);
+	j = (u16)clamp((z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero(), 0, h-1);
 }
 
-/**
- * Returns the position of the center of the given tile
- */
-static void TileCenter(u16 i, u16 j, entity_pos_t& x, entity_pos_t& z)
+void CCmpObstructionManager::Rasterize(Grid<u16>& grid, entity_pos_t expand, ICmpObstructionManager::flags_t requireMask, u16 setMask)
 {
-	x = entity_pos_t::FromInt(i*(int)TERRAIN_TILE_SIZE + (int)TERRAIN_TILE_SIZE/2);
-	z = entity_pos_t::FromInt(j*(int)TERRAIN_TILE_SIZE + (int)TERRAIN_TILE_SIZE/2);
-}
+	PROFILE3("Rasterize");
 
-bool CCmpObstructionManager::Rasterise(Grid<u8>& grid)
-{
-	if (!IsDirty(grid))
-		return false;
+	// Since m_DirtyID is only updated for pathfinding/foundation blocking shapes,
+	// NeedUpdate+Rasterise will only be accurate for that subset of shapes.
+	// (If we ever want to support rasterizing more shapes, we need to improve
+	// the dirty-detection system too.)
+	ENSURE(!(requireMask & ~(FLAG_BLOCK_PATHFINDING|FLAG_BLOCK_FOUNDATION)));
 
-	PROFILE("Rasterise");
+	// Cells are only marked as blocked if the whole cell is strictly inside the shape.
+	// (That ensures the shape's geometric border is always reachable.)
 
-	grid.m_DirtyID = m_DirtyID;
+	// TODO: it might be nice to rasterize with rounded corners for large 'expand' values.
 
-	// TODO: this is all hopelessly inefficient
-	// What we should perhaps do is have some kind of quadtree storing Shapes so it's
-	// quick to invalidate and update small numbers of tiles
-
-	grid.reset();
-
-	// For tile-based pathfinding:
-	// Since we only count tiles whose centers are inside the square,
-	// we maybe want to expand the square a bit so we're less likely to think there's
-	// free space between buildings when there isn't. But this is just a random guess
-	// and needs to be tweaked until everything works nicely.
-	//entity_pos_t expandPathfinding = entity_pos_t::FromInt(TERRAIN_TILE_SIZE / 2);
-	// Actually that's bad because units get stuck when the A* pathfinder thinks they're
-	// blocked on all sides, so it's better to underestimate
-	entity_pos_t expandPathfinding = entity_pos_t::FromInt(0);
-
-	// For AI building foundation planning, we want to definitely block all
-	// potentially-obstructed tiles (so we don't blindly build on top of an obstruction),
-	// so we need to expand by at least 1/sqrt(2) of a tile
-	entity_pos_t expandFoundation = (entity_pos_t::FromInt(TERRAIN_TILE_SIZE) * 3) / 4;
+	// (This could be implemented much more efficiently.)
 
 	for (std::map<u32, StaticShape>::iterator it = m_StaticShapes.begin(); it != m_StaticShapes.end(); ++it)
 	{
-		CFixedVector2D center(it->second.x, it->second.z);
-
-		if (it->second.flags & FLAG_BLOCK_PATHFINDING)
+		const StaticShape& shape = it->second;
+		if (shape.flags & requireMask)
 		{
-			CFixedVector2D halfSize(it->second.hw + expandPathfinding, it->second.hh + expandPathfinding);
-			CFixedVector2D halfBound = Geometry::GetHalfBoundingBox(it->second.u, it->second.v, halfSize);
-
-			u16 i0, j0, i1, j1;
-			NearestTile(center.X - halfBound.X, center.Y - halfBound.Y, i0, j0, grid.m_W, grid.m_H);
-			NearestTile(center.X + halfBound.X, center.Y + halfBound.Y, i1, j1, grid.m_W, grid.m_H);
-			for (u16 j = j0; j <= j1; ++j)
+			ObstructionSquare square = { shape.x, shape.z, shape.u, shape.v, shape.hw, shape.hh };
+			SimRasterize::Spans spans;
+			SimRasterize::RasterizeRectWithClearance(spans, square, expand, ICmpObstructionManager::NAVCELL_SIZE);
+			for (size_t k = 0; k < spans.size(); ++k)
 			{
-				for (u16 i = i0; i <= i1; ++i)
+				i16 j = spans[k].j;
+				if (j >= 0 && j <= grid.m_H)
 				{
-					entity_pos_t x, z;
-					TileCenter(i, j, x, z);
-					if (Geometry::PointIsInSquare(CFixedVector2D(x, z) - center, it->second.u, it->second.v, halfSize))
-						grid.set(i, j, grid.get(i, j) | TILE_OBSTRUCTED_PATHFINDING);
-				}
-			}
-		}
-
-		if (it->second.flags & FLAG_BLOCK_FOUNDATION)
-		{
-			CFixedVector2D halfSize(it->second.hw + expandFoundation, it->second.hh + expandFoundation);
-			CFixedVector2D halfBound = Geometry::GetHalfBoundingBox(it->second.u, it->second.v, halfSize);
-
-			u16 i0, j0, i1, j1;
-			NearestTile(center.X - halfBound.X, center.Y - halfBound.Y, i0, j0, grid.m_W, grid.m_H);
-			NearestTile(center.X + halfBound.X, center.Y + halfBound.Y, i1, j1, grid.m_W, grid.m_H);
-			for (u16 j = j0; j <= j1; ++j)
-			{
-				for (u16 i = i0; i <= i1; ++i)
-				{
-					entity_pos_t x, z;
-					TileCenter(i, j, x, z);
-					if (Geometry::PointIsInSquare(CFixedVector2D(x, z) - center, it->second.u, it->second.v, halfSize))
-						grid.set(i, j, grid.get(i, j) | TILE_OBSTRUCTED_FOUNDATION);
+					i16 i0 = std::max(spans[k].i0, (i16)0);
+					i16 i1 = std::min(spans[k].i1, (i16)grid.m_W);
+					for (i16 i = i0; i < i1; ++i)
+						grid.set(i, j, grid.get(i, j) | setMask);
 				}
 			}
 		}
@@ -804,79 +762,18 @@ bool CCmpObstructionManager::Rasterise(Grid<u8>& grid)
 	{
 		CFixedVector2D center(it->second.x, it->second.z);
 
-		if (it->second.flags & FLAG_BLOCK_PATHFINDING)
+		if (it->second.flags & requireMask)
 		{
-			entity_pos_t r = it->second.r + expandPathfinding;
+			entity_pos_t r = it->second.r + expand;
 
 			u16 i0, j0, i1, j1;
-			NearestTile(center.X - r, center.Y - r, i0, j0, grid.m_W, grid.m_H);
-			NearestTile(center.X + r, center.Y + r, i1, j1, grid.m_W, grid.m_H);
-			for (u16 j = j0; j <= j1; ++j)
-				for (u16 i = i0; i <= i1; ++i)
-					grid.set(i, j, grid.get(i, j) | TILE_OBSTRUCTED_PATHFINDING);
-		}
-
-		if (it->second.flags & FLAG_BLOCK_FOUNDATION)
-		{
-			entity_pos_t r = it->second.r + expandFoundation;
-
-			u16 i0, j0, i1, j1;
-			NearestTile(center.X - r, center.Y - r, i0, j0, grid.m_W, grid.m_H);
-			NearestTile(center.X + r, center.Y + r, i1, j1, grid.m_W, grid.m_H);
-			for (u16 j = j0; j <= j1; ++j)
-				for (u16 i = i0; i <= i1; ++i)
-					grid.set(i, j, grid.get(i, j) | TILE_OBSTRUCTED_FOUNDATION);
+			NearestNavcell(center.X - r, center.Y - r, i0, j0, grid.m_W, grid.m_H);
+			NearestNavcell(center.X + r, center.Y + r, i1, j1, grid.m_W, grid.m_H);
+			for (u16 j = j0+1; j < j1; ++j)
+				for (u16 i = i0+1; i < i1; ++i)
+					grid.set(i, j, grid.get(i, j) | setMask);
 		}
 	}
-
-	// Any tiles outside or very near the edge of the map are impassable
-
-	// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
-	const u16 edgeSize = 3; // number of tiles around the edge that will be off-world
-
-	u8 edgeFlags = TILE_OBSTRUCTED_PATHFINDING | TILE_OBSTRUCTED_FOUNDATION | TILE_OUTOFBOUNDS;
-
-	if (m_PassabilityCircular)
-	{
-		for (u16 j = 0; j < grid.m_H; ++j)
-		{
-			for (u16 i = 0; i < grid.m_W; ++i)
-			{
-				// Based on CCmpRangeManager::LosIsOffWorld
-				// but tweaked since it's tile-based instead.
-				// (We double all the values so we can handle half-tile coordinates.)
-				// This needs to be slightly tighter than the LOS circle,
-				// else units might get themselves lost in the SoD around the edge.
-
-				ssize_t dist2 = (i*2 + 1 - grid.m_W)*(i*2 + 1 - grid.m_W)
-						+ (j*2 + 1 - grid.m_H)*(j*2 + 1 - grid.m_H);
-
-				if (dist2 >= (grid.m_W - 2*edgeSize) * (grid.m_H - 2*edgeSize))
-					grid.set(i, j, edgeFlags);
-			}
-		}
-	}
-	else
-	{
-		u16 i0, j0, i1, j1;
-		NearestTile(m_WorldX0, m_WorldZ0, i0, j0, grid.m_W, grid.m_H);
-		NearestTile(m_WorldX1, m_WorldZ1, i1, j1, grid.m_W, grid.m_H);
-
-		for (u16 j = 0; j < grid.m_H; ++j)
-			for (u16 i = 0; i < i0+edgeSize; ++i)
-				grid.set(i, j, edgeFlags);
-		for (u16 j = 0; j < grid.m_H; ++j)
-			for (u16 i = (u16)(i1-edgeSize+1); i < grid.m_W; ++i)
-				grid.set(i, j, edgeFlags);
-		for (u16 j = 0; j < j0+edgeSize; ++j)
-			for (u16 i = (u16)(i0+edgeSize); i < i1-edgeSize+1; ++i)
-				grid.set(i, j, edgeFlags);
-		for (u16 j = (u16)(j1-edgeSize+1); j < grid.m_H; ++j)
-			for (u16 i = (u16)(i0+edgeSize); i < i1-edgeSize+1; ++i)
-				grid.set(i, j, edgeFlags);
-	}
-
-	return true;
 }
 
 void CCmpObstructionManager::GetObstructionsInRange(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t x1, entity_pos_t z1, std::vector<ObstructionSquare>& squares)
@@ -930,41 +827,38 @@ void CCmpObstructionManager::GetObstructionsInRange(const IObstructionTestFilter
 	}
 }
 
-bool CCmpObstructionManager::FindMostImportantObstruction(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t r, ObstructionSquare& square)
+void CCmpObstructionManager::GetUnitsOnObstruction(const ObstructionSquare& square, std::vector<entity_id_t>& out)
 {
-	std::vector<ObstructionSquare> squares;
+	PROFILE3("GetUnitsOnObstruction");
 
-	CFixedVector2D center(x, z);
+	// Ideally we'd want to find all units s.t. the RasterizeRectWithClearance
+	// of the building's shape with the unit's clearance covers the navcell
+	// the unit is on.
+	// But ObstructionManager doesn't actually know the clearance values
+	// (only the radiuses), so we can't easily do that properly.
+	// Instead, cheat and just ignore the clearance entirely;
+	// this might allow players to build buildings so a unit ends up on
+	// an impassable tile, which is slightly bad and might let players cheat,
+	// so TODO: fix this properly.
 
-	// First look for obstructions that are covering the exact target point
-	GetObstructionsInRange(filter, x, z, x, z, squares);
-	// Building squares are more important but returned last, so check backwards
-	for (std::vector<ObstructionSquare>::reverse_iterator it = squares.rbegin(); it != squares.rend(); ++it)
-	{
-		CFixedVector2D halfSize(it->hw, it->hh);
-		if (Geometry::PointIsInSquare(CFixedVector2D(it->x, it->z) - center, it->u, it->v, halfSize))
-		{
-			square = *it;
-			return true;
-		}
-	}
+	SimRasterize::Spans spans;
+	SimRasterize::RasterizeRectWithClearance(spans, square, fixed::Zero(), ICmpObstructionManager::NAVCELL_SIZE);
+ 
+	for (std::map<u32, UnitShape>::iterator it = m_UnitShapes.begin(); it != m_UnitShapes.end(); ++it)
+ 	{
+		// Check whether the unit's center is on a navcell that's in
+		// any of the spans
 
-	// Then look for obstructions that cover the target point when expanded by r
-	// (i.e. if the target is not inside an object but closer than we can get to it)
-	
-	GetObstructionsInRange(filter, x-r, z-r, x+r, z+r, squares);
-	// Building squares are more important but returned last, so check backwards
-	for (std::vector<ObstructionSquare>::reverse_iterator it = squares.rbegin(); it != squares.rend(); ++it)
-	{
-		CFixedVector2D halfSize(it->hw + r, it->hh + r);
-		if (Geometry::PointIsInSquare(CFixedVector2D(it->x, it->z) - center, it->u, it->v, halfSize))
-		{
-			square = *it;
-			return true;
-		}
-	}
+		u16 i = (it->second.x / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
+		u16 j = (it->second.z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
 
-	return false;
+		for (size_t k = 0; k < spans.size(); ++k)
+ 		{
+			if (j == spans[k].j && spans[k].i0 <= i && i < spans[k].i1)
+				out.push_back(it->second.entity);
+ 		}
+ 	}
+ 	//TODO Should we expand by r here?
 }
 
 void CCmpObstructionManager::RenderSubmit(SceneCollector& collector)

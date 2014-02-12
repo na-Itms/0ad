@@ -1,4 +1,4 @@
-/* Copyright (C) 2011 Wildfire Games.
+/* Copyright (C) 2012 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -38,6 +38,7 @@ public:
 
 	/**
 	 * Attempt to walk into range of a to a given point, or as close as possible.
+	 * The range is measured from the center of the unit.
 	 * If the unit is already in range, or cannot move anywhere at all, or if there is
 	 * some other error, then returns false.
 	 * Otherwise, returns true and sends a MotionChanged message after starting to move,
@@ -60,6 +61,8 @@ public:
 
 	/**
 	 * Attempt to walk into range of a given target entity, or as close as possible.
+	 * The range is measured between approximately the edges of the unit and the target, so that
+	 * maxRange=0 is not unreachably close to the target.
 	 * If the unit is already in range, or cannot move anywhere at all, or if there is
 	 * some other error, then returns false.
 	 * Otherwise, returns true and sends a MotionChanged message after starting to move,

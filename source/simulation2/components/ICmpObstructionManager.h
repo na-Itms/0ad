@@ -48,12 +48,29 @@ class IObstructionTestFilter;
  * Units can be marked as either moving or stationary, which simply determines whether
  * certain filters include or exclude them.
  *
- * The @c Rasterise function approximates the current set of shapes onto a 2D grid,
+ * The @c Rasterize function approximates the current set of shapes onto a 2D grid,
  * for use with tile-based pathfinding.
  */
 class ICmpObstructionManager : public IComponent
 {
 public:
+	/**
+	 * The pathfinders operate primarily over a navigation grid (a uniform-cost
+	 * 2D passability grid, with horizontal/vertical (not diagonal) connectivity).
+	 * This is based on the terrain tile passability, plus the rasterized shapes of
+	 * obstructions, all expanded outwards by the radius of the units.
+	 * Since units are much smaller than terrain tiles, the nav grid should be
+	 * higher resolution than the tiles.
+	 * We therefore split each terrain tile into NxN "nav cells" (for some integer N,
+	 * preferably a power of two).
+	 */
+	static const int NAVCELLS_PER_TILE = 4;
+
+	/**
+	 * Size of a navcell in metres ( = TERRAIN_TILE_SIZE / NAVCELLS_PER_TILE)
+	 */
+	static const fixed NAVCELL_SIZE;
+
 	/**
 	 * External identifiers for shapes.
 	 * (This is a struct rather than a raw u32 for type-safety.)
@@ -205,7 +222,7 @@ public:
 		std::vector<entity_id_t>* out) = 0;
 
 	/**
-	 * Bit-flags for Rasterise.
+	 * Bit-flags for Rasterize.
 	 */
 	enum TileObstruction
 	{
@@ -215,16 +232,25 @@ public:
 	};
 
 	/**
-	 * Convert the current set of shapes onto a grid.
-	 * Tiles that are intersected by a pathfind-blocking shape will have TILE_OBSTRUCTED_PATHFINDING set;
-	 * tiles that are intersected by a foundation-blocking shape will also have TILE_OBSTRUCTED_FOUNDATION;
-	 * tiles that are outside the world bounds will also have TILE_OUTOFBOUNDS;
-	 * others will be set to 0.
-	 * This is very cheap if the grid has been rasterised before and the set of shapes has not changed.
-	 * @param grid the grid to be updated
-	 * @return true if any changes were made to the grid, false if it was already up-to-date
+	 * Convert the current set of shapes onto a navcell grid.
+	 * Shapes are expanded by the clearance radius @p expand.
+	 * Only shapes with at least one of the flags from @p requireMask will be considered.
+	 * @p setMask will be ORed onto the @p grid value for all navcells
+	 * that are wholly enclosed by an expanded shape.
 	 */
-	virtual bool Rasterise(Grid<u8>& grid) = 0;
+	virtual void Rasterize(Grid<u16>& grid, entity_pos_t expand, ICmpObstructionManager::flags_t requireMask, u16 setMask) = 0;
+
+	/**
+	 * Returns whether obstructions have changed such that Rasterize will
+	 * return different data, since the last call to NeedUpdate with the same
+	 * @p dirtyID handle.
+	 * This should be first called with @p dirtyID pointing to 0; the function
+	 * will return true and update the pointed-at value to indicate the current
+	 * state. Pass the same pointer to subsequent calls, and the function either
+	 * will return false (if nothing relevant has changed), or will update the
+	 * value and return true (in which case you should call Rasterize again).
+	 */
+	virtual bool NeedUpdate(size_t* dirtyID) = 0;
 
 	/**
 	 * Standard representation for all types of shapes, for use with geometry processing code.
@@ -248,12 +274,12 @@ public:
 	virtual void GetObstructionsInRange(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t x1, entity_pos_t z1, std::vector<ObstructionSquare>& squares) = 0;
 
 	/**
-	 * Find a single obstruction that blocks a unit at the given point with the given radius.
-	 * Static obstructions (buildings) are more important than unit obstructions, and
-	 * obstructions that cover the given point are more important than those that only cover
-	 * the point expanded by the radius.
+	 * Returns the entity IDs of all unit shapes that intersect the given
+	 * obstruction square.
+	 * (TODO: This currently ignores the clearance/radius values of units,
+	 * so it just uses the unexpanded obstruction shapes, which is not ideal.)
 	 */
-	virtual bool FindMostImportantObstruction(const IObstructionTestFilter& filter, entity_pos_t x, entity_pos_t z, entity_pos_t r, ObstructionSquare& square) = 0;
+	virtual void GetUnitsOnObstruction(const ObstructionSquare& square, std::vector<entity_id_t>& out) = 0;
 
 	/**
 	 * Get the obstruction square representing the given shape.
@@ -344,10 +370,19 @@ public:
 	{
 		if (group == m_Group || (group2 != INVALID_ENTITY && group2 == m_Group))
 			return false;
+
+		// If an obstruction already blocks tile-based pathfinding,
+		// it will be handled as part of the terrain passability handling
+		// and doesn't need to be matched by this filter
+		if (flags & ICmpObstructionManager::FLAG_BLOCK_PATHFINDING)
+			return false;
+
 		if (!(flags & ICmpObstructionManager::FLAG_BLOCK_MOVEMENT))
 			return false;
+
 		if ((flags & ICmpObstructionManager::FLAG_MOVING) && !m_AvoidMoving)
 			return false;
+
 		return true;
 	}
 };

@@ -570,25 +570,9 @@ public:
 	{
 		std::vector<entity_id_t> ret;
 
-		CmpPtr<ICmpPosition> cmpPosition(GetEntityHandle());
-		if (!cmpPosition)
-			return ret; // error
-
-		if (!cmpPosition->IsInWorld())
-			return ret; // no obstruction
-
-		CFixedVector2D pos = cmpPosition->GetPosition2D();
-
 		CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSystemEntity());
 		if (!cmpObstructionManager)
 			return ret; // error
-
-		// required precondition to use SkipControlGroupsRequireFlagObstructionFilter
-		if (m_ControlGroup == INVALID_ENTITY)
-		{
-			LOGERROR("[CmpObstruction] Cannot test for unit or structure obstructions; primary control group must be valid");
-			return ret;
-		}
 
 		flags_t flags = 0;
 		bool invertMatch = false;
@@ -612,18 +596,17 @@ public:
 			flags = ICmpObstructionManager::FLAG_BLOCK_FOUNDATION | ICmpObstructionManager::FLAG_BLOCK_PATHFINDING;
 		}
 
-		// Ignore collisions within the same control group, or with other shapes that don't match the filter.
-		// Note that, since the control group for each entity defaults to the entity's ID, this is typically 
-		// equivalent to only ignoring the entity's own shape and other shapes that don't match the filter.
-		SkipControlGroupsRequireFlagObstructionFilter filter(invertMatch,
-				m_ControlGroup, m_ControlGroup2, flags);
-
-		if (m_Type == STATIC)
-			cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
-		else if (m_Type == UNIT)
-			cmpObstructionManager->TestUnitShape(filter, pos.X, pos.Y, m_Size0, &ret);
-		else
-			cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
+		ICmpObstructionManager::ObstructionSquare square;
+		if (!GetObstructionSquare(square))
+			return ret; // error
+			
+		cmpObstructionManager->GetUnitsOnObstruction(square, ret);
+		//if (m_Type == STATIC)
+		//	cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
+		//else if (m_Type == UNIT)
+		//	cmpObstructionManager->TestUnitShape(filter, pos.X, pos.Y, m_Size0, &ret);
+		//else
+		//	cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
 	
 		return ret;
 	}

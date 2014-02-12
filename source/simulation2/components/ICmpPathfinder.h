@@ -21,6 +21,7 @@
 #include "simulation2/system/Interface.h"
 
 #include "simulation2/components/ICmpObstruction.h"
+#include "simulation2/helpers/PathGoal.h"
 #include "simulation2/helpers/Position.h"
 
 #include "maths/FixedVector2D.h"
@@ -39,7 +40,7 @@ template<typename T> class Grid;
  * accounts for terrain costs but ignore units, and a 'short' vertex-based pathfinder that
  * provides precise paths and avoids other units.
  *
- * Both use the same concept of a Goal: either a point, circle or square.
+ * Both use the same concept of a PathGoal: either a point, circle or square.
  * (If the starting point is inside the goal shape then the path will move outwards
  * to reach the shape's outline.)
  *
@@ -49,19 +50,6 @@ class ICmpPathfinder : public IComponent
 {
 public:
 	typedef u16 pass_class_t;
-	typedef u8 cost_class_t;
-
-	struct Goal
-	{
-		enum Type {
-			POINT,
-			CIRCLE,
-			SQUARE
-		} type;
-		entity_pos_t x, z; // position of center
-		CFixedVector2D u, v; // if SQUARE, then orthogonal unit axes
-		entity_pos_t hw, hh; // if SQUARE, then half width & height; if CIRCLE, then hw is radius
-	};
 
 	struct Waypoint
 	{
@@ -88,12 +76,6 @@ public:
 	 */
 	virtual pass_class_t GetPassabilityClass(const std::string& name) = 0;
 
-	/**
-	 * Get the tag for a given movement cost class name.
-	 * Logs an error and returns something acceptable if the name is unrecognised.
-	 */
-	virtual cost_class_t GetCostClass(const std::string& name) = 0;
-
 	virtual const Grid<u16>& GetPassabilityGrid() = 0;
 
 	/**
@@ -101,7 +83,12 @@ public:
 	 * The waypoints correspond to the centers of horizontally/vertically adjacent tiles
 	 * along the path.
 	 */
-	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const Goal& goal, pass_class_t passClass, cost_class_t costClass, Path& ret) = 0;
+	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, Path& ret) = 0;
+
+	/**
+	 * Equivalent to ComputePath, but using the JPS pathfinder.
+	 */
+	virtual void ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, Path& ret) = 0;
 
 	/**
 	 * Asynchronous version of ComputePath.
@@ -109,12 +96,12 @@ public:
 	 * Returns a unique non-zero number, which will match the 'ticket' in the result,
 	 * so callers can recognise each individual request they make.
 	 */
-	virtual u32 ComputePathAsync(entity_pos_t x0, entity_pos_t z0, const Goal& goal, pass_class_t passClass, cost_class_t costClass, entity_id_t notify) = 0;
+	virtual u32 ComputePathAsync(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, entity_id_t notify) = 0;
 
 	/**
 	 * If the debug overlay is enabled, render the path that will computed by ComputePath.
 	 */
-	virtual void SetDebugPath(entity_pos_t x0, entity_pos_t z0, const Goal& goal, pass_class_t passClass, cost_class_t costClass) = 0;
+	virtual void SetDebugPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass) = 0;
 
 	/**
 	 * Compute a precise path from the given point to the goal, and return the set of waypoints.
@@ -122,7 +109,7 @@ public:
 	 * a unit of radius 'r' will be able to follow the path with no collisions.
 	 * The path is restricted to a box of radius 'range' from the starting point.
 	 */
-	virtual void ComputeShortPath(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const Goal& goal, pass_class_t passClass, Path& ret) = 0;
+	virtual void ComputeShortPath(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, Path& ret) = 0;
 
 	/**
 	 * Asynchronous version of ComputeShortPath (using ControlGroupObstructionFilter).
@@ -130,18 +117,12 @@ public:
 	 * Returns a unique non-zero number, which will match the 'ticket' in the result,
 	 * so callers can recognise each individual request they make.
 	 */
-	virtual u32 ComputeShortPathAsync(entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const Goal& goal, pass_class_t passClass, bool avoidMovingUnits, entity_id_t group, entity_id_t notify) = 0;
-
-	/**
-	 * Find the speed factor (typically around 1.0) for a unit of the given cost class
-	 * at the given position.
-	 */
-	virtual fixed GetMovementSpeed(entity_pos_t x0, entity_pos_t z0, cost_class_t costClass) = 0;
+	virtual u32 ComputeShortPathAsync(entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, bool avoidMovingUnits, entity_id_t group, entity_id_t notify) = 0;
 
 	/**
 	 * Returns the coordinates of the point on the goal that is closest to pos in a straight line.
 	 */
-	virtual CFixedVector2D GetNearestPointOnGoal(CFixedVector2D pos, const Goal& goal) = 0;
+	virtual CFixedVector2D GetNearestPointOnGoal(CFixedVector2D pos, const PathGoal& goal) = 0;
 
 	/**
 	 * Check whether the given movement line is valid and doesn't hit any obstructions
@@ -199,6 +180,16 @@ public:
 	 * Process moves during the same turn they were created in to improve responsiveness.
 	 */
 	virtual void ProcessSameTurnMoves() = 0;
+
+	/**
+	 * Returns some stats about the last ComputePath.
+	 */
+	virtual void GetDebugData(u32& steps, double& time, Grid<u8>& grid) = 0;
+
+	/**
+	 * Returns some stats about the last ComputePathJPS.
+	 */
+	virtual void GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid) = 0;
 
 	DECLARE_INTERFACE_TYPE(Pathfinder)
 };
