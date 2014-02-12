@@ -402,23 +402,23 @@ public:
 	void SetStatusClosed() { SetStatus(STATUS_CLOSED); }
 
 	// Get pi,pj coords of predecessor to this tile on best path, given i,j coords of this tile
-	int GetPredI(int i) { return i + GetPredDI(); }
-	int GetPredJ(int j) { return j + GetPredDJ(); }
+	inline int GetPredI(int i) { return i + GetPredDI(); }
+	inline int GetPredJ(int j) { return j + GetPredDJ(); }
 
-	PathCost GetCost() const { return g; }
-	void SetCost(PathCost cost) { g = cost; }
+	inline PathCost GetCost() const { return g; }
+	inline void SetCost(PathCost cost) { g = cost; }
 
 private:
 	PathCost g; // cost to reach this tile
 	u32 data; // 2-bit status; 15-bit PredI; 15-bit PredJ; packed for storage efficiency
 
 public:
-	u8 GetStatus() const
+	inline u8 GetStatus() const
 	{
 		return data & 3;
 	}
 
-	void SetStatus(u8 s)
+	inline void SetStatus(u8 s)
 	{
 		ASSERT(s < 4);
 		data &= ~3;
@@ -436,7 +436,7 @@ public:
 	}
 
 	// Set the pi,pj coords of predecessor, given i,j coords of this tile
-	void SetPred(int pi, int pj, int i, int j)
+	inline void SetPred(int pi, int pj, int i, int j)
 	{
 		int di = pi - i;
 		int dj = pj - j;
@@ -819,7 +819,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 #endif
 
 	PROFILE3("ComputePathJPS");
-	//TIMER(L"ComputePathJPS");
+	TIMER(L"ComputePathJPS");
 	double time = timer_Time();
 
 	// Convert the start coordinates to tile indexes

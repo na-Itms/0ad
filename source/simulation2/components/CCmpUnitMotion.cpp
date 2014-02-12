@@ -45,6 +45,8 @@
 
 #define DISABLE_SHORT_PATHFINDER 1
 
+#define USE_SHORT_FOR_UNIT 1
+
 /**
  * When advancing along the long path, and picking a new waypoint to move
  * towards, we'll pick one that's up to this far from the unit's current
@@ -65,7 +67,7 @@ static const int WAYPOINT_ADVANCE_LOOKAHEAD_TURNS = 4;
  * Maximum range to restrict short path queries to. (Larger ranges are slower,
  * smaller ranges might miss some legitimate routes around large obstacles.)
  */
-static const entity_pos_t SHORT_PATH_SEARCH_RANGE = entity_pos_t::FromInt(TERRAIN_TILE_SIZE*10);
+static const entity_pos_t SHORT_PATH_SEARCH_RANGE = entity_pos_t::FromInt(TERRAIN_TILE_SIZE*6);
 
 /**
  * When short-pathing to an intermediate waypoint, we aim for a circle of this radius
@@ -922,9 +924,15 @@ void CCmpUnitMotion::Move(fixed dt)
 		while (timeLeft > zero)
 		{
 #if DISABLE_SHORT_PATHFINDER
+#if USE_SHORT_FOR_UNIT
+			// If we ran out of path, we have to stop
+			if (m_ShortPath.m_Waypoints.empty() && m_LongPath.m_Waypoints.empty())
+				break;
+#else
 			// If we ran out of path, we have to stop
 			if (m_LongPath.m_Waypoints.empty())
 				break;
+#endif
 #else
 			// If we ran out of short path, we have to stop
 			if (m_ShortPath.m_Waypoints.empty())
@@ -932,11 +940,15 @@ void CCmpUnitMotion::Move(fixed dt)
 #endif
 
 #if DISABLE_SHORT_PATHFINDER
+#if USE_SHORT_FOR_UNIT
 			CFixedVector2D target;
 			if (m_ShortPath.m_Waypoints.empty())
 				target = CFixedVector2D(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
 			else
 				target = CFixedVector2D(m_ShortPath.m_Waypoints.back().x, m_ShortPath.m_Waypoints.back().z);
+#else
+			CFixedVector2D target(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
+#endif
 #else
 			CFixedVector2D target(m_ShortPath.m_Waypoints.back().x, m_ShortPath.m_Waypoints.back().z);
 #endif
@@ -957,10 +969,14 @@ void CCmpUnitMotion::Move(fixed dt)
 					timeLeft = timeLeft - (offsetLength / maxSpeed);
 
 #if DISABLE_SHORT_PATHFINDER
+#if USE_SHORT_FOR_UNIT
 					if (m_ShortPath.m_Waypoints.empty())
 						m_LongPath.m_Waypoints.pop_back();
 					else
 						m_ShortPath.m_Waypoints.pop_back();
+#else
+					m_LongPath.m_Waypoints.pop_back();
+#endif
 #else
 					m_ShortPath.m_Waypoints.pop_back();
 #endif
@@ -1008,32 +1024,33 @@ void CCmpUnitMotion::Move(fixed dt)
 		
 		if (wasObstructed)
 		{
+#if USE_SHORT_FOR_UNIT
 			// Oops, we hit something (very likely another unit).
 			// Stop, and recompute the whole path.
 			// TODO: if the target has UnitMotion and is higher priority,
 			// we should wait a little bit.
 			
 			// TODO: so that's when we want to slide, right?
-			while (!m_LongPath.m_Waypoints.empty())
+			while (m_LongPath.m_Waypoints.size() >= 1)
 			{
 				CFixedVector2D waypoint(m_LongPath.m_Waypoints.back().x,m_LongPath.m_Waypoints.back().z);
-				m_LongPath.m_Waypoints.pop_back();
-				if (m_LongPath.m_Waypoints.empty() || (pos-waypoint).CompareLength(fixed::FromInt(15)) == 1)
+				if (m_LongPath.m_Waypoints.size() == 1 || (pos-waypoint).CompareLength(fixed::FromInt(15)) == 1)
 				{
-					if ((pos-waypoint).CompareLength(fixed::FromInt(25)) == 1)
+					if ((pos-waypoint).CompareLength(SHORT_PATH_SEARCH_RANGE) == 1)
 					{
 						waypoint = waypoint-pos;
-						waypoint.Normalize(fixed::FromInt(25));
+						waypoint.Normalize(SHORT_PATH_SEARCH_RANGE);
 						waypoint += pos;
 					}
 					PathGoal goal = { PathGoal::POINT, waypoint.X, waypoint.Y };
-					RequestShortPath(pos, goal, false);
+					RequestShortPath(pos, goal, true);
 					m_PathState = PATHSTATE_WAITING_REQUESTING_SHORT;
 					break;
 				}
+				m_LongPath.m_Waypoints.pop_back();
  			}
 			// TODO: check where the collision was and move slightly.
-			
+#endif
 			return;
 		}
 
@@ -1047,7 +1064,7 @@ void CCmpUnitMotion::Move(fixed dt)
 			// If we are close to reaching the end of the short path
 			// (or have reached it already), try to extend it
 
-#if !DISABLE_SHORT_PATHFINDER
+#if !DISABLE_SHORT_PATHFINDER && !USE_SHORT_FOR_UNIT
 			entity_pos_t minDistance = basicSpeed.Multiply(dt) * WAYPOINT_ADVANCE_LOOKAHEAD_TURNS;
 			if (PathIsShort(m_ShortPath, pos, minDistance))
 			{
@@ -1057,13 +1074,11 @@ void CCmpUnitMotion::Move(fixed dt)
 				if (!m_ShortPath.m_Waypoints.empty())
 					from = CFixedVector2D(m_ShortPath.m_Waypoints[0].x, m_ShortPath.m_Waypoints[0].z);
 
-#if !DISABLE_SHORT_PATHFINDER
 				if (PickNextLongWaypoint(from, ShouldAvoidMovingUnits()))
 				{
 					m_PathState = PATHSTATE_FOLLOWING_REQUESTING_SHORT_APPEND;
 				}
 				else
-#endif
 				{
 					// Failed (there were no long waypoints left).
 					// If there's still some short path then continue following
@@ -1108,7 +1123,7 @@ void CCmpUnitMotion::Move(fixed dt)
 							// nearest point on the square, not towards its center
 						}
 					}
-#if !DISABLE_SHORT_PATHFINDER
+#if !DISABLE_SHORT_PATHFINDER && !USE_SHORT_FOR_UNIT
 				}
 			}
 #endif

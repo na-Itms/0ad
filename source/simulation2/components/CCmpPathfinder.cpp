@@ -851,7 +851,7 @@ void CCmpPathfinder::ImprovePathWaypoints(Path& path, pass_class_t passClass)
 		return;
 	
 	StationaryOnlyObstructionFilter filter;
-	CFixedVector2D prev(waypoints[0].x, waypoints[0].z);
+	CFixedVector2D prev(waypoints.back().x, waypoints.back().z);
 	newWaypoints.push_back(waypoints.front());
 	for (size_t k = 1; k < waypoints.size()-1; ++k)
 	{
