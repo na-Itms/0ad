@@ -365,6 +365,14 @@ public:
 	 */
 	void NormalizePathWaypoints(Path& path);
 
+	/**
+	 * Given a path with an arbitrary collection of waypoints, updates the
+	 * waypoints to be nicer. Calls "Testline" between waypoints
+	 * so that bended paths can become straight if there's nothing in between
+	 * (this happens because A* is 8-direction, and the map isn't actually a grid).
+	 */
+	void ImprovePathWaypoints(Path& path);
+	
 	virtual u32 ComputePathAsync(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, entity_id_t notify);
 
 	virtual void ComputeShortPath(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, Path& ret);

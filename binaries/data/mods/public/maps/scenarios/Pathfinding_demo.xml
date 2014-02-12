@@ -2,19 +2,22 @@
 
 <Scenario version="5">
 	<Environment>
-		<LightingModel>standard</LightingModel>
 		<SkySet>default</SkySet>
 		<SunColour r="1" g="1" b="1"/>
 		<SunElevation angle="0.785398"/>
 		<SunRotation angle="-0.785396"/>
 		<TerrainAmbientColour r="0.313726" g="0.376471" b="0.521569"/>
 		<UnitsAmbientColour r="0.501961" g="0.501961" b="0.501961"/>
+		<Fog>
+			<FogFactor>0</FogFactor>
+			<FogThickness>0.5</FogThickness>
+			<FogColour r="0.8" g="0.8" b="0.898039"/>
+		</Fog>
 		<Water>
 			<WaterBody>
 				<Type>lake</Type>
 				<Colour r="0.294118" g="0.34902" b="0.694118"/>
 				<Height>5</Height>
-				<Shininess>150</Shininess>
 				<Waviness>4.0</Waviness>
 				<Murkiness>0.45</Murkiness>
 				<Tint r="0.27451" g="0.294118" b="0.584314"/>
@@ -22,9 +25,16 @@
 				<ReflectionTintStrength>0</ReflectionTintStrength>
 			</WaterBody>
 		</Water>
+		<Postproc>
+			<Brightness>0</Brightness>
+			<Contrast>1</Contrast>
+			<Saturation>0.99</Saturation>
+			<Bloom>0.1999</Bloom>
+			<PostEffect>default</PostEffect>
+		</Postproc>
 	</Environment>
 	<Camera>
-		<Position x="293.891" y="91.214" z="137.616"/>
+		<Position x="293.891" y="260.018" z="-103.461"/>
 		<Rotation angle="0"/>
 		<Declination angle="0.610865"/>
 	</Camera>
@@ -686,6 +696,20 @@
 			<Player>1</Player>
 			<Position x="402.36667" z="209.59253"/>
 			<Orientation y="2.35621"/>
+		</Entity>
+		<Entity uid="139">
+			<Template>units/maur_elephant_archer_a</Template>
+			<Player>1</Player>
+			<Position x="271.06794" z="261.01594"/>
+			<Orientation y="2.35621"/>
+			<Actor seed="31151"/>
+		</Entity>
+		<Entity uid="140">
+			<Template>units/rome_mechanical_siege_ballista_packed</Template>
+			<Player>1</Player>
+			<Position x="273.1745" z="243.61445"/>
+			<Orientation y="2.35621"/>
+			<Actor seed="1010"/>
 		</Entity>
 	</Entities>
 	<Paths/>

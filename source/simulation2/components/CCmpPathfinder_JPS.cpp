@@ -1005,8 +1005,9 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 		jp = n.GetPredJ(jp);
 	}
 
-	NormalizePathWaypoints(path);
-
+	//NormalizePathWaypoints(path);
+	ImprovePathWaypoints(path);
+	
 	// Save this grid for debug display
 	m_DebugTime = timer_Time() - time;
 	delete m_DebugGridJPS;

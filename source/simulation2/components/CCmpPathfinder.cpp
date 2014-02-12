@@ -837,3 +837,40 @@ void CCmpPathfinder::NormalizePathWaypoints(Path& path)
 
 	path.m_Waypoints.swap(newWaypoints);
 }
+
+void CCmpPathfinder::ImprovePathWaypoints(Path& path)
+{
+	if (path.m_Waypoints.size() < 2)
+		return;
+	
+	std::vector<Waypoint>& waypoints = path.m_Waypoints;
+	std::vector<Waypoint> newWaypoints;
+	
+	CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSimContext(), SYSTEM_ENTITY);
+	if (!cmpObstructionManager)
+		return;
+	
+	NullObstructionFilter filter;
+	CFixedVector2D prev(waypoints[0].x, waypoints[0].z);
+	newWaypoints.push_back(waypoints.front());
+	for (size_t k = 1; k < waypoints.size()-1; ++k)
+	{
+		CFixedVector2D ahead(waypoints[k+1].x, waypoints[k+1].z);
+		CFixedVector2D curr(waypoints[k].x, waypoints[k].z);
+		if ((ahead-curr).Perpendicular().Dot(curr-prev) == fixed::Zero())
+		{
+			// this way the testline will test less.
+			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
+			continue;
+		}
+		
+		// TODO: add proper width.
+		if (cmpObstructionManager->TestLine(filter, ahead.X, ahead.Y, prev.X, prev.Y, fixed::FromInt(1)))
+		{
+			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
+			newWaypoints.push_back(waypoints[k]);
+		}
+	}
+	newWaypoints.push_back(waypoints.back());
+	path.m_Waypoints.swap(newWaypoints);
+}
