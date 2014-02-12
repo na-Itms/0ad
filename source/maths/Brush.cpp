@@ -380,7 +380,6 @@ void CBrush::Intersect(const CFrustum& frustum, CBrush& result) const
 
 	ENSURE(prev == &result);
 }
-
 std::vector<CVector3D> CBrush::GetVertices() const 
 {
 	return m_Vertices;

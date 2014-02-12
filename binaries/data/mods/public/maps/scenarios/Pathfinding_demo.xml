@@ -11,7 +11,7 @@
 		<Fog>
 			<FogFactor>0</FogFactor>
 			<FogThickness>0.5</FogThickness>
-			<FogColour r="0.8" g="0.8" b="0.898039"/>
+			<FogColour r="0.8" g="0.8" b="0.894118"/>
 		</Fog>
 		<Water>
 			<WaterBody>
@@ -34,17 +34,19 @@
 		</Postproc>
 	</Environment>
 	<Camera>
-		<Position x="293.891" y="260.018" z="-103.461"/>
-		<Rotation angle="0"/>
+		<Position x="249.053" y="41.7141" z="187.51"/>
+		<Rotation angle="-2.09633"/>
 		<Declination angle="0.610865"/>
 	</Camera>
 	<ScriptSettings><![CDATA[
 {
-  "Name": "Pathfinding Demo",
+  "DefaultStance": "defensive",
   "Description": "A map for testing unit movement algorithms.",
+  "GameType": "endless",
   "Keywords": [
     "demo"
   ],
+  "Name": "Pathfinding Demo",
   "PlayerData": [
     {
       "AI": "",
@@ -55,9 +57,7 @@
       "Civ": "celt"
     }
   ],
-  "RevealMap": true,
-  "DefaultStance": "defensive",
-  "GameType": "endless"
+  "RevealMap": true
 }
 ]]></ScriptSettings>
 	<Entities>
@@ -710,6 +710,13 @@
 			<Position x="273.1745" z="243.61445"/>
 			<Orientation y="2.35621"/>
 			<Actor seed="1010"/>
+		</Entity>
+		<Entity uid="141">
+			<Template>structures/iber_house</Template>
+			<Player>0</Player>
+			<Position x="227.0604" z="162.98438"/>
+			<Orientation y="2.35621"/>
+			<Actor seed="26048"/>
 		</Entity>
 	</Entities>
 	<Paths/>
