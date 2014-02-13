@@ -1479,7 +1479,7 @@ bool CCmpUnitMotion::MoveToPointRange(entity_pos_t x, entity_pos_t z, entity_pos
 		{
 			// Too close to target - move outwards to a circle
 			// that's slightly larger than the min range
-			goal.type = PathGoal::INVERTED_CIRCLE;
+			goal.type = PathGoal::CIRCLE;// TODO: INVERTED_CIRCLE;
 			goal.hw = minRange + g_GoalDelta;
 		}
 		else if (maxRange >= entity_pos_t::Zero() && distance > maxRange)
