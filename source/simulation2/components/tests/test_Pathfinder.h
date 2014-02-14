@@ -172,8 +172,9 @@ public:
 	void test_perf2()
 	{
 		CTerrain terrain;
+		shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(128 * 1024 * 1024);
 
-		CSimulation2 sim2(NULL, &terrain);
+		CSimulation2 sim2(NULL, rt, &terrain);
 		sim2.LoadDefaultScripts();
 		sim2.ResetState();
 
@@ -227,7 +228,9 @@ public:
 	{
 		CTerrain terrain;
 
-		CSimulation2 sim2(NULL, &terrain);
+		shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(128 * 1024 * 1024);
+		
+		CSimulation2 sim2(NULL, rt, &terrain);
 		sim2.LoadDefaultScripts();
 		sim2.ResetState();
 

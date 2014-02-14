@@ -819,8 +819,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 #endif
 
 	PROFILE3("ComputePathJPS");
-	TIMER(L"ComputePathJPS");
-	double time = timer_Time();
+	//TIMER(L"ComputePathJPS");
 
 	// Convert the start coordinates to tile indexes
 	u16 i0, j0;
@@ -1010,7 +1009,6 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 	ImprovePathWaypoints(path, passClass);
 	
 	// Save this grid for debug display
-	m_DebugTime = timer_Time() - time;
 	delete m_DebugGridJPS;
 	m_DebugGridJPS = state.tiles;
 	m_DebugSteps = state.steps;

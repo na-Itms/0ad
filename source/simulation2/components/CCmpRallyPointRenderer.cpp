@@ -651,8 +651,12 @@ void CCmpRallyPointRenderer::RecomputeRallyPointPath(size_t index, CmpPtr<ICmpPo
 		GetClosestsEdgePointFrom(newend,newend, cmpPosition, cmpFootprint);
 		waypoints.back().x = newend.X;
 		waypoints.back().z = newend.Y;
+	} else {
+		// make sure we actually start at the rallypoint because the pathfinder moves us to a usable tile.
+		waypoints.back().x = m_RallyPoints[index-1].X;
+		waypoints.back().z = m_RallyPoints[index-1].Y;
 	}
-	// pathfinder makes us go to the nearest passable cell.
+	// pathfinder makes us go to the nearest passable cell which isn't always what we want
 	waypoints[0].x = m_RallyPoints[index].X;
 	waypoints[0].z = m_RallyPoints[index].Y;
 
