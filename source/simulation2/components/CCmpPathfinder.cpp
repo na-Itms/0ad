@@ -772,8 +772,10 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const I
 
 //////////////////////////////////////////////////////////
 
-void CCmpPathfinder::ComputePathOffImpassable(u16 i0, u16 j0, pass_class_t passClass, Path& path)
+void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, Path& path)
 {
+	u16 i0, j0;
+	NearestNavcell(x0, z0, i0, j0);
 	u16 iGoal = i0;
 	u16 jGoal = j0;
 	this->PathfinderHierFindNearestPassableNavcell(iGoal, jGoal, passClass);

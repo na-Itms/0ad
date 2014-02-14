@@ -652,6 +652,9 @@ void CCmpRallyPointRenderer::RecomputeRallyPointPath(size_t index, CmpPtr<ICmpPo
 		waypoints.back().x = newend.X;
 		waypoints.back().z = newend.Y;
 	}
+	// pathfinder makes us go to the nearest passable cell.
+	waypoints[0].x = m_RallyPoints[index].X;
+	waypoints[0].z = m_RallyPoints[index].Y;
 
 	// From here on, we choose to represent the waypoints as CVector2D floats to avoid to have to convert back and forth
 	// between fixed-point Waypoint/CFixedVector2D and various other float-based formats used by interpolation and whatnot.

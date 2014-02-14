@@ -353,9 +353,9 @@ public:
 	/**
 	 * Same kind of interface as ICmpPathfinder::ComputePath, but works when the
 	 * unit is starting on an impassable navcell. Returns a path heading directly
-	 * to the nearest passable navcell.
+	 * to the nearest passable navcell, then the goal.
 	 */
-	void ComputePathOffImpassable(u16 i0, u16 j0, pass_class_t passClass, Path& ret);
+	void ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, Path& path);
 
 	/**
 	 * Given a path with an arbitrary collection of waypoints, updates the

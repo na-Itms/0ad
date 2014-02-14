@@ -670,11 +670,8 @@ void CCmpPathfinder_Hier::FindPassableRegions(std::set<RegionID>& regions, pass_
 
 	const std::vector<Chunk>& chunks = m_Chunks[passClass];
 	for (size_t c = 0; c < chunks.size(); ++c)
-	{
-		// Skip the impassable region r=0
-		for (int r = 1; r < chunks[c].m_NumRegions; ++r)
+		for (int r = 0; r < chunks[c].m_NumRegions; ++r)
 			regions.insert(RegionID(chunks[c].m_ChunkI, chunks[c].m_ChunkJ, r));
-	}
 }
 
 void CCmpPathfinder::PathfinderHierInit()

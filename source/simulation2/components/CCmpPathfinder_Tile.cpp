@@ -371,7 +371,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 	// the escape-from-impassability mode if currently on an impassable navcell
 	if (!IS_PASSABLE(m_Grid->get(i0, j0), passClass))
 	{
-		ComputePathOffImpassable(i0, j0, passClass, path);
+		ComputePathOffImpassable(x0, z0, origGoal,passClass, path);
 		return;
 	}
 
