@@ -831,8 +831,11 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 		// The JPS pathfinder requires units to be on passable tiles
 		// (otherwise it might crash), so handle the supposedly-invalid
 		// state specially
-		ComputePathOffImpassable(i0, j0, passClass, path);
-		return;
+		
+		// TODO: this really seems buggy sometimes.
+		this->PathfinderHierFindNearestPassableNavcell(i0, j0, passClass);
+		//ComputePathOffImpassable(i0, j0, passClass, path);
+		//return;
 	}
 
 	state.goal = origGoal;
