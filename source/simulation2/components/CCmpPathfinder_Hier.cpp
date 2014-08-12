@@ -98,7 +98,8 @@ public:
 	void SetDebugOverlay(bool enabled);
 
 private:
-	static const u8 CHUNK_SIZE = 64; // number of navcells per side
+	static const u8 CHUNK_SIZE = 96; // number of navcells per side
+									 // TODO PATHFINDER: figure out best number. Probably 64 < n < 128
 
 	struct Chunk
 	{

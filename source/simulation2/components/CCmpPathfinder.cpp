@@ -170,7 +170,7 @@ void CCmpPathfinder::HandleMessage(const CMessage& msg, bool UNUSED(global))
 	case MT_WaterChanged:
 	case MT_ObstructionMapShapeChanged:
 	{
-		// TODO: we ought to only bother updating the dirtied region
+		// TODO PATHFINDER: we ought to only bother updating the dirtied region
 		m_TerrainDirty = true;
 		break;
 	}
@@ -229,8 +229,9 @@ const Grid<u16>& CCmpPathfinder::GetPassabilityGrid()
  *
  * This is used for adding clearance onto terrain-based navcell passability.
  *
- * TODO: might be nicer to get rounded corners by measuring clearances as
+ * TODO PATHFINDER: might be nicer to get rounded corners by measuring clearances as
  * Euclidean distances; currently it effectively does dist=max(dx,dy) instead.
+ * This would only really be a problem for big clearances.
  */
 static void ExpandImpassableCells(Grid<u16>& grid, u16 clearance, ICmpPathfinder::pass_class_t mask)
 {

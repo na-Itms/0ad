@@ -600,14 +600,14 @@ public:
 		if (!GetObstructionSquare(square))
 			return ret; // error
 			
-		cmpObstructionManager->GetUnitsOnObstruction(square, ret);
-		//if (m_Type == STATIC)
-		//	cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
-		//else if (m_Type == UNIT)
-		//	cmpObstructionManager->TestUnitShape(filter, pos.X, pos.Y, m_Size0, &ret);
-		//else
-		//	cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
-	
+		/*cmpObstructionManager->GetUnitsOnObstruction(square, ret);
+		if (m_Type == STATIC)
+			cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
+		else if (m_Type == UNIT)
+			cmpObstructionManager->TestUnitShape(filter, pos.X, pos.Y, m_Size0, &ret);
+		else
+			cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);
+		*/
 		return ret;
 	}
 

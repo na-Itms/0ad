@@ -155,6 +155,7 @@ typedef SparseGrid<PathfindTileJPS> PathfindTileJPSGrid;
  * The i/j components are packed into a single u32, since we usually use these
  * objects for equality comparisons and the VC2010 optimizer doesn't seem to automatically
  * compare two u16s in a single operation.
+ * TODO: maybe VC2012 will?
  */
 struct TileID
 {
