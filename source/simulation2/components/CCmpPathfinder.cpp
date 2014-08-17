@@ -860,9 +860,9 @@ void CCmpPathfinder::ImprovePathWaypoints(Path& path, pass_class_t passClass)
 	{
 		CFixedVector2D ahead(waypoints[k+1].x, waypoints[k+1].z);
 		CFixedVector2D curr(waypoints[k].x, waypoints[k].z);
-		if ((ahead-curr).Perpendicular().Dot(curr-prev) == fixed::Zero())
+		// If we're mostly striaght, don't even bother.
+		if ( (ahead-curr).Perpendicular().Dot(curr-prev).Absolute() <= fixed::Epsilon()*100)
 		{
-			// this way the testline will test less.
 			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
 			continue;
 		}
