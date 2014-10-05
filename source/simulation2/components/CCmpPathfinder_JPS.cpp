@@ -645,7 +645,7 @@ static void AddJumpedHoriz(int i, int j, int di, PathCost g, PathfinderStateJPS&
 		if (!PASSABLE(ni, j))
 			break;
 
-		if ((ni == state.iGoal && j == state.jGoal) || // XXX
+		if (state.goal.NavcellContainsGoal(ni, j) || // XXX
 #if ACCEPT_DIAGONAL_GAPS
 			(!PASSABLE(ni, j-1) && PASSABLE(ni+di, j-1)) ||
 			(!PASSABLE(ni, j+1) && PASSABLE(ni+di, j+1)))
@@ -671,7 +671,7 @@ static bool HasJumpedHoriz(int i, int j, int di, PathfinderStateJPS& state)
 		if (!PASSABLE(ni, j))
 			return false;
 
-		if ((ni == state.iGoal && j == state.jGoal) || // XXX
+		if (state.goal.NavcellContainsGoal(ni, j) || // XXX
 #if ACCEPT_DIAGONAL_GAPS
 			(!PASSABLE(ni, j-1) && PASSABLE(ni+di, j-1)) ||
 			(!PASSABLE(ni, j+1) && PASSABLE(ni+di, j+1)))
@@ -696,7 +696,7 @@ static void AddJumpedVert(int i, int j, int dj, PathCost g, PathfinderStateJPS& 
 		if (!PASSABLE(i, nj))
 			break;
 
-		if ((i == state.iGoal && nj == state.jGoal) ||
+		if (state.goal.NavcellContainsGoal(i, nj) || // XXX
 #if ACCEPT_DIAGONAL_GAPS
 			(!PASSABLE(i-1, nj) && PASSABLE(i-1, nj+dj)) ||
 			(!PASSABLE(i+1, nj) && PASSABLE(i+1, nj+dj)))
@@ -722,7 +722,7 @@ static bool HasJumpedVert(int i, int j, int dj, PathfinderStateJPS& state)
 		if (!PASSABLE(i, nj))
 			return false;
 
-		if ((i == state.iGoal && nj == state.jGoal) ||
+		if (state.goal.NavcellContainsGoal(i, nj) || // XXX
 #if ACCEPT_DIAGONAL_GAPS
 			(!PASSABLE(i-1, nj) && PASSABLE(i-1, nj+dj)) ||
 			(!PASSABLE(i+1, nj) && PASSABLE(i+1, nj+dj)))
