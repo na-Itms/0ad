@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Wildfire Games.
+/* Copyright (C) 2014 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -127,8 +127,6 @@ private:
 		bool RegionContainsGoal(u16 r, const PathGoal& goal) const;
 
 		void RegionNavcellNearest(u16 r, int iGoal, int jGoal, int& iBest, int& jBest, u32& dist2Best) const;
-
-		void FloodFill(int i0, int j0, u16 r);
 	};
 
 	typedef std::map<RegionID, std::set<RegionID> > EdgesMap;
@@ -202,6 +200,21 @@ public:
 	}
 };
 
+// Find the root ID of a region, used by InitRegions
+inline u16 RootID(u16 x, std::vector<u16> v)
+{
+	// Just add a basic check for infinite loops
+	int checkLoop = 0;
+	while (v[x] < x)
+	{
+		++checkLoop;
+		ENSURE(checkLoop < 1000 && "Long loop (probably infinite), unable to find an invariant point");
+		x = v[x];
+	}
+
+	return x;
+}
+
 void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* grid, pass_class_t passClass)
 {
 	TIMER_ACCRUE(tc_InitRegions);
@@ -216,60 +229,78 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 	int i1 = std::min(i0 + CHUNK_SIZE, (int)grid->m_W);
 	int j1 = std::min(j0 + CHUNK_SIZE, (int)grid->m_H);
 
+	// Efficiently flood-fill the m_Regions grid
+
+	int regionID = 0;
+	std::vector<u16> connect;
+
+	u16* pCurrentID = NULL;
+	u16 LeftID = 0;
+	u16 UpID = 0;
+
+	connect.reserve(32); // TODO: What's a sensible number?
+	connect.push_back(0); // connect[0] = 0
+	
 	// Start by filling the grid with 0 for blocked,
-	// and a 0xFFFF placeholder for unblocked
+	// and regionID for unblocked
 	for (int j = j0; j < j1; ++j)
 	{
 		for (int i = i0; i < i1; ++i)
 		{
-			if (IS_PASSABLE(grid->get(i, j), passClass))
-				m_Regions[j-j0][i-i0] = 0xFFFF;
+			pCurrentID = &m_Regions[j-j0][i-i0];
+			if (!IS_PASSABLE(grid->get(i, j), passClass))
+			{
+				*pCurrentID = 0;
+				continue;
+			}
+			
+			if (j > j0)
+				UpID = m_Regions[j-1-j0][i-i0];
+
+			if (i == i0)
+				LeftID = 0;
 			else
-				m_Regions[j-j0][i-i0] = 0;
+				LeftID = m_Regions[j-j0][i-1-i0];
+
+			if (LeftID > 0)
+			{
+				*pCurrentID = LeftID;
+				if (*pCurrentID != UpID && UpID > 0)
+				{
+					u16 id0 = RootID(UpID, connect);
+					u16 id1 = RootID(LeftID, connect);
+						
+					if (id0 < id1)
+						connect[id1] = id0;
+					else if (id0 > id1)
+						connect[id0] = id1;
+				}
+			}
+			else if (UpID > 0)
+				*pCurrentID = UpID;
+			else
+			{
+				// New ID
+				*pCurrentID = ++regionID;
+				connect.push_back(regionID);
+			}
 		}
 	}
 
-	// Scan for tiles with the 0xFFFF placeholder, and then floodfill
-	// the new region this tile belongs to
-	int r = 0;
-	for (int j = 0; j < CHUNK_SIZE; ++j)
+	// Directly point the root ID
+	m_NumRegions = 0;
+	for (u16 i = regionID; i > 0; --i)
 	{
-		for (int i = 0; i < CHUNK_SIZE; ++i)
-		{
-			if (m_Regions[j][i] == 0xFFFF)
-				FloodFill(i, j, ++r);
-		}
+		if (connect[i] == i)
+			++m_NumRegions;
+		else
+			connect[i] = RootID(i,connect);
 	}
 
-	m_NumRegions = r;
-}
-
-/**
- * Flood-fill a connected area of navcells that are currently set to
- * region 0xFFFF, starting at chunk-local coords (i0,j0),
- * and assign them to region r.
- */
-void CCmpPathfinder_Hier::Chunk::FloodFill(int i0, int j0, u16 r)
-{
-	std::vector<std::pair<u8, u8> > stack;
-	stack.push_back(std::make_pair(i0, j0));
-
-	while (!stack.empty())
-	{
-		int i = stack.back().first;
-		int j = stack.back().second;
-		stack.pop_back();
-		m_Regions[j][i] = r;
-
-		if (i > 0 && m_Regions[j][i-1] == 0xFFFF)
-			stack.push_back(std::make_pair(i-1, j));
-		if (j > 0 && m_Regions[j-1][i] == 0xFFFF)
-			stack.push_back(std::make_pair(i, j-1));
-		if (i < CHUNK_SIZE-1 && m_Regions[j][i+1] == 0xFFFF)
-			stack.push_back(std::make_pair(i+1, j));
-		if (j < CHUNK_SIZE-1 && m_Regions[j+1][i] == 0xFFFF)
-			stack.push_back(std::make_pair(i, j+1));
-	}
+	// Replace IDs by the root ID
+	for (int i = 0; i < CHUNK_SIZE; ++i)
+		for (int j = 0; j < CHUNK_SIZE; ++j)
+			m_Regions[i][j] = connect[m_Regions[i][j]];
 }
 
 /**
