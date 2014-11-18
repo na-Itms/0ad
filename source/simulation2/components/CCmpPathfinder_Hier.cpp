@@ -236,7 +236,7 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 
 	u16* pCurrentID = NULL;
 	u16 LeftID = 0;
-	u16 UpID = 0;
+	u16 DownID = 0;
 
 	connect.reserve(32); // TODO: What's a sensible number?
 	connect.push_back(0); // connect[0] = 0
@@ -255,7 +255,7 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 			}
 			
 			if (j > j0)
-				UpID = m_Regions[j-1-j0][i-i0];
+				DownID = m_Regions[j-1-j0][i-i0];
 
 			if (i == i0)
 				LeftID = 0;
@@ -265,9 +265,9 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 			if (LeftID > 0)
 			{
 				*pCurrentID = LeftID;
-				if (*pCurrentID != UpID && UpID > 0)
+				if (*pCurrentID != DownID && DownID > 0)
 				{
-					u16 id0 = RootID(UpID, connect);
+					u16 id0 = RootID(DownID, connect);
 					u16 id1 = RootID(LeftID, connect);
 						
 					if (id0 < id1)
@@ -276,8 +276,8 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 						connect[id0] = id1;
 				}
 			}
-			else if (UpID > 0)
-				*pCurrentID = UpID;
+			else if (DownID > 0)
+				*pCurrentID = DownID;
 			else
 			{
 				// New ID
