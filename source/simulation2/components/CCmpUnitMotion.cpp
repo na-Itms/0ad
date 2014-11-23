@@ -43,8 +43,6 @@
 // instead of calling the pathfinder
 #define DISABLE_PATHFINDER 0
 
-#define USE_SHORT_FOR_UNIT 1
-
 /**
  * When advancing along the long path, and picking a new waypoint to move
  * towards, we'll pick one that's up to this far from the unit's current
@@ -895,25 +893,16 @@ void CCmpUnitMotion::Move(fixed dt)
 		
 		while (timeLeft > zero)
 		{
-#if USE_SHORT_FOR_UNIT
 			// If we ran out of path, we have to stop
 			if (m_ShortPath.m_Waypoints.empty() && m_LongPath.m_Waypoints.empty())
 				break;
-#else
-			// If we ran out of path, we have to stop
-			if (m_LongPath.m_Waypoints.empty())
-				break;
-#endif
 
-#if USE_SHORT_FOR_UNIT
 			CFixedVector2D target;
 			if (m_ShortPath.m_Waypoints.empty())
 				target = CFixedVector2D(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
 			else
 				target = CFixedVector2D(m_ShortPath.m_Waypoints.back().x, m_ShortPath.m_Waypoints.back().z);
-#else
-			CFixedVector2D target(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
-#endif
+			
 			CFixedVector2D offset = target - pos;
 
 			// Work out how far we can travel in timeLeft
@@ -930,14 +919,11 @@ void CCmpUnitMotion::Move(fixed dt)
 					// Spend the rest of the time heading towards the next waypoint
 					timeLeft = timeLeft - (offsetLength / maxSpeed);
 
-#if USE_SHORT_FOR_UNIT
 					if (m_ShortPath.m_Waypoints.empty())
 						m_LongPath.m_Waypoints.pop_back();
 					else
 						m_ShortPath.m_Waypoints.pop_back();
-#else
-					m_LongPath.m_Waypoints.pop_back();
-#endif
+
 					continue;
 				}
 				else
@@ -982,7 +968,6 @@ void CCmpUnitMotion::Move(fixed dt)
 		
 		if (wasObstructed)
 		{
-#if USE_SHORT_FOR_UNIT
 			// Oops, we hit something (very likely another unit).
 			// Stop, and recompute the whole path.
 			// TODO: if the target has UnitMotion and is higher priority,
@@ -1008,7 +993,6 @@ void CCmpUnitMotion::Move(fixed dt)
 				m_LongPath.m_Waypoints.pop_back();
  			}
 			// TODO: check where the collision was and move slightly.
-#endif
 			return;
 		}
 
