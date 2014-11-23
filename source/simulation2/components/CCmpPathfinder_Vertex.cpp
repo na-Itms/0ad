@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Wildfire Games.
+/* Copyright (C) 2014 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -626,7 +626,6 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	entity_pos_t x0, entity_pos_t z0, entity_pos_t r,
 	entity_pos_t range, const PathGoal& goal, pass_class_t passClass, Path& path)
 {
-	UpdateGrid(); // TODO: only need to bother updating if the terrain changed
 
 	PROFILE3("ComputeShortPath");
 	TIMER(L"ComputeShortPath");
@@ -1053,8 +1052,6 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 	// To handle the special case of units that are stuck on impassable cells,
 	// we allow them to move from an impassable to a passable cell (but not
 	// vice versa).
-
-	UpdateGrid();
 
 	u16 i0, j0, i1, j1;
 	NearestNavcell(x0, z0, i0, j0);

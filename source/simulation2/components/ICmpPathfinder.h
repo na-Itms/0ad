@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Wildfire Games.
+/* Copyright (C) 2014 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -177,6 +177,11 @@ public:
 	 * Process moves during the same turn they were created in to improve responsiveness.
 	 */
 	virtual void ProcessSameTurnMoves() = 0;
+
+	/**
+	 * Regenerates the grid based on the current obstruction list, if necessary
+	 */
+	virtual void UpdateGrid() = 0;
 
 	/**
 	 * Returns some stats about the last ComputePath.
