@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Wildfire Games.
+/* Copyright (C) 2014 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -62,6 +62,7 @@ void CCmpPathfinder::Init(const CParamNode& UNUSED(paramNode))
 {
 	m_MapSize = 0;
 	m_Grid = NULL;
+	m_BaseGrid = NULL;
 	m_ObstructionGridDirtyID = 0;
 	m_TerrainDirty = true;
 	m_NextAsyncTicket = 1;
@@ -119,6 +120,7 @@ void CCmpPathfinder::Deinit()
 	PathfinderHierDeinit();
 
 	SAFE_DELETE(m_Grid);
+	SAFE_DELETE(m_BaseGrid);
 }
 
 struct SerializeLongRequest
@@ -487,6 +489,7 @@ void CCmpPathfinder::UpdateGrid()
 	if (m_Grid && m_MapSize != cmpTerrain->GetTilesPerSide())
 	{
 		SAFE_DELETE(m_Grid);
+		SAFE_DELETE(m_BaseGrid);
 		m_TerrainDirty = true;
 	}
 
@@ -495,6 +498,7 @@ void CCmpPathfinder::UpdateGrid()
 	{
 		m_MapSize = cmpTerrain->GetTilesPerSide();
 		m_Grid = new Grid<NavcellData>(m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE, m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE);
+		m_BaseGrid = new Grid<NavcellData>(m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE, m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE);
 		m_ObstructionGridDirtyID = 0;
 	}
 
@@ -513,54 +517,67 @@ void CCmpPathfinder::UpdateGrid()
 		// Obstructions or terrain changed - we need to recompute passability
 		// TODO: only bother recomputing the region that has actually changed
 
-		Grid<u16> shoreGrid = ComputeShoreGrid();
-
-		ComputeTerrainPassabilityGrid(shoreGrid);
-
-		if (1) // XXX: if circular
+		// If the terrain has changed, recompute entirely m_Grid
+		// Else, use data from m_BaseGrid and add obstructions
+		if (m_TerrainDirty)
 		{
-			PROFILE3("off-world passability");
+			Grid<u16> shoreGrid = ComputeShoreGrid();
 
-			// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
-			const int edgeSize = 3 * ICmpObstructionManager::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
+			ComputeTerrainPassabilityGrid(shoreGrid);
 
-			NavcellData edgeMask = 0;
-			for (size_t n = 0; n < m_PassClasses.size(); ++n)
-				edgeMask |= m_PassClasses[n].m_Mask;
-
-			int w = m_Grid->m_W;
-			int h = m_Grid->m_H;
-			for (int j = 0; j < h; ++j)
+			if (1) // XXX: if circular
 			{
-				for (int i = 0; i < w; ++i)
+				PROFILE3("off-world passability");
+
+				// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
+				const int edgeSize = 3 * ICmpObstructionManager::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
+
+				NavcellData edgeMask = 0;
+				for (size_t n = 0; n < m_PassClasses.size(); ++n)
+					edgeMask |= m_PassClasses[n].m_Mask;
+
+				int w = m_Grid->m_W;
+				int h = m_Grid->m_H;
+				for (int j = 0; j < h; ++j)
 				{
-					// Based on CCmpRangeManager::LosIsOffWorld
-					// but tweaked since it's tile-based instead.
-					// (We double all the values so we can handle half-tile coordinates.)
-					// This needs to be slightly tighter than the LOS circle,
-					// else units might get themselves lost in the SoD around the edge.
+					for (int i = 0; i < w; ++i)
+					{
+						// Based on CCmpRangeManager::LosIsOffWorld
+						// but tweaked since it's tile-based instead.
+						// (We double all the values so we can handle half-tile coordinates.)
+						// This needs to be slightly tighter than the LOS circle,
+						// else units might get themselves lost in the SoD around the edge.
 
-					int dist2 = (i*2 + 1 - w)*(i*2 + 1 - w)
-						+ (j*2 + 1 - h)*(j*2 + 1 - h);
+						int dist2 = (i*2 + 1 - w)*(i*2 + 1 - w)
+							+ (j*2 + 1 - h)*(j*2 + 1 - h);
 
-					if (dist2 >= (w - 2*edgeSize) * (h - 2*edgeSize))
-						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+						if (dist2 >= (w - 2*edgeSize) * (h - 2*edgeSize))
+							m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+					}
 				}
 			}
-		}
 
-		// Expand the impassability grid, for any class with non-zero clearance,
-		// so that we can stop units getting too close to impassable navcells
-		for (size_t n = 0; n < m_PassClasses.size(); ++n)
-		{
-			if (m_PassClasses[n].m_HasClearance)
+			// Expand the impassability grid, for any class with non-zero clearance,
+			// so that we can stop units getting too close to impassable navcells
+			for (size_t n = 0; n < m_PassClasses.size(); ++n)
 			{
-				// TODO: if multiple classes have the same clearance, we should
-				// only bother doing this once for them all
-				int clearance = (m_PassClasses[n].m_Clearance / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToInfinity();
-				if (clearance > 0)
-					ExpandImpassableCells(*m_Grid, clearance, m_PassClasses[n].m_Mask);
+				if (m_PassClasses[n].m_HasClearance)
+				{
+					// TODO: if multiple classes have the same clearance, we should
+					// only bother doing this once for them all
+					int clearance = (m_PassClasses[n].m_Clearance / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToInfinity();
+					if (clearance > 0)
+						ExpandImpassableCells(*m_Grid, clearance, m_PassClasses[n].m_Mask);
+				}
 			}
+
+			// Store the updated terrain-only grid
+			*m_BaseGrid = *m_Grid;
+		}
+		else
+		{
+			ENSURE(m_Grid->m_W == m_BaseGrid->m_W && m_Grid->m_H == m_BaseGrid->m_H);
+			memcpy(m_Grid->m_Data, m_BaseGrid->m_Data, (m_Grid->m_W)*(m_Grid->m_H)*sizeof(NavcellData));
 		}
 
 		// Add obstructions onto the grid, for any class with (possibly zero) clearance
