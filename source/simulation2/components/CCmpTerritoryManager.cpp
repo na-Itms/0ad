@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Wildfire Games.
+/* Copyright (C) 2014 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -88,6 +88,10 @@ public:
 	// connected flag in bit 6 (TERRITORY_CONNECTED_MASK);
 	// processed flag in bit 7 (TERRITORY_PROCESSED_MASK)
 	Grid<u8>* m_Territories;
+	
+	// Territory grid with the same resolution as the passability grid
+	// The AIs always work with maps of this resolution
+	Grid<u8>* m_PassResolTerritories;
 
 	// Set to true when territories change; will send a TerritoriesChanged message
 	// during the Update phase
@@ -113,6 +117,7 @@ public:
 	virtual void Init(const CParamNode& UNUSED(paramNode))
 	{
 		m_Territories = NULL;
+		m_PassResolTerritories = NULL;
 		m_DebugOverlay = NULL;
 //		m_DebugOverlay = new TerritoryOverlay(*this);
 		m_BoundaryLinesDirty = true;
@@ -135,6 +140,7 @@ public:
 	virtual void Deinit()
 	{
 		SAFE_DELETE(m_Territories);
+		SAFE_DELETE(m_PassResolTerritories);
 		SAFE_DELETE(m_DebugOverlay);
 	}
 
@@ -223,6 +229,13 @@ public:
 		return *m_Territories;
 	}
 
+	virtual const Grid<u8>& GetPassabilityResolutionTerritoryGrid()
+	{
+		CalculateTerritories();
+		ENSURE(m_PassResolTerritories);
+		return *m_PassResolTerritories;
+	}
+
 	virtual player_id_t GetOwner(entity_pos_t x, entity_pos_t z);
 	virtual bool IsConnected(entity_pos_t x, entity_pos_t z);
 
@@ -235,6 +248,7 @@ public:
 	void MakeDirty()
 	{
 		SAFE_DELETE(m_Territories);
+		SAFE_DELETE(m_PassResolTerritories);
 		++m_DirtyID;
 		m_BoundaryLinesDirty = true;
 		m_TriggerEvent = true;
@@ -352,6 +366,8 @@ void CCmpTerritoryManager::CalculateTerritories()
 {
 	if (m_Territories)
 		return;
+	
+	ENSURE(!m_PassResolTerritories);
 
 	PROFILE("CalculateTerritories");
 
@@ -587,6 +603,16 @@ void CCmpTerritoryManager::CalculateTerritories()
 		}
 
 #undef MARK_AND_PUSH
+	}
+
+	// Generate the passability-resolution territory map
+	m_PassResolTerritories = new Grid<u8>(passGrid.m_W, passGrid.m_H);
+	for (int j = 0; j < passGrid.m_H; ++j)
+	{
+		for (int i = 0; i < passGrid.m_W; ++i)
+		{
+			m_PassResolTerritories->set(i, j, m_Territories->get(i / NAVCELLS_PER_TERRITORY_TILE, j / NAVCELLS_PER_TERRITORY_TILE));
+		}
 	}
 }
 

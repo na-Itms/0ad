@@ -1,4 +1,4 @@
-/* Copyright (C) 2011 Wildfire Games.
+/* Copyright (C) 2014 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -47,6 +47,7 @@ public:
 	 * (civ center etc).
 	 */
 	virtual const Grid<u8>& GetTerritoryGrid() = 0;
+	virtual const Grid<u8>& GetPassabilityResolutionTerritoryGrid() = 0;
 
 	/**
 	 * Get owner of territory at given position.
