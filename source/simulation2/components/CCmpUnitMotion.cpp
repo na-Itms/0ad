@@ -606,6 +606,12 @@ private:
 	bool ComputeTargetPosition(CFixedVector2D& out);
 
 	/**
+	 * Attempts to replace the current path with a straight line to the goal,
+	 * if this goal is a point, is close enough and the route is not obstructed.
+	 */
+	bool TryGoingStraightToGoalPoint(CFixedVector2D from);
+
+	/**
 	 * Attempts to replace the current path with a straight line to the target
 	 * entity, if it's close enough and the route is not obstructed.
 	 */
@@ -1025,11 +1031,8 @@ void CCmpUnitMotion::Move(fixed dt)
 				{
 					// check if target was reached in case of a moving target
 					CmpPtr<ICmpUnitMotion> cmpUnitMotion(GetSimContext(), m_TargetEntity);
-					if 
-					(
-						cmpUnitMotion && cmpUnitMotion->IsMoving() &&
-						MoveToTargetRange(m_TargetEntity, m_TargetMinRange, m_TargetMaxRange)
-					)
+					if (cmpUnitMotion && cmpUnitMotion->IsMoving() &&
+						MoveToTargetRange(m_TargetEntity, m_TargetMinRange, m_TargetMaxRange))
 						return;
 
 					// Not in formation, so just finish moving
@@ -1080,6 +1083,36 @@ bool CCmpUnitMotion::ComputeTargetPosition(CFixedVector2D& out)
 		CFixedVector2D offset = m_TargetOffset.Rotate(angle);
 		out = cmpPosition->GetPosition2D() + offset;
 	}
+	return true;
+}
+
+bool CCmpUnitMotion::TryGoingStraightToGoalPoint(CFixedVector2D from)
+{
+	// Make sure the goal is a point
+	if (m_FinalGoal.type != PathGoal::POINT)
+		return false;
+
+	// Fail if the goal is too far away
+	CFixedVector2D goalPos;
+	goalPos.X = m_FinalGoal.x;
+	goalPos.Y = m_FinalGoal.z;
+	if ((goalPos - from).CompareLength(DIRECT_PATH_RANGE) > 0)
+		return false;
+
+	CmpPtr<ICmpPathfinder> cmpPathfinder(GetSystemEntity());
+	if (!cmpPathfinder)
+		return false;
+
+	// Check if there's any collisions on that route
+	if (!cmpPathfinder->CheckMovement(GetObstructionFilter(), from.X, from.Y, goalPos.X, goalPos.Y, m_Radius, m_PassClass))
+		return false;
+
+	// That route is okay, so update our path
+	m_LongPath.m_Waypoints.clear();
+	m_ShortPath.m_Waypoints.clear();
+	ICmpPathfinder::Waypoint wp = { goalPos.X, goalPos.Y };
+	m_LongPath.m_Waypoints.push_back(wp);
+
 	return true;
 }
 
@@ -1264,7 +1297,12 @@ void CCmpUnitMotion::BeginPathing(CFixedVector2D from, const PathGoal& goal)
 		return;
 	}
 
-	// TODO: should go straight to non-entity points too
+	// Same thing applies to non-entity points
+	if (TryGoingStraightToGoalPoint(from))
+	{
+		m_PathState = PATHSTATE_FOLLOWING;
+		return;
+	}
 
 	// Otherwise we need to compute a path.
 
