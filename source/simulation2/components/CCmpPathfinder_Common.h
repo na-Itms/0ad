@@ -145,7 +145,7 @@ private:
 typedef u16 NavcellData; // 1 bit per passability class (up to PASS_CLASS_BITS)
 static const int PASS_CLASS_BITS = 16;
 #define IS_PASSABLE(item, classmask) (((item) & (classmask)) == 0)
-#define PASS_CLASS_MASK_FROM_INDEX(id) ((pass_class_t)(1u << (id)))
+#define PASS_CLASS_MASK_FROM_INDEX(id) ((pass_class_t)(1u << (id + 2)))
 
 typedef SparseGrid<PathfindTile> PathfindTileGrid;
 typedef SparseGrid<PathfindTileJPS> PathfindTileJPSGrid;
