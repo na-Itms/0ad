@@ -41,6 +41,11 @@
                 <data type="decimal"/>
               </element>
             </optional>
+            <optional>
+              <element name="Clearance">
+                <data type="decimal"/>
+              </element>
+            </optional>
           </interleave>
         </element>
       </oneOrMore>
