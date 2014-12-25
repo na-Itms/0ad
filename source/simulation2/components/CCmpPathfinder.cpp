@@ -896,13 +896,13 @@ void CCmpPathfinder::ImprovePathWaypoints(Path& path, pass_class_t passClass)
 		return;
 	
 	StationaryOnlyObstructionFilter filter;
-	CFixedVector2D prev(waypoints.back().x, waypoints.back().z);
+	CFixedVector2D prev(waypoints.front().x, waypoints.front().z);
 	newWaypoints.push_back(waypoints.front());
 	for (size_t k = 1; k < waypoints.size()-1; ++k)
 	{
 		CFixedVector2D ahead(waypoints[k+1].x, waypoints[k+1].z);
 		CFixedVector2D curr(waypoints[k].x, waypoints[k].z);
-		// If we're mostly striaght, don't even bother.
+		// If we're mostly straight, don't even bother.
 		if ( (ahead-curr).Perpendicular().Dot(curr-prev).Absolute() <= fixed::Epsilon()*100)
 		{
 			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
