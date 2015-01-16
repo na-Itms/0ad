@@ -896,6 +896,15 @@ void CCmpUnitMotion::Move(fixed dt)
 			if (m_ShortPath.m_Waypoints.empty() && m_LongPath.m_Waypoints.empty())
 				break;
 
+			// If we're heading towards the ultimate waypoint, replace the path
+			// by a short path towards the final goal
+			if (m_ShortPath.m_Waypoints.empty() && m_LongPath.m_Waypoints.size() == 1)
+			{
+				m_LongPath.m_Waypoints.clear();
+				ICmpPathfinder::Waypoint finalWaypoint = { m_FinalGoal.x, m_FinalGoal.z };
+				m_ShortPath.m_Waypoints.push_back(finalWaypoint);
+			}
+
 			CFixedVector2D target;
 			if (m_ShortPath.m_Waypoints.empty())
 				target = CFixedVector2D(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
