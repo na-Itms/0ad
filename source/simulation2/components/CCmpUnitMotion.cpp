@@ -1009,10 +1009,7 @@ void CCmpUnitMotion::Move(fixed dt)
 		{
 			// If we're not currently computing any new paths:
 
-			// If we are close to reaching the end of the short path
-			// (or have reached it already), try to extend it
-
-			if (m_LongPath.m_Waypoints.empty())
+			if (m_LongPath.m_Waypoints.empty() && m_ShortPath.m_Waypoints.empty())
 			{
 				if (IsFormationMember())
 				{
@@ -1111,7 +1108,7 @@ bool CCmpUnitMotion::TryGoingStraightToGoalPoint(CFixedVector2D from)
 	m_LongPath.m_Waypoints.clear();
 	m_ShortPath.m_Waypoints.clear();
 	ICmpPathfinder::Waypoint wp = { goalPos.X, goalPos.Y };
-	m_LongPath.m_Waypoints.push_back(wp);
+	m_ShortPath.m_Waypoints.push_back(wp);
 
 	return true;
 }
@@ -1149,7 +1146,7 @@ bool CCmpUnitMotion::TryGoingStraightToTargetEntity(CFixedVector2D from)
 	m_LongPath.m_Waypoints.clear();
 	m_ShortPath.m_Waypoints.clear();
 	ICmpPathfinder::Waypoint wp = { goalPos.X, goalPos.Y };
-	m_LongPath.m_Waypoints.push_back(wp);
+	m_ShortPath.m_Waypoints.push_back(wp);
 
 	return true;
 }
