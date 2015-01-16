@@ -657,13 +657,6 @@ private:
 	void RequestShortPath(CFixedVector2D from, const PathGoal& goal, bool avoidMovingUnits);
 
 	/**
-	 * Select a next long waypoint, given the current unit position.
-	 * Also recomputes the short path to use that waypoint.
-	 * Returns false on error, or if there is no waypoint to pick.
-	 */
-	bool PickNextLongWaypoint(const CFixedVector2D& pos, bool avoidMovingUnits);
-
-	/**
 	 * Convert a path into a renderable list of lines
 	 */
 	void RenderPath(const ICmpPathfinder::Path& path, std::vector<SOverlayLine>& lines, CColor color);
@@ -1329,42 +1322,6 @@ void CCmpUnitMotion::RequestShortPath(CFixedVector2D from, const PathGoal& goal,
 		return;
 
 	m_ExpectedPathTicket = cmpPathfinder->ComputeShortPathAsync(from.X, from.Y, m_Radius, SHORT_PATH_SEARCH_RANGE, goal, m_PassClass, avoidMovingUnits, m_TargetEntity, GetEntityId());
-}
-
-bool CCmpUnitMotion::PickNextLongWaypoint(const CFixedVector2D& pos, bool avoidMovingUnits)
-{
-	// If there's no long path, we can't pick the next waypoint from it
-	if (m_LongPath.m_Waypoints.empty())
-		return false;
-
-	// First try to get the immediate next waypoint
-	entity_pos_t targetX = m_LongPath.m_Waypoints.back().x;
-	entity_pos_t targetZ = m_LongPath.m_Waypoints.back().z;
-	m_LongPath.m_Waypoints.pop_back();
-
-	// Now we need to recompute a short path to the waypoint
-
-	PathGoal goal;
-	if (m_LongPath.m_Waypoints.empty())
-	{
-		// This was the last waypoint - head for the exact goal
-		goal = m_FinalGoal;
-	}
-	else
-	{
-		// Head for somewhere near the waypoint (but allow some leeway in case it's obstructed)
-		goal.type = PathGoal::CIRCLE;
-		goal.hw = SHORT_PATH_GOAL_RADIUS;
-		goal.x = targetX;
-		goal.z = targetZ;
-	}
-
-// 	m_ShortPath.m_Waypoints.clear();
-// 	m_ShortPath.m_Waypoints = m_LongPath.m_Waypoints;
-// 	ICmpPathfinder::Waypoint nextLongWaypoint = { goal.x, goal.z };
-//	m_ShortPath.m_Waypoints.push_back(nextLongWaypoint);
-
-	return true;
 }
 
 bool CCmpUnitMotion::MoveToPointRange(entity_pos_t x, entity_pos_t z, entity_pos_t minRange, entity_pos_t maxRange)
