@@ -946,7 +946,7 @@ public:
 		CmpPtr<ICmpTerritoryManager> cmpTerritoryManager(GetSystemEntity());
 		if (cmpTerritoryManager && cmpTerritoryManager->NeedUpdate(&m_TerritoriesDirtyID))
 		{
-			territoryMap = &cmpTerritoryManager->GetPassabilityResolutionTerritoryGrid();
+			territoryMap = &cmpTerritoryManager->GetTerritoryGrid();
 		}
 		
 		LoadPathfinderClasses(state);
