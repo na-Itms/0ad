@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -36,7 +36,7 @@ class PathfinderHierOverlay;
 
 /**
  * Hierarchical pathfinder.
- * 
+ *
  * Currently this doesn't actually find shortest paths, it just deals with
  * connectivity.
  *
@@ -155,7 +155,7 @@ private:
 
 	u16 m_ChunksW, m_ChunksH;
 	std::map<pass_class_t, std::vector<Chunk> > m_Chunks;
-	
+
 	std::map<pass_class_t, EdgesMap> m_Edges;
 
 public:
@@ -240,7 +240,7 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 
 	connect.reserve(32); // TODO: What's a sensible number?
 	connect.push_back(0); // connect[0] = 0
-	
+
 	// Start by filling the grid with 0 for blocked,
 	// and regionID for unblocked
 	for (int j = j0; j < j1; ++j)
@@ -253,7 +253,7 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 				*pCurrentID = 0;
 				continue;
 			}
-			
+
 			if (j > j0)
 				DownID = m_Regions[j-1-j0][i-i0];
 
@@ -269,7 +269,7 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
 				{
 					u16 id0 = RootID(DownID, connect);
 					u16 id1 = RootID(LeftID, connect);
-						
+
 					if (id0 < id1)
 						connect[id1] = id0;
 					else if (id0 > id1)

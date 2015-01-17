@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -88,7 +88,7 @@ public:
 	// connected flag in bit 6 (TERRITORY_CONNECTED_MASK);
 	// processed flag in bit 7 (TERRITORY_PROCESSED_MASK)
 	Grid<u8>* m_Territories;
-	
+
 	// Territory grid with the same resolution as the passability grid
 	// The AIs always work with maps of this resolution
 	Grid<u8>* m_PassResolTerritories;
@@ -366,7 +366,7 @@ void CCmpTerritoryManager::CalculateTerritories()
 {
 	if (m_Territories)
 		return;
-	
+
 	ENSURE(!m_PassResolTerritories);
 
 	PROFILE("CalculateTerritories");

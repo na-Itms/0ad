@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -43,8 +43,8 @@
 	TIMER_ADD_CLIENT(tc_FinishAsyncRequests);
 	TIMER_ADD_CLIENT(tc_ProcessLongRequests);
 	TIMER_ADD_CLIENT(tc_ProcessShortRequests);
-	TIMER_ADD_CLIENT(tc_ProcessLongRequests_Loop);	
-	TIMER_ADD_CLIENT(tc_UpdateGrid);	
+	TIMER_ADD_CLIENT(tc_ProcessLongRequests_Loop);
+	TIMER_ADD_CLIENT(tc_UpdateGrid);
 #else
 	#undef TIMER_ACCRUE
 	#define	TIMER_ACCRUE(a) ;
@@ -887,14 +887,14 @@ void CCmpPathfinder::ImprovePathWaypoints(Path& path, pass_class_t passClass)
 {
 	if (path.m_Waypoints.size() < 2)
 		return;
-	
+
 	std::vector<Waypoint>& waypoints = path.m_Waypoints;
 	std::vector<Waypoint> newWaypoints;
-	
+
 	CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSimContext(), SYSTEM_ENTITY);
 	if (!cmpObstructionManager)
 		return;
-	
+
 	StationaryOnlyObstructionFilter filter;
 	CFixedVector2D prev(waypoints.front().x, waypoints.front().z);
 	newWaypoints.push_back(waypoints.front());
@@ -908,7 +908,7 @@ void CCmpPathfinder::ImprovePathWaypoints(Path& path, pass_class_t passClass)
 			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
 			continue;
 		}
-		
+
 		// TODO: add proper width.
 		if (!CheckMovement(filter, prev.X, prev.Y, ahead.X, ahead.Y, fixed::FromInt(4), passClass))
 		{

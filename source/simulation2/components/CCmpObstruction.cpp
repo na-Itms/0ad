@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -599,7 +599,7 @@ public:
 		ICmpObstructionManager::ObstructionSquare square;
 		if (!GetObstructionSquare(square))
 			return ret; // error
-			
+
 		/*cmpObstructionManager->GetUnitsOnObstruction(square, ret);
 		if (m_Type == STATIC)
 			cmpObstructionManager->TestStaticShape(filter, pos.X, pos.Y, cmpPosition->GetRotation().Y, m_Size0, m_Size1, &ret);

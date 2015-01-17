@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -843,9 +843,9 @@ void CCmpObstructionManager::GetUnitsOnObstruction(const ObstructionSquare& squa
 
 	SimRasterize::Spans spans;
 	SimRasterize::RasterizeRectWithClearance(spans, square, fixed::Zero(), ICmpObstructionManager::NAVCELL_SIZE);
- 
+
 	for (std::map<u32, UnitShape>::iterator it = m_UnitShapes.begin(); it != m_UnitShapes.end(); ++it)
- 	{
+	{
 		// Check whether the unit's center is on a navcell that's in
 		// any of the spans
 
@@ -853,12 +853,12 @@ void CCmpObstructionManager::GetUnitsOnObstruction(const ObstructionSquare& squa
 		u16 j = (it->second.z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
 
 		for (size_t k = 0; k < spans.size(); ++k)
- 		{
+		{
 			if (j == spans[k].j && spans[k].i0 <= i && i < spans[k].i1)
 				out.push_back(it->second.entity);
- 		}
- 	}
- 	//TODO Should we expand by r here?
+		}
+	}
+	//TODO Should we expand by r here?
 }
 
 void CCmpObstructionManager::RenderSubmit(SceneCollector& collector)

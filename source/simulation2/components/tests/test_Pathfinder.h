@@ -214,22 +214,21 @@ public:
 
 		DumpPath(stream, 128*4, 256*4, 128*4, 384*4, cmpPathfinder);
 // 	  	RepeatPath(500, 128*4, 256*4, 128*4, 384*4, cmpPathfinder);
-// //		RepeatPath(100, 128*4, 256*4, 128*4, 384*4, cmpPathfinder);
-// 
+//
 // 		DumpPath(stream, 128*4, 204*4, 192*4, 204*4, cmpPathfinder);
-// 
+//
 // 		DumpPath(stream, 128*4, 230*4, 32*4, 230*4, cmpPathfinder);
 
 		stream << "</g>\n";
 		stream << "</svg>\n";
 	}
-	
+
 	void test_perf3()
 	{
 		CTerrain terrain;
 
 		shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(128 * 1024 * 1024);
-		
+
 		CSimulation2 sim2(NULL, rt, &terrain);
 		sim2.LoadDefaultScripts();
 		sim2.ResetState();

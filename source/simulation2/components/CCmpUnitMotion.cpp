@@ -910,7 +910,7 @@ void CCmpUnitMotion::Move(fixed dt)
 				target = CFixedVector2D(m_LongPath.m_Waypoints.back().x, m_LongPath.m_Waypoints.back().z);
 			else
 				target = CFixedVector2D(m_ShortPath.m_Waypoints.back().x, m_ShortPath.m_Waypoints.back().z);
-			
+
 			CFixedVector2D offset = target - pos;
 
 			// Work out how far we can travel in timeLeft
@@ -999,7 +999,7 @@ void CCmpUnitMotion::Move(fixed dt)
 					break;
 				}
 				m_LongPath.m_Waypoints.pop_back();
- 			}
+			}
 			// TODO: check where the collision was and move slightly.
 			return;
 		}
@@ -1503,113 +1503,113 @@ bool CCmpUnitMotion::MoveToTargetRange(entity_id_t target, entity_pos_t minRange
 	}
 
 	/*
-	 * If we're starting outside the maxRange, we need to move closer in.
-	 * If we're starting inside the minRange, we need to move further out.
-	 * These ranges are measured from the center of this entity to the edge of the target;
-	 * we add the goal range onto the size of the target shape to get the goal shape.
-	 * (Then we extend it outwards/inwards by a little bit to be sure we'll end up
-	 * within the right range, in case of minor numerical inaccuracies.)
-	 *
-	 * There's a bit of a problem with large square targets:
-	 * the pathfinder only lets us move to goals that are squares, but the points an equal
-	 * distance from the target make a rounded square shape instead.
-	 *
-	 * When moving closer, we could shrink the goal radius to 1/sqrt(2) so the goal shape fits entirely
-	 * within the desired rounded square, but that gives an unfair advantage to attackers who approach
-	 * the target diagonally.
-	 *
-	 * If the target is small relative to the range (e.g. archers attacking anything),
-	 * then we cheat and pretend the target is actually a circle.
-	 * (TODO: that probably looks rubbish for things like walls?)
-	 *
-	 * If the target is large relative to the range (e.g. melee units attacking buildings),
-	 * then we multiply maxRange by approx 1/sqrt(2) to guarantee they'll always aim close enough.
-  	 * (Those units should set minRange to 0 so they'll never be considered *too* close.)
-  	 */
-  
-  	 CFixedVector2D halfSize(obstruction.hw, obstruction.hh);
-  	 PathGoal goal;
-  	 goal.x = obstruction.x;
-  	 goal.z = obstruction.z;
+	* If we're starting outside the maxRange, we need to move closer in.
+	* If we're starting inside the minRange, we need to move further out.
+	* These ranges are measured from the center of this entity to the edge of the target;
+	* we add the goal range onto the size of the target shape to get the goal shape.
+	* (Then we extend it outwards/inwards by a little bit to be sure we'll end up
+	* within the right range, in case of minor numerical inaccuracies.)
+	*
+	* There's a bit of a problem with large square targets:
+	* the pathfinder only lets us move to goals that are squares, but the points an equal
+	* distance from the target make a rounded square shape instead.
+	*
+	* When moving closer, we could shrink the goal radius to 1/sqrt(2) so the goal shape fits entirely
+	* within the desired rounded square, but that gives an unfair advantage to attackers who approach
+	* the target diagonally.
+	*
+	* If the target is small relative to the range (e.g. archers attacking anything),
+	* then we cheat and pretend the target is actually a circle.
+	* (TODO: that probably looks rubbish for things like walls?)
+	*
+	* If the target is large relative to the range (e.g. melee units attacking buildings),
+	* then we multiply maxRange by approx 1/sqrt(2) to guarantee they'll always aim close enough.
+	* (Those units should set minRange to 0 so they'll never be considered *too* close.)
+	*/
 
-  	 entity_pos_t distance = Geometry::DistanceToSquare(pos - CFixedVector2D(obstruction.x, obstruction.z), obstruction.u, obstruction.v, halfSize);
+	CFixedVector2D halfSize(obstruction.hw, obstruction.hh);
+	PathGoal goal;
+	goal.x = obstruction.x;
+	goal.z = obstruction.z;
 
-  	 if (distance < minRange)
-  	 {
- 		// Too close to the square - need to move away
+	entity_pos_t distance = Geometry::DistanceToSquare(pos - CFixedVector2D(obstruction.x, obstruction.z), obstruction.u, obstruction.v, halfSize);
 
- 		// TODO: maybe we should do the ShouldTreatTargetAsCircle thing here?
+	if (distance < minRange)
+	{
+		// Too close to the square - need to move away
 
-  	 	entity_pos_t goalDistance = minRange + g_GoalDelta;
+		// TODO: maybe we should do the ShouldTreatTargetAsCircle thing here?
 
-  	 	goal.type = PathGoal::SQUARE;
-  	 	goal.u = obstruction.u;
-  	 	goal.v = obstruction.v;
- 		entity_pos_t delta = std::max(goalDistance, m_Radius + entity_pos_t::FromInt(TERRAIN_TILE_SIZE)/16); // ensure it's far enough to not intersect the building itself
- 		goal.hw = obstruction.hw + delta;
- 		goal.hh = obstruction.hh + delta;
- 	}
- 	else if (maxRange < entity_pos_t::Zero() || distance < maxRange)
- 	{
- 		// We're already in range - no need to move anywhere
- 		FaceTowardsPointFromPos(pos, goal.x, goal.z);
- 		return false;
- 	}
- 	else
- 	{
- 		// We might need to move closer:
+		entity_pos_t goalDistance = minRange + g_GoalDelta;
 
- 		// Circumscribe the square
- 		entity_pos_t circleRadius = halfSize.Length();
+		goal.type = PathGoal::SQUARE;
+		goal.u = obstruction.u;
+		goal.v = obstruction.v;
+		entity_pos_t delta = std::max(goalDistance, m_Radius + entity_pos_t::FromInt(TERRAIN_TILE_SIZE)/16); // ensure it's far enough to not intersect the building itself
+		goal.hw = obstruction.hw + delta;
+		goal.hh = obstruction.hh + delta;
+	}
+	else if (maxRange < entity_pos_t::Zero() || distance < maxRange)
+	{
+		// We're already in range - no need to move anywhere
+		FaceTowardsPointFromPos(pos, goal.x, goal.z);
+		return false;
+	}
+	else
+	{
+		// We might need to move closer:
 
- 		if (ShouldTreatTargetAsCircle(maxRange, obstruction.hw, obstruction.hh, circleRadius))
- 		{
- 			// The target is small relative to our range, so pretend it's a circle
+		// Circumscribe the square
+		entity_pos_t circleRadius = halfSize.Length();
 
- 			// Note that the distance to the circle will always be less than
- 			// the distance to the square, so the previous "distance < maxRange"
- 			// check is still valid (though not sufficient)
- 			entity_pos_t circleDistance = (pos - CFixedVector2D(obstruction.x, obstruction.z)).Length() - circleRadius;
+		if (ShouldTreatTargetAsCircle(maxRange, obstruction.hw, obstruction.hh, circleRadius))
+		{
+			// The target is small relative to our range, so pretend it's a circle
 
- 			if (circleDistance < maxRange)
- 			{
- 				// We're already in range - no need to move anywhere
- 				if (m_FacePointAfterMove)
- 					FaceTowardsPointFromPos(pos, goal.x, goal.z);
- 				return false;
- 			}
+			// Note that the distance to the circle will always be less than
+			// the distance to the square, so the previous "distance < maxRange"
+			// check is still valid (though not sufficient)
+			entity_pos_t circleDistance = (pos - CFixedVector2D(obstruction.x, obstruction.z)).Length() - circleRadius;
 
- 			entity_pos_t goalDistance = maxRange - g_GoalDelta;
+			if (circleDistance < maxRange)
+			{
+				// We're already in range - no need to move anywhere
+				if (m_FacePointAfterMove)
+					FaceTowardsPointFromPos(pos, goal.x, goal.z);
+				return false;
+			}
 
- 			goal.type = PathGoal::CIRCLE;
- 			goal.hw = circleRadius + goalDistance;
- 		}
- 		else
- 		{
- 			// The target is large relative to our range, so treat it as a square and
- 			// get close enough that the diagonals come within range
+			entity_pos_t goalDistance = maxRange - g_GoalDelta;
 
- 			entity_pos_t goalDistance = (maxRange - g_GoalDelta)*2 / 3; // multiply by slightly less than 1/sqrt(2)
+			goal.type = PathGoal::CIRCLE;
+			goal.hw = circleRadius + goalDistance;
+		}
+		else
+		{
+			// The target is large relative to our range, so treat it as a square and
+			// get close enough that the diagonals come within range
 
- 			goal.type = PathGoal::SQUARE;
- 			goal.u = obstruction.u;
- 			goal.v = obstruction.v;
- 			entity_pos_t delta = std::max(goalDistance, m_Radius + entity_pos_t::FromInt(TERRAIN_TILE_SIZE)/16); // ensure it's far enough to not intersect the building itself
- 			goal.hw = obstruction.hw + delta;
- 			goal.hh = obstruction.hh + delta;
- 		}
- 	}
+			entity_pos_t goalDistance = (maxRange - g_GoalDelta)*2 / 3; // multiply by slightly less than 1/sqrt(2)
 
- 	m_State = STATE_INDIVIDUAL_PATH;
- 	m_TargetEntity = target;
- 	m_TargetOffset = CFixedVector2D();
- 	m_TargetMinRange = minRange;
- 	m_TargetMaxRange = maxRange;
- 	m_FinalGoal = goal;
+			goal.type = PathGoal::SQUARE;
+			goal.u = obstruction.u;
+			goal.v = obstruction.v;
+			entity_pos_t delta = std::max(goalDistance, m_Radius + entity_pos_t::FromInt(TERRAIN_TILE_SIZE)/16); // ensure it's far enough to not intersect the building itself
+			goal.hw = obstruction.hw + delta;
+			goal.hh = obstruction.hh + delta;
+		}
+	}
 
- 	BeginPathing(pos, goal);
+	m_State = STATE_INDIVIDUAL_PATH;
+	m_TargetEntity = target;
+	m_TargetOffset = CFixedVector2D();
+	m_TargetMinRange = minRange;
+	m_TargetMaxRange = maxRange;
+	m_FinalGoal = goal;
 
- 	return true;
+	BeginPathing(pos, goal);
+
+	return true;
 }
 
 bool CCmpUnitMotion::IsInTargetRange(entity_id_t target, entity_pos_t minRange, entity_pos_t maxRange)

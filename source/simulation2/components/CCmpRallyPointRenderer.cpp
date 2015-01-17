@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -624,10 +624,10 @@ void CCmpRallyPointRenderer::RecomputeRallyPointPath(size_t index, CmpPtr<ICmpPo
 	// waypoint is centered at a tile. We'll have to do some post-processing on the path to get it smooth.
 	Path path;
 	std::vector<Waypoint>& waypoints = path.m_Waypoints;
-	
+
 	CFixedVector2D start(cmpPosition->GetPosition2D());
 	Goal goal = { Goal::POINT, m_RallyPoints[index].X, m_RallyPoints[index].Y };
-	
+
 	if (index == 0)
 	{
 		GetClosestsEdgePointFrom(start,m_RallyPoints[index], cmpPosition, cmpFootprint);
@@ -927,34 +927,34 @@ void CCmpRallyPointRenderer::GetClosestsEdgePointFrom(CFixedVector2D& result, CF
 {
 	ENSURE(cmpPosition);
 	ENSURE(cmpFootprint);
-		
+
 	// grab the shape and dimensions of the footprint
 	entity_pos_t footprintSize0, footprintSize1, footprintHeight;
 	ICmpFootprint::EShape footprintShape;
 	cmpFootprint->GetShape(footprintShape, footprintSize0, footprintSize1, footprintHeight);
-	
+
 	// grab the center of the footprint
 	CFixedVector2D center = cmpPosition->GetPosition2D();
-	
+
 	// -----------------------------------------------------------------------------------------------------
-	
+
 	switch (footprintShape)
 	{
 		case ICmpFootprint::SQUARE:
 		{
 			// in this case, footprintSize0 and 1 indicate the size along the X and Z axes, respectively.
-			
+
 			// the building's footprint could be rotated any which way, so let's get the rotation around the Y axis
 			// and the rotated unit vectors in the X/Z plane of the shape's footprint
 			// (the Footprint itself holds only the outline, the Position holds the orientation)
-			
+
 			fixed s, c; // sine and cosine of the Y axis rotation angle (aka the yaw)
 			fixed a = cmpPosition->GetRotation().Y;
 			sincos_approx(a, s, c);
 			CFixedVector2D u(c, -s); // unit vector along the rotated X axis
 			CFixedVector2D v(s, c); // unit vector along the rotated Z axis
 			CFixedVector2D halfSize(footprintSize0/2, footprintSize1/2);
-			
+
 			CFixedVector2D footprintEdgePoint = Geometry::NearestPointOnSquare(start - center, u, v, halfSize);
 			result = center + footprintEdgePoint;
 			break;
