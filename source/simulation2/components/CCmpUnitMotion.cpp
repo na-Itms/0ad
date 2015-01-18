@@ -980,8 +980,17 @@ void CCmpUnitMotion::Move(fixed dt)
 			// Stop, and recompute the whole path.
 			// TODO: if the target has UnitMotion and is higher priority,
 			// we should wait a little bit.
-			
-			// TODO: so that's when we want to slide, right?
+
+			// If we are short pathing, recompute the short path to the final short waypoint
+			if (!m_ShortPath.m_Waypoints.empty())
+			{
+				PathGoal goal = { PathGoal::POINT, m_ShortPath.m_Waypoints.front().x, m_ShortPath.m_Waypoints.front().z };
+				RequestShortPath(pos, goal, true);
+				m_PathState = PATHSTATE_WAITING_REQUESTING_SHORT;
+				return;
+			}
+
+
 			while (m_LongPath.m_Waypoints.size() >= 1)
 			{
 				CFixedVector2D waypoint(m_LongPath.m_Waypoints.back().x,m_LongPath.m_Waypoints.back().z);
