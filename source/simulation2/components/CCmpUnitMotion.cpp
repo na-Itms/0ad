@@ -896,13 +896,18 @@ void CCmpUnitMotion::Move(fixed dt)
 			if (m_ShortPath.m_Waypoints.empty() && m_LongPath.m_Waypoints.empty())
 				break;
 
-			// If we're heading towards the ultimate waypoint, replace the path
-			// by a short path towards the final goal
-			if (m_ShortPath.m_Waypoints.empty() && m_LongPath.m_Waypoints.size() == 1)
+			// If we're heading towards the ultimate waypoint, request a short path
+			// towards the final goal
+			if (m_LongPath.m_Waypoints.size() == 1)
 			{
-				m_LongPath.m_Waypoints.clear();
-				ICmpPathfinder::Waypoint finalWaypoint = { m_FinalGoal.x, m_FinalGoal.z };
-				m_ShortPath.m_Waypoints.push_back(finalWaypoint);
+				if (!m_ShortPath.m_Waypoints.empty())
+					m_LongPath.m_Waypoints.clear();
+				else
+				{
+					PathGoal goal = { PathGoal::POINT, m_FinalGoal.x, m_FinalGoal.z };
+					RequestShortPath(pos, goal, true);
+					m_PathState = PATHSTATE_FOLLOWING_REQUESTING_SHORT;
+				}
 			}
 
 			CFixedVector2D target;
