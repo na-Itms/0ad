@@ -1318,11 +1318,6 @@ void CCmpUnitMotion::BeginPathing(CFixedVector2D from, const PathGoal& goal)
 	}
 
 	// Otherwise we need to compute a path.
-
-	// TODO: if it's close then just do a short path, not a long path
-	// (But if it's close on the opposite side of a river then we really
-	// need a long path, so we can't simply check linear distance)
-
 	m_PathState = PATHSTATE_WAITING_REQUESTING_LONG;
 	RequestLongPath(from, goal);
 }
