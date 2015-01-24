@@ -113,7 +113,7 @@ public:
 				// If clearance isn't an integer number of navcells then we'll
 				// probably get weird behaviour when expanding the navcell grid
 				// by clearance, vs expanding static obstructions by clearance
-				LOGWARNING(L"Pathfinder passability class has clearance %f, should be multiple of %f",
+				LOGWARNING("Pathfinder passability class has clearance %f, should be multiple of %f",
 					m_Clearance.ToFloat(), ICmpObstructionManager::NAVCELL_SIZE.ToFloat());
 			}
 		}
