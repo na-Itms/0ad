@@ -733,7 +733,7 @@ void CCmpPathfinder::ProcessSameTurnMoves()
 //////////////////////////////////////////////////////////
 
 ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckUnitPlacement(const IObstructionTestFilter& filter,
-	entity_pos_t x, entity_pos_t z, entity_pos_t r,	pass_class_t passClass, bool onlyCenterPoint)
+	entity_pos_t x, entity_pos_t z, entity_pos_t r,	pass_class_t passClass, bool UNUSED(onlyCenterPoint))
 {
 	// Check unit obstruction
 	CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSystemEntity());
@@ -767,7 +767,7 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const I
 
 ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const IObstructionTestFilter& filter,
 	entity_pos_t x, entity_pos_t z, entity_pos_t a, entity_pos_t w,
-	entity_pos_t h, entity_id_t id, pass_class_t passClass, bool onlyCenterPoint)
+	entity_pos_t h, entity_id_t id, pass_class_t passClass, bool UNUSED(onlyCenterPoint))
 {
 	// Check unit obstruction
 	CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSystemEntity());
@@ -815,7 +815,7 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const I
 
 //////////////////////////////////////////////////////////
 
-void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, Path& path)
+void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& UNUSED(origGoal), pass_class_t passClass, Path& path)
 {
 	u16 i0, j0;
 	NearestNavcell(x0, z0, i0, j0);
