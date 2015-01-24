@@ -142,6 +142,7 @@ public:
 	// Dynamic state:
 
 	entity_pos_t m_Radius;
+	bool m_Blocked;
 	bool m_Moving;
 	bool m_FacePointAfterMove;
 
@@ -292,6 +293,7 @@ public:
 		m_FormationController = paramNode.GetChild("FormationController").ToBool();
 
 		m_Moving = false;
+		m_Blocked = false;
 		m_FacePointAfterMove = true;
 
 		m_WalkSpeed = m_OriginalWalkSpeed = paramNode.GetChild("WalkSpeed").ToFixed();
@@ -353,6 +355,7 @@ public:
 		serialize.NumberFixed_Unbounded("speed", m_Speed);
 
 		serialize.Bool("moving", m_Moving);
+		serialize.Bool("blocked", m_Blocked);
 		serialize.Bool("facePointAfterMove", m_FacePointAfterMove);
 
 		SerializeVector<SerializeWaypoint>()(serialize, "long path", m_LongPath.m_Waypoints);
@@ -986,6 +989,14 @@ void CCmpUnitMotion::Move(fixed dt)
 			// TODO: if the target has UnitMotion and is higher priority,
 			// we should wait a little bit.
 
+			// Wait for one iteration, in case the unit we hit moves
+			if (m_Blocked)
+			{
+				m_Blocked = false;
+				return;
+			}
+			m_Blocked = true;
+
 			// If we are short pathing, recompute the short path to the final short waypoint
 			if (!m_ShortPath.m_Waypoints.empty())
 			{
@@ -994,7 +1005,6 @@ void CCmpUnitMotion::Move(fixed dt)
 				m_PathState = PATHSTATE_WAITING_REQUESTING_SHORT;
 				return;
 			}
-
 
 			while (m_LongPath.m_Waypoints.size() >= 1)
 			{
@@ -1017,6 +1027,8 @@ void CCmpUnitMotion::Move(fixed dt)
 			// TODO: check where the collision was and move slightly.
 			return;
 		}
+
+		m_Blocked = false;
 
 		// We successfully moved along our path, until running out of
 		// waypoints or time.
