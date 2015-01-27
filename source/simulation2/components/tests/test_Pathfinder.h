@@ -172,7 +172,7 @@ public:
 	void test_perf2()
 	{
 		CTerrain terrain;
-		shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(128 * 1024 * 1024);
+		std::shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(std::shared_ptr<ScriptRuntime>(), 128 * 1024 * 1024);
 
 		CSimulation2 sim2(NULL, rt, &terrain);
 		sim2.LoadDefaultScripts();
@@ -181,7 +181,9 @@ public:
 		CMapReader* mapReader = new CMapReader(); // it'll call "delete this" itself
 
 		LDR_BeginRegistering();
-		mapReader->LoadMap(L"maps/scenarios/Peloponnese.pmp", CScriptValRooted(), &terrain, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+		mapReader->LoadMap(L"maps/scenarios/Peloponnese.pmp", 
+			sim2.GetScriptInterface().GetJSRuntime(), JS::UndefinedHandleValue, 
+			&terrain, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			&sim2, &sim2.GetSimContext(), -1, false);
 		LDR_EndRegistering();
 		TS_ASSERT_OK(LDR_NonprogressiveLoad());
@@ -227,7 +229,7 @@ public:
 	{
 		CTerrain terrain;
 
-		shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(128 * 1024 * 1024);
+		std::shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(std::shared_ptr<ScriptRuntime>(), 128 * 1024 * 1024);
 
 		CSimulation2 sim2(NULL, rt, &terrain);
 		sim2.LoadDefaultScripts();
@@ -236,7 +238,9 @@ public:
 		CMapReader* mapReader = new CMapReader(); // it'll call "delete this" itself
 
 		LDR_BeginRegistering();
-		mapReader->LoadMap(L"maps/scenarios/Peloponnese.pmp", CScriptValRooted(), &terrain, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+		mapReader->LoadMap(L"maps/scenarios/Peloponnese.pmp",
+			sim2.GetScriptInterface().GetJSRuntime(), JS::UndefinedHandleValue,
+			&terrain, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			&sim2, &sim2.GetSimContext(), -1, false);
 		LDR_EndRegistering();
 		TS_ASSERT_OK(LDR_NonprogressiveLoad());
