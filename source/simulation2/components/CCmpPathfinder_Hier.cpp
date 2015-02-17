@@ -99,7 +99,7 @@ public:
 	bool MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass_class_t passClass);
 
 	/**
-	 * Updates @p i0, @p j0 (which is assumed to be an impassable navcell)
+	 * Updates @p i, @p j (which is assumed to be an impassable navcell)
 	 * to the nearest passable navcell.
 	 */
 	void FindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass);
