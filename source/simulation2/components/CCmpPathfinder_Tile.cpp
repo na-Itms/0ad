@@ -478,7 +478,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 	PROFILE2_ATTR("steps: %u", state.steps);
 
 #if PATHFIND_STATS
-	debug_printf(L"PATHFINDER: steps=%d avgo=%d proc=%d impc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveClosed, state.numImproveOpen, state.numAddToOpen);
+	debug_printf("PATHFINDER: steps=%d avgo=%d proc=%d impc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveClosed, state.numImproveOpen, state.numAddToOpen);
 #endif
 }
 

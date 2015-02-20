@@ -320,7 +320,7 @@ static CFixedVector2D NearestPointOnGoal(CFixedVector2D pos, const PathGoal& goa
 	}
 
 	default:
-		debug_warn(L"invalid type");
+		debug_warn("invalid type");
 		return CFixedVector2D();
 	}
 }
@@ -891,7 +891,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 		std::vector<EdgeAA> edgesBottom;
 		std::vector<EdgeAA> edgesTop;
 		SplitAAEdges(vertexes[curr.id].p, edges, edgeSquares, edgesUnaligned, edgesLeft, edgesRight, edgesBottom, edgesTop);
-		//debug_printf(L"edges: e=%d aa=%d; u=%d l=%d r=%d b=%d t=%d\n", edges.size(), edgeSquares.size(), edgesUnaligned.size(), edgesLeft.size(), edgesRight.size(), edgesBottom.size(), edgesTop.size());
+		//debug_printf("edges: e=%d aa=%d; u=%d l=%d r=%d b=%d t=%d\n", edges.size(), edgeSquares.size(), edgesUnaligned.size(), edgesLeft.size(), edgesRight.size(), edgesBottom.size(), edgesTop.size());
 
 		// Check the lines to every other vertex
 		for (size_t n = 0; n < vertexes.size(); ++n)
@@ -1064,7 +1064,7 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 	u16 i = i0;
 	u16 j = j0;
 
-// 	debug_printf(L"(%f,%f)..(%f,%f) [%d,%d]..[%d,%d]\n", x0.ToFloat(), z0.ToFloat(), x1.ToFloat(), z1.ToFloat(), i0, j0, i1, j1);
+// 	debug_printf("(%f,%f)..(%f,%f) [%d,%d]..[%d,%d]\n", x0.ToFloat(), z0.ToFloat(), x1.ToFloat(), z1.ToFloat(), i0, j0, i1, j1);
 
 	bool currentlyOnImpassable = !IS_PASSABLE(m_Grid->get(i0, j0), passClass);
 
@@ -1110,7 +1110,7 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 		entity_pos_t dota = (CFixedVector2D(xia, zj) - CFixedVector2D(x0, z0)).Dot(perp);
 		entity_pos_t dotb = (CFixedVector2D(xib, zj) - CFixedVector2D(x0, z0)).Dot(perp);
 
-// 		debug_printf(L"(%f,%f)-(%f,%f) :: %f %f\n", xia.ToFloat(), zj.ToFloat(), xib.ToFloat(), zj.ToFloat(), dota.ToFloat(), dotb.ToFloat());
+// 		debug_printf("(%f,%f)-(%f,%f) :: %f %f\n", xia.ToFloat(), zj.ToFloat(), xib.ToFloat(), zj.ToFloat(), dota.ToFloat(), dotb.ToFloat());
 
 		if ((dota < entity_pos_t::Zero() && dotb < entity_pos_t::Zero()) ||
 		    (dota > entity_pos_t::Zero() && dotb > entity_pos_t::Zero()))

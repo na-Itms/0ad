@@ -579,10 +579,10 @@ bool CCmpPathfinder_Hier::MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass
 	std::set<RegionID> reachableRegions;
 	FindReachableRegions(source, reachableRegions, passClass);
 
-// 	debug_printf(L"\nReachable from (%d,%d): ", i0, j0);
+// 	debug_printf("\nReachable from (%d,%d): ", i0, j0);
 // 	for (std::set<RegionID>::iterator it = reachableRegions.begin(); it != reachableRegions.end(); ++it)
-// 		debug_printf(L"[%d,%d,%d], ", it->ci, it->cj, it->r);
-// 	debug_printf(L"\n");
+// 		debug_printf("[%d,%d,%d], ", it->ci, it->cj, it->r);
+// 	debug_printf("\n");
 
 	// Check whether any reachable region contains the goal
 	for (std::set<RegionID>::const_iterator it = reachableRegions.begin(); it != reachableRegions.end(); ++it)

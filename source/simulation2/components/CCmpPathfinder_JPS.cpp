@@ -877,7 +877,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 	{
 		state.jpc = new JumpPointCache;
 		state.jpc->reset(m_Grid, passClass);
-		debug_printf(L"PATHFINDER: JPC memory: %d kB\n", (int)state.jpc->GetMemoryUsage() / 1024);
+		debug_printf("PATHFINDER: JPC memory: %d kB\n", (int)state.jpc->GetMemoryUsage() / 1024);
 		m_JumpPointCache[passClass] = shared_ptr<JumpPointCache>(state.jpc);
 	}
 #endif
@@ -1113,7 +1113,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 	PROFILE2_ATTR("steps: %d", state.steps);
 
 #if PATHFIND_STATS
-	debug_printf(L"PATHFINDER: steps=%d avgo=%d proc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveOpen, state.numAddToOpen);
+	debug_printf("PATHFINDER: steps=%d avgo=%d proc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveOpen, state.numAddToOpen);
 #endif
 }
 

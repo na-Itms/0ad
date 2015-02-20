@@ -357,7 +357,7 @@ public:
 #endif
 		}
 		t = timer_Time() - t;
-		debug_printf(L"### RepeatPath %fms each (%fs total)\n", 1000*t / n, t);
+		debug_printf("### RepeatPath %fms each (%fs total)\n", 1000*t / n, t);
 	}
 
 };
