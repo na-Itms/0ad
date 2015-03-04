@@ -14,16 +14,20 @@
       <MaxTerrainSlope>1.0</MaxTerrainSlope>
       <Clearance>1.0</Clearance>
     </default>
-    <siege-large>
-      <MaxWaterDepth>2</MaxWaterDepth>
-      <MaxTerrainSlope>1.0</MaxTerrainSlope>
-      <Clearance>4.0</Clearance>
-    </siege-large>
     <default-no-clearance>
       <MaxWaterDepth>2</MaxWaterDepth>
       <MaxTerrainSlope>1.0</MaxTerrainSlope>
       <Clearance>0.0</Clearance>
     </default-no-clearance>
+    <default-terrain-only>
+      <MaxWaterDepth>2</MaxWaterDepth>
+      <MaxTerrainSlope>1.0</MaxTerrainSlope>
+    </default-terrain-only>
+    <siege-large>
+      <MaxWaterDepth>2</MaxWaterDepth>
+      <MaxTerrainSlope>1.0</MaxTerrainSlope>
+      <Clearance>4.0</Clearance>
+    </siege-large>
     <ship>
       <MinWaterDepth>1</MinWaterDepth>
       <Clearance>12.0</Clearance>

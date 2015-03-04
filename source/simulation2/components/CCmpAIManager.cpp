@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -1085,7 +1085,6 @@ private:
 		JSAutoRequest rq(cx);
 
 		JS::RootedValue classesVal(cx);
-		scriptInterface.Eval("({ pathfinderObstruction: 1, foundationObstruction: 2 })", &classesVal);
 
 		std::map<std::string, ICmpPathfinder::pass_class_t> classes = cmpPathfinder->GetPassabilityClasses();
 		for (std::map<std::string, ICmpPathfinder::pass_class_t>::iterator it = classes.begin(); it != classes.end(); ++it)
