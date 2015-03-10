@@ -111,7 +111,7 @@ static const fixed CHECK_TARGET_MOVEMENT_MIN_COS = fixed::FromInt(866)/1000;
 static const CColor OVERLAY_COLOUR_LONG_PATH(1, 1, 1, 1);
 static const CColor OVERLAY_COLOUR_SHORT_PATH(1, 0, 0, 1);
 
-static const entity_pos_t g_GoalDelta = ICmpObstructionManager::NAVCELL_SIZE; // for extending the goal outwards/inwards a little bit
+static const entity_pos_t g_GoalDelta = Pathfinding::NAVCELL_SIZE; // for extending the goal outwards/inwards a little bit
 
 class CCmpUnitMotion : public ICmpUnitMotion
 {
@@ -136,7 +136,7 @@ public:
 	bool m_FormationController;
 	fixed m_WalkSpeed, m_OriginalWalkSpeed; // in metres per second
 	fixed m_RunSpeed, m_OriginalRunSpeed;
-	ICmpPathfinder::pass_class_t m_PassClass;
+	pass_class_t m_PassClass;
 	std::string m_PassClassName;
 
 	// Dynamic state:
@@ -249,8 +249,8 @@ public:
 
 	// Currently active paths (storing waypoints in reverse order).
 	// The last item in each path is the point we're currently heading towards.
-	ICmpPathfinder::Path m_LongPath;
-	ICmpPathfinder::Path m_ShortPath;
+	WaypointPath m_LongPath;
+	WaypointPath m_ShortPath;
 
 	PathGoal m_FinalGoal;
 
@@ -465,7 +465,7 @@ public:
 		return m_RunSpeed;
 	}
 
-	virtual ICmpPathfinder::pass_class_t GetPassabilityClass()
+	virtual pass_class_t GetPassabilityClass()
 	{
 		return m_PassClass;
 	}
@@ -589,7 +589,7 @@ private:
 	/**
 	 * Handle the result of an asynchronous path query.
 	 */
-	void PathResult(u32 ticket, const ICmpPathfinder::Path& path);
+	void PathResult(u32 ticket, const WaypointPath& path);
 
 	/**
 	 * Do the per-turn movement and other updates.
@@ -630,7 +630,7 @@ private:
 	 * Returns whether the length of the given path, plus the distance from
 	 * 'from' to the first waypoints, it shorter than minDistance.
 	 */
-	bool PathIsShort(const ICmpPathfinder::Path& path, CFixedVector2D from, entity_pos_t minDistance);
+	bool PathIsShort(const WaypointPath& path, CFixedVector2D from, entity_pos_t minDistance);
 
 	/**
 	 * Rotate to face towards the target point, given the current pos
@@ -662,14 +662,14 @@ private:
 	/**
 	 * Convert a path into a renderable list of lines
 	 */
-	void RenderPath(const ICmpPathfinder::Path& path, std::vector<SOverlayLine>& lines, CColor color);
+	void RenderPath(const WaypointPath& path, std::vector<SOverlayLine>& lines, CColor color);
 
 	void RenderSubmit(SceneCollector& collector);
 };
 
 REGISTER_COMPONENT_TYPE(UnitMotion)
 
-void CCmpUnitMotion::PathResult(u32 ticket, const ICmpPathfinder::Path& path)
+void CCmpUnitMotion::PathResult(u32 ticket, const WaypointPath& path)
 {
 	// Ignore obsolete path requests
 	if (ticket != m_ExpectedPathTicket)
@@ -688,7 +688,7 @@ void CCmpUnitMotion::PathResult(u32 ticket, const ICmpPathfinder::Path& path)
 		// close enough to the unit then we can probably get unstuck
 		if (m_LongPath.m_Waypoints.empty())
 		{
-			ICmpPathfinder::Waypoint wp = { m_FinalGoal.x, m_FinalGoal.z };
+			Waypoint wp = { m_FinalGoal.x, m_FinalGoal.z };
 			m_LongPath.m_Waypoints.push_back(wp);
 		}
 
@@ -748,7 +748,7 @@ void CCmpUnitMotion::PathResult(u32 ticket, const ICmpPathfinder::Path& path)
 		// close enough to the unit then we can probably get unstuck
 		if (m_LongPath.m_Waypoints.empty())
 		{
-			ICmpPathfinder::Waypoint wp = { m_FinalGoal.x, m_FinalGoal.z };
+			Waypoint wp = { m_FinalGoal.x, m_FinalGoal.z };
 			m_LongPath.m_Waypoints.push_back(wp);
 		}
 
@@ -1135,7 +1135,7 @@ bool CCmpUnitMotion::TryGoingStraightToGoalPoint(CFixedVector2D from)
 	// That route is okay, so update our path
 	m_LongPath.m_Waypoints.clear();
 	m_ShortPath.m_Waypoints.clear();
-	ICmpPathfinder::Waypoint wp = { goalPos.X, goalPos.Y };
+	Waypoint wp = { goalPos.X, goalPos.Y };
 	m_ShortPath.m_Waypoints.push_back(wp);
 
 	return true;
@@ -1173,7 +1173,7 @@ bool CCmpUnitMotion::TryGoingStraightToTargetEntity(CFixedVector2D from)
 	m_FinalGoal = goal;
 	m_LongPath.m_Waypoints.clear();
 	m_ShortPath.m_Waypoints.clear();
-	ICmpPathfinder::Waypoint wp = { goalPos.X, goalPos.Y };
+	Waypoint wp = { goalPos.X, goalPos.Y };
 	m_ShortPath.m_Waypoints.push_back(wp);
 
 	return true;
@@ -1228,7 +1228,7 @@ bool CCmpUnitMotion::CheckTargetMovement(CFixedVector2D from, entity_pos_t minDe
 	return true;
 }
 
-bool CCmpUnitMotion::PathIsShort(const ICmpPathfinder::Path& path, CFixedVector2D from, entity_pos_t minDistance)
+bool CCmpUnitMotion::PathIsShort(const WaypointPath& path, CFixedVector2D from, entity_pos_t minDistance)
 {
 	entity_pos_t distLeft = minDistance;
 
@@ -1734,7 +1734,7 @@ void CCmpUnitMotion::MoveToFormationOffset(entity_id_t target, entity_pos_t x, e
 
 
 
-void CCmpUnitMotion::RenderPath(const ICmpPathfinder::Path& path, std::vector<SOverlayLine>& lines, CColor color)
+void CCmpUnitMotion::RenderPath(const WaypointPath& path, std::vector<SOverlayLine>& lines, CColor color)
 {
 	bool floating = false;
 	CmpPtr<ICmpPosition> cmpPosition(GetEntityHandle());

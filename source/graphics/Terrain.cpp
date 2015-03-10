@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -36,6 +36,9 @@
 #include "maths/FixedVector3D.h"
 #include "maths/MathUtil.h"
 #include "ps/CLogger.h"
+#include "simulation2/helpers/Pathfinding.h"
+
+const fixed Pathfinding::NAVCELL_SIZE = fixed::FromInt(TERRAIN_TILE_SIZE) / Pathfinding::NAVCELLS_PER_TILE;
 
 ///////////////////////////////////////////////////////////////////////////////
 // CTerrain constructor

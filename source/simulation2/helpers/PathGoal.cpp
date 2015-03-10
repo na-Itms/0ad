@@ -20,8 +20,7 @@
 #include "PathGoal.h"
 
 #include "graphics/Terrain.h"
-#include "simulation2/components/ICmpObstructionManager.h"
-#include "simulation2/helpers/Geometry.h"
+#include "Pathfinding.h"
 
 #define PATHGOAL_PROFILE 1
 #if PATHGOAL_PROFILE
@@ -37,10 +36,10 @@ static bool NavcellContainsCircle(int i, int j, fixed x, fixed z, fixed r, bool 
 	// (or on the edge of) the circle
 
 	// Get world-space bounds of navcell
-	entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-	entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-	entity_pos_t x1 = x0 + ICmpObstructionManager::NAVCELL_SIZE;
-	entity_pos_t z1 = z0 + ICmpObstructionManager::NAVCELL_SIZE;
+	entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(Pathfinding::NAVCELL_SIZE);
+	entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(Pathfinding::NAVCELL_SIZE);
+	entity_pos_t x1 = x0 + Pathfinding::NAVCELL_SIZE;
+	entity_pos_t z1 = z0 + Pathfinding::NAVCELL_SIZE;
 
 	if (inside)
 	{
@@ -72,10 +71,10 @@ static bool NavcellContainsSquare(int i, int j,
 	// (or on the edge of) the square
 
 	// Get world-space bounds of navcell
-	entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-	entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-	entity_pos_t x1 = x0 + ICmpObstructionManager::NAVCELL_SIZE;
-	entity_pos_t z1 = z0 + ICmpObstructionManager::NAVCELL_SIZE;
+	entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(Pathfinding::NAVCELL_SIZE);
+	entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(Pathfinding::NAVCELL_SIZE);
+	entity_pos_t x1 = x0 + Pathfinding::NAVCELL_SIZE;
+	entity_pos_t z1 = z0 + Pathfinding::NAVCELL_SIZE;
 
 	if (inside)
 	{
@@ -107,8 +106,8 @@ bool PathGoal::NavcellContainsGoal(int i, int j) const
 	case POINT:
 	{
 		// Only accept a single navcell
-		int gi = (x >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
-		int gj = (z >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
+		int gi = (x >> Pathfinding::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
+		int gj = (z >> Pathfinding::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
 		return gi == i && gj == j;
 	}
 	case CIRCLE:
@@ -144,8 +143,8 @@ bool PathGoal::NavcellRectContainsGoal(int i0, int j0, int i1, int j1, int* gi, 
 	case POINT:
 	{
 		// Calculate the navcell that contains the point goal
-		int i = (x >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
-		int j = (z >> ICmpObstructionManager::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
+		int i = (x >> Pathfinding::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
+		int j = (z >> Pathfinding::NAVCELL_SIZE_LOG2).ToInt_RoundToNegInfinity();
 		// If that goal navcell is in the given range, return it
 		if (imin <= i && i <= imax && jmin <= j && j <= jmax)
 		{
@@ -166,10 +165,10 @@ bool PathGoal::NavcellRectContainsGoal(int i0, int j0, int i1, int j1, int* gi, 
 		{
 			for (int i = i0; imin <= i && i <= imax; i += di)
 			{
-				entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-				entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-				entity_pos_t x1 = x0 + ICmpObstructionManager::NAVCELL_SIZE;
-				entity_pos_t z1 = z0 + ICmpObstructionManager::NAVCELL_SIZE;
+				entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(Pathfinding::NAVCELL_SIZE);
+				entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(Pathfinding::NAVCELL_SIZE);
+				entity_pos_t x1 = x0 + Pathfinding::NAVCELL_SIZE;
+				entity_pos_t z1 = z0 + Pathfinding::NAVCELL_SIZE;
 				entity_pos_t nx = Clamp(x, x0, x1);
 				entity_pos_t nz = Clamp(z, z0, z1);
 				if ((CFixedVector2D(nx, nz) - CFixedVector2D(x, z)).CompareLength(hw) <= 0)
@@ -193,10 +192,10 @@ bool PathGoal::NavcellRectContainsGoal(int i0, int j0, int i1, int j1, int* gi, 
 		{
 			for (int i = i0; imin <= i && i <= imax; i += di)
 			{
-				entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-				entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-				entity_pos_t x1 = x0 + ICmpObstructionManager::NAVCELL_SIZE;
-				entity_pos_t z1 = z0 + ICmpObstructionManager::NAVCELL_SIZE;
+				entity_pos_t x0 = entity_pos_t::FromInt(i).Multiply(Pathfinding::NAVCELL_SIZE);
+				entity_pos_t z0 = entity_pos_t::FromInt(j).Multiply(Pathfinding::NAVCELL_SIZE);
+				entity_pos_t x1 = x0 + Pathfinding::NAVCELL_SIZE;
+				entity_pos_t z1 = z0 + Pathfinding::NAVCELL_SIZE;
 				entity_pos_t nx = Clamp(x, x0, x1);
 				entity_pos_t nz = Clamp(z, z0, z1);
 				if (Geometry::PointIsInSquare(CFixedVector2D(nx - x, nz - z), u, v, CFixedVector2D(hw, hh)))

@@ -275,8 +275,8 @@ REGISTER_COMPONENT_TYPE(TerritoryManager)
  */
 static void NearestTerritoryTile(entity_pos_t x, entity_pos_t z, int& i, int& j, int w, int h)
 {
-	i = clamp((x / (ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity(), 0, w-1);
-	j = clamp((z / (ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity(), 0, h-1);
+	i = clamp((x / (Pathfinding::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity(), 0, w - 1);
+	j = clamp((z / (Pathfinding::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity(), 0, h - 1);
 }
 
 /**
@@ -284,8 +284,8 @@ static void NearestTerritoryTile(entity_pos_t x, entity_pos_t z, int& i, int& j,
  */
 static void TerritoryTileCenter(int i, int j, entity_pos_t& x, entity_pos_t& z)
 {
-	x = entity_pos_t::FromInt(i*2 + 1).Multiply(ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / 2);
-	z = entity_pos_t::FromInt(j*2 + 1).Multiply(ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / 2);
+	x = entity_pos_t::FromInt(i*2 + 1).Multiply(Pathfinding::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / 2);
+	z = entity_pos_t::FromInt(j*2 + 1).Multiply(Pathfinding::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / 2);
 }
 
 /*
@@ -363,8 +363,8 @@ void CCmpTerritoryManager::CalculateTerritories()
 		return;
 
 	CmpPtr<ICmpPathfinder> cmpPathfinder(GetSystemEntity());
-	ICmpPathfinder::pass_class_t passClassDefault = cmpPathfinder->GetPassabilityClass("territory");
-	ICmpPathfinder::pass_class_t passClassUnrestricted = cmpPathfinder->GetPassabilityClass("unrestricted");
+	pass_class_t passClassDefault = cmpPathfinder->GetPassabilityClass("territory");
+	pass_class_t passClassUnrestricted = cmpPathfinder->GetPassabilityClass("unrestricted");
 
 	const Grid<u16>& passGrid = cmpPathfinder->GetPassabilityGrid();
 
@@ -490,7 +490,7 @@ void CCmpTerritoryManager::CalculateTerritories()
 
 			CmpPtr<ICmpTerritoryInfluence> cmpTerritoryInfluence(GetSimContext(), *eit);
 			u32 weight = cmpTerritoryInfluence->GetWeight();
-			u32 radius = (fixed::FromInt(cmpTerritoryInfluence->GetRadius()) / (ICmpObstructionManager::NAVCELL_SIZE * NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity();
+			u32 radius = (fixed::FromInt(cmpTerritoryInfluence->GetRadius()) / (Pathfinding::NAVCELL_SIZE * NAVCELLS_PER_TERRITORY_TILE)).ToInt_RoundToNegInfinity();
 			u32 falloff = weight / radius; // earlier check for GetRadius() == 0 prevents divide-by-zero
 
 			// TODO: we should have some maximum value on weight, to avoid overflow
@@ -767,7 +767,7 @@ bool CCmpTerritoryManager::IsConnected(entity_pos_t x, entity_pos_t z)
 }
 
 TerritoryOverlay::TerritoryOverlay(CCmpTerritoryManager& manager) :
-	TerrainTextureOverlay((float)ICmpObstructionManager::NAVCELLS_PER_TILE / ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE),
+	TerrainTextureOverlay((float)Pathfinding::NAVCELLS_PER_TILE / ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE),
 	m_TerritoryManager(manager)
 {
 }

@@ -228,7 +228,7 @@ public:
 	 * and/or set 'mirror' to reverse the direction.
 	 */
 	void ComputeRows(std::vector<Row>& rows,
-		const Grid<NavcellData>& terrain, ICmpPathfinder::pass_class_t passClass,
+		const Grid<NavcellData>& terrain, pass_class_t passClass,
 		bool transpose, bool mirror)
 	{
 		int w = terrain.m_W;
@@ -301,7 +301,7 @@ public:
 		}
 	}
 
-	void reset(const Grid<NavcellData>* terrain, ICmpPathfinder::pass_class_t passClass)
+	void reset(const Grid<NavcellData>* terrain, pass_class_t passClass)
 	{
 		PROFILE3("JumpPointCache reset");
 		TIMER(L"JumpPointCache reset");
@@ -457,7 +457,7 @@ struct PathfinderStateJPS
 
 	u16 iGoal, jGoal; // goal tile
 
-	ICmpPathfinder::pass_class_t passClass;
+	pass_class_t passClass;
 
 	PriorityQueue open;
 	// (there's no explicit closed list; it's encoded in PathfindTile)
@@ -612,28 +612,28 @@ inline bool OnTheWay(int i, int j, int di, int dj, const PathGoal& goal)
 	if (dj != 0)
 	{
 		// Farthest goal point, z-direction
-		int gj = ((goal.z + (dj > 0 ? hh : -hh)) / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
+		int gj = ((goal.z + (dj > 0 ? hh : -hh)) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
 		if ((gj - j)*dj < 0) // we're not moving towards the goal
 			return false;
 	}
 	else
 	{
-		if (j < ((goal.z - hh) / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity() ||
-			j > ((goal.z + hh) / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
+		if (j < ((goal.z - hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity() ||
+			j > ((goal.z + hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
 			return false;
 	}
 
 	if (di != 0)
 	{
 		// Farthest goal point, x-direction
-		int gi = ((goal.x + (di > 0 ? hw : -hw)) / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
+		int gi = ((goal.x + (di > 0 ? hw : -hw)) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
 		if ((gi - i)*di < 0) // we're not moving towards the goal
 			return false;
 	}
 	else
 	{
-		if (i < ((goal.x - hw) / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity() ||
-			i > ((goal.x + hh) / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
+		if (i < ((goal.x - hw) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity() ||
+			i > ((goal.x + hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
 			return false;
 	}
 
@@ -867,7 +867,7 @@ void CCmpPathfinder::PathfinderJPSMakeDirty()
 	m_JumpPointCache.clear();
 }
 
-void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, Path& path)
+void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
 {
 	PathfinderStateJPS state = { 0 };
 
@@ -887,7 +887,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 
 	// Convert the start coordinates to tile indexes
 	u16 i0, j0;
-	NearestNavcell(x0, z0, i0, j0);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
 
 	if (!IS_PASSABLE(m_Grid->get(i0, j0), passClass))
 	{
@@ -896,11 +896,11 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 		// state specially
 		//ComputePathOffImpassable(x0, z0, origGoal, passClass, path);
 		//return;
-		PathfinderHierFindNearestPassableNavcell(i0,j0,passClass);
+		m_PathfinderHier->FindNearestPassableNavcell(i0, j0, passClass);
 	}
 
 	state.goal = origGoal;
-	PathfinderHierMakeGoalReachable(i0, j0, state.goal, passClass);
+	m_PathfinderHier->MakeGoalReachable(i0, j0, state.goal, passClass);
 
 	// If we're already at the goal tile, then move directly to the exact goal coordinates
 	// XXX: this seems bogus for non-point goals, it should be the point on the current cell nearest the goal
@@ -911,7 +911,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 		return;
 	}
 
-	NearestNavcell(state.goal.x, state.goal.z, state.iGoal, state.jGoal);
+	Pathfinding::NearestNavcell(state.goal.x, state.goal.z, state.iGoal, state.jGoal, m_MapSize, m_MapSize);
 
 	state.passClass = passClass;
 
@@ -1089,7 +1089,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 	{
 		PathfindTileJPS& n = state.tiles->get(ip, jp);
 		entity_pos_t x, z;
-		NavcellCenter(ip, jp, x, z);
+		Pathfinding::NavcellCenter(ip, jp, x, z);
 		Waypoint w = { x, z };
 		path.m_Waypoints.push_back(w);
 
@@ -1126,7 +1126,7 @@ void CCmpPathfinder::GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid)
 		return;
 
 	u16 iGoal, jGoal;
-	NearestNavcell(m_DebugGoal.x, m_DebugGoal.z, iGoal, jGoal);
+	Pathfinding::NearestNavcell(m_DebugGoal.x, m_DebugGoal.z, iGoal, jGoal, m_MapSize, m_MapSize);
 
 	grid = Grid<u8>(m_DebugGridJPS->m_W, m_DebugGridJPS->m_H);
 	for (u16 j = 0; j < grid.m_H; ++j)

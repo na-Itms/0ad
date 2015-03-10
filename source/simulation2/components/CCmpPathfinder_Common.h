@@ -35,16 +35,17 @@
 #include "graphics/Terrain.h"
 #include "maths/MathUtil.h"
 #include "ps/CLogger.h"
+#include "renderer/Scene.h"
 #include "simulation2/components/ICmpObstructionManager.h"
 #include "simulation2/helpers/Geometry.h"
 #include "simulation2/helpers/Grid.h"
+#include "simulation2/helpers/HierarchicalPathfinder.h"
 
 class PathfinderOverlay;
 class SceneCollector;
 struct PathfindTile;
 struct PathfindTileJPS;
 class JumpPointCache;
-class CCmpPathfinder_Hier;
 
 #ifdef NDEBUG
 #define PATHFIND_DEBUG 0
@@ -53,99 +54,6 @@ class CCmpPathfinder_Hier;
 #endif
 
 #define PATHFIND_USE_JPS 1
-
-/*
- * For efficient pathfinding we want to try hard to minimise the per-tile search cost,
- * so we precompute the tile passability flags and movement costs for the various different
- * types of unit.
- * We also want to minimise memory usage (there can easily be 100K tiles so we don't want
- * to store many bytes for each).
- *
- * To handle passability efficiently, we have a small number of passability classes
- * (e.g. "infantry", "ship"). Each unit belongs to a single passability class, and
- * uses that for all its pathfinding.
- * Passability is determined by water depth, terrain slope, forestness, buildingness.
- * We need at least one bit per class per tile to represent passability.
- *
- * We use a separate bit to indicate building obstructions (instead of folding it into
- * the class passabilities) so that it can be ignored when doing the accurate short paths.
- * We use another bit to indicate tiles near obstructions that block construction,
- * for the AI to plan safe building spots.
- */
-class PathfinderPassability
-{
-public:
-	PathfinderPassability(ICmpPathfinder::pass_class_t mask, const CParamNode& node) :
-		m_Mask(mask)
-	{
-		if (node.GetChild("MinWaterDepth").IsOk())
-			m_MinDepth = node.GetChild("MinWaterDepth").ToFixed();
-		else
-			m_MinDepth = std::numeric_limits<fixed>::min();
-
-		if (node.GetChild("MaxWaterDepth").IsOk())
-			m_MaxDepth = node.GetChild("MaxWaterDepth").ToFixed();
-		else
-			m_MaxDepth = std::numeric_limits<fixed>::max();
-
-		if (node.GetChild("MaxTerrainSlope").IsOk())
-			m_MaxSlope = node.GetChild("MaxTerrainSlope").ToFixed();
-		else
-			m_MaxSlope = std::numeric_limits<fixed>::max();
-
-		if (node.GetChild("MinShoreDistance").IsOk())
-			m_MinShore = node.GetChild("MinShoreDistance").ToFixed();
-		else
-			m_MinShore = std::numeric_limits<fixed>::min();
-
-		if (node.GetChild("MaxShoreDistance").IsOk())
-			m_MaxShore = node.GetChild("MaxShoreDistance").ToFixed();
-		else
-			m_MaxShore = std::numeric_limits<fixed>::max();
-
-		if (node.GetChild("Clearance").IsOk())
-		{
-			m_HasClearance = true;
-			m_Clearance = node.GetChild("Clearance").ToFixed();
-
-			if (!(m_Clearance % ICmpObstructionManager::NAVCELL_SIZE).IsZero())
-			{
-				// If clearance isn't an integer number of navcells then we'll
-				// probably get weird behaviour when expanding the navcell grid
-				// by clearance, vs expanding static obstructions by clearance
-				LOGWARNING("Pathfinder passability class has clearance %f, should be multiple of %f",
-					m_Clearance.ToFloat(), ICmpObstructionManager::NAVCELL_SIZE.ToFloat());
-			}
-		}
-		else
-		{
-			m_HasClearance = false;
-			m_Clearance = fixed::Zero();
-		}
-	}
-
-	bool IsPassable(fixed waterdepth, fixed steepness, fixed shoredist)
-	{
-		return ((m_MinDepth <= waterdepth && waterdepth <= m_MaxDepth) && (steepness < m_MaxSlope) && (m_MinShore <= shoredist && shoredist <= m_MaxShore));
-	}
-
-	ICmpPathfinder::pass_class_t m_Mask;
-
-	bool m_HasClearance; // whether static obstructions are impassable
-	fixed m_Clearance; // min distance from static obstructions
-
-private:
-	fixed m_MinDepth;
-	fixed m_MaxDepth;
-	fixed m_MaxSlope;
-	fixed m_MinShore;
-	fixed m_MaxShore;
-};
-
-typedef u16 NavcellData; // 1 bit per passability class (up to PASS_CLASS_BITS)
-static const int PASS_CLASS_BITS = 16;
-#define IS_PASSABLE(item, classmask) (((item) & (classmask)) == 0)
-#define PASS_CLASS_MASK_FROM_INDEX(id) ((pass_class_t)(1u << id))
 
 typedef SparseGrid<PathfindTile> PathfindTileGrid;
 typedef SparseGrid<PathfindTileJPS> PathfindTileJPSGrid;
@@ -237,7 +145,7 @@ struct AsyncLongPathRequest
 	entity_pos_t x0;
 	entity_pos_t z0;
 	PathGoal goal;
-	ICmpPathfinder::pass_class_t passClass;
+	pass_class_t passClass;
 	entity_id_t notify;
 };
 
@@ -249,7 +157,7 @@ struct AsyncShortPathRequest
 	entity_pos_t r;
 	entity_pos_t range;
 	PathGoal goal;
-	ICmpPathfinder::pass_class_t passClass;
+	pass_class_t passClass;
 	bool avoidMovingUnits;
 	entity_id_t group;
 	entity_id_t notify;
@@ -296,15 +204,16 @@ public:
 	std::map<pass_class_t, shared_ptr<JumpPointCache> > m_JumpPointCache; // for JPS pathfinder
 
 	// Interface to the hierarchical pathfinder.
-	// (This is hidden behind proxy methods to keep the code
-	// slightly better encapsulated.)
-	CCmpPathfinder_Hier* m_PathfinderHier;
-	void PathfinderHierInit();
-	void PathfinderHierDeinit();
-	void PathfinderHierReload();
-	void PathfinderHierRenderSubmit(SceneCollector& collector);
-	bool PathfinderHierMakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass_class_t passClass);
-	void PathfinderHierFindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass);
+	HierarchicalPathfinder* m_PathfinderHier;
+	void PathfinderHierRecompute()
+	{
+		m_PathfinderHier->Recompute(m_PassClassMasks, m_Grid);
+	}
+	void PathfinderHierRenderSubmit(SceneCollector& collector)
+	{
+		for (size_t i = 0; i < m_PathfinderHier->m_DebugOverlayLines.size(); ++i)
+			collector.Submit(&m_PathfinderHier->m_DebugOverlayLines[i]);
+	}
 
 	void PathfinderJPSMakeDirty();
 
@@ -319,7 +228,7 @@ public:
 	u32 m_DebugSteps;
 	double m_DebugTime;
 	PathGoal m_DebugGoal;
-	Path* m_DebugPath;
+	WaypointPath* m_DebugPath;
 	PathfinderOverlay* m_DebugOverlay;
 	pass_class_t m_DebugPassClass;
 
@@ -348,16 +257,16 @@ public:
 
 	virtual const Grid<u16>& GetPassabilityGrid();
 
-	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, Path& ret);
+	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret);
 
-	virtual void ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, Path& ret);
+	virtual void ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret);
 
 	/**
 	 * Same kind of interface as ICmpPathfinder::ComputePath, but works when the
 	 * unit is starting on an impassable navcell. Returns a path heading directly
 	 * to the nearest passable navcell, then the goal.
 	 */
-	void ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, Path& path);
+	void ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path);
 
 	/**
 	 * Given a path with an arbitrary collection of waypoints, updates the
@@ -365,7 +274,7 @@ public:
 	 * ensures a consistent maximum distance between adjacent waypoints.
 	 * Might be nice to improve it to smooth the paths, etc.)
 	 */
-	void NormalizePathWaypoints(Path& path);
+	void NormalizePathWaypoints(WaypointPath& path);
 
 	/**
 	 * Given a path with an arbitrary collection of waypoints, updates the
@@ -373,11 +282,11 @@ public:
 	 * so that bended paths can become straight if there's nothing in between
 	 * (this happens because A* is 8-direction, and the map isn't actually a grid).
 	 */
-	void ImprovePathWaypoints(Path& path, pass_class_t passClass);
+	void ImprovePathWaypoints(WaypointPath& path, pass_class_t passClass);
 
 	virtual u32 ComputePathAsync(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, entity_id_t notify);
 
-	virtual void ComputeShortPath(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, Path& ret);
+	virtual void ComputeShortPath(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret);
 
 	virtual u32 ComputeShortPathAsync(entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, bool avoidMovingUnits, entity_id_t controller, entity_id_t notify);
 
@@ -387,7 +296,10 @@ public:
 
 	virtual void SetDebugOverlay(bool enabled);
 
-	virtual void SetHierDebugOverlay(bool enabled);
+	virtual void SetHierDebugOverlay(bool enabled)
+	{
+		m_PathfinderHier->SetDebugOverlay(enabled, &GetSimContext());
+	}
 
 	virtual void GetDebugData(u32& steps, double& time, Grid<u8>& grid);
 
@@ -410,31 +322,6 @@ public:
 	void ProcessShortRequests(const std::vector<AsyncShortPathRequest>& shortRequests);
 
 	virtual void ProcessSameTurnMoves();
-
-	/**
-	 * Compute the navcell indexes on the grid nearest to a given point
-	 */
-	void NearestNavcell(entity_pos_t x, entity_pos_t z, u16& i, u16& j)
-	{
-		i = (u16)clamp((x / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity(), 0, m_MapSize*ICmpObstructionManager::NAVCELLS_PER_TILE - 1);
-		j = (u16)clamp((z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity(), 0, m_MapSize*ICmpObstructionManager::NAVCELLS_PER_TILE - 1);
-	}
-
-	/**
-	 * Returns the position of the center of the given tile
-	 */
-	static void TileCenter(u16 i, u16 j, entity_pos_t& x, entity_pos_t& z)
-	{
-		cassert(TERRAIN_TILE_SIZE % 2 == 0);
-		x = entity_pos_t::FromInt(i*(int)TERRAIN_TILE_SIZE + (int)TERRAIN_TILE_SIZE/2);
-		z = entity_pos_t::FromInt(j*(int)TERRAIN_TILE_SIZE + (int)TERRAIN_TILE_SIZE/2);
-	}
-
-	static void NavcellCenter(u16 i, u16 j, entity_pos_t& x, entity_pos_t& z)
-	{
-		x = entity_pos_t::FromInt(i*2 + 1).Multiply(ICmpObstructionManager::NAVCELL_SIZE / 2);
-		z = entity_pos_t::FromInt(j*2 + 1).Multiply(ICmpObstructionManager::NAVCELL_SIZE / 2);
-	}
 
 	/**
 	 * Regenerates the grid based on the current obstruction list, if necessary

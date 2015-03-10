@@ -85,7 +85,7 @@ public:
 		entity_pos_t z1 = entity_pos_t::FromInt(495);
 		ICmpPathfinder::Goal goal = { ICmpPathfinder::Goal::POINT, x1, z1 };
 
-		ICmpPathfinder::Path path;
+		WaypointPath path;
 		cmp->ComputePath(x0, z0, goal, cmp->GetPassabilityClass("default"), path);
 		for (size_t i = 0; i < path.m_Waypoints.size(); ++i)
 			printf("%d: %f %f\n", (int)i, path.m_Waypoints[i].x.ToDouble(), path.m_Waypoints[i].z.ToDouble());
@@ -102,7 +102,7 @@ public:
 			entity_pos_t z1 = z0 + entity_pos_t::FromInt(rand() % 64);
 			PathGoal goal = { PathGoal::POINT, x1, z1 };
 
-			ICmpPathfinder::Path path;
+			WaypointPath path;
 			cmp->ComputePath(x0, z0, goal, cmp->GetPassabilityClass("default"), path);
 		}
 
@@ -135,7 +135,7 @@ public:
 
 		NullObstructionFilter filter;
 		PathGoal goal = { PathGoal::POINT, range, range };
-		ICmpPathfinder::Path path;
+		WaypointPath path;
 		cmpPathfinder->ComputeShortPath(filter, range/3, range/3, fixed::FromInt(2), range, goal, 0, path);
 		for (size_t i = 0; i < path.m_Waypoints.size(); ++i)
 			printf("# %d: %f %f\n", (int)i, path.m_Waypoints[i].x.ToFloat(), path.m_Waypoints[i].z.ToFloat());
@@ -195,7 +195,7 @@ public:
 		CmpPtr<ICmpObstructionManager> cmpObstructionManager(sim2, SYSTEM_ENTITY);
 		CmpPtr<ICmpPathfinder> cmpPathfinder(sim2, SYSTEM_ENTITY);
 
-		ICmpPathfinder::pass_class_t obstructionsMask = cmpPathfinder->GetPassabilityClass("default") | ICmpObstructionManager::TILE_OBSTRUCTED_PATHFINDING;
+		pass_class_t obstructionsMask = cmpPathfinder->GetPassabilityClass("default") | ICmpObstructionManager::TILE_OBSTRUCTED_PATHFINDING;
 		const Grid<u16>& obstructions = cmpPathfinder->GetPassabilityGrid();
 
 		int scale = 1;
@@ -252,7 +252,7 @@ public:
 		CmpPtr<ICmpObstructionManager> cmpObstructionManager(sim2, SYSTEM_ENTITY);
 		CmpPtr<ICmpPathfinder> cmpPathfinder(sim2, SYSTEM_ENTITY);
 
-		ICmpPathfinder::pass_class_t obstructionsMask = cmpPathfinder->GetPassabilityClass("default") | ICmpObstructionManager::TILE_OBSTRUCTED_PATHFINDING;
+		pass_class_t obstructionsMask = cmpPathfinder->GetPassabilityClass("default") | ICmpObstructionManager::TILE_OBSTRUCTED_PATHFINDING;
 		const Grid<u16>& obstructions = cmpPathfinder->GetPassabilityGrid();
 
 		int scale = 31;
@@ -291,7 +291,7 @@ public:
 
 		PathGoal goal = { PathGoal::POINT, x1, z1 };
 
-		ICmpPathfinder::Path path;
+		WaypointPath path;
 #if USE_JPS
 		cmpPathfinder->ComputePathJPS(x0, z0, goal, cmpPathfinder->GetPassabilityClass("default"), path);
 #else
@@ -333,7 +333,7 @@ public:
 		stream << " title='length: " << length << "; tiles explored: " << debugSteps << "; time: " << debugTime*1000 << " msec'";
 		stream << " class='path' points='";
 		for (size_t i = 0; i < path.m_Waypoints.size(); ++i)
-			stream << path.m_Waypoints[i].x.ToDouble()*ICmpObstructionManager::NAVCELLS_PER_TILE/TERRAIN_TILE_SIZE << "," << path.m_Waypoints[i].z.ToDouble()*ICmpObstructionManager::NAVCELLS_PER_TILE/TERRAIN_TILE_SIZE << " ";
+			stream << path.m_Waypoints[i].x.ToDouble()*Pathfinding::NAVCELLS_PER_TILE/TERRAIN_TILE_SIZE << "," << path.m_Waypoints[i].z.ToDouble()*Pathfinding::NAVCELLS_PER_TILE/TERRAIN_TILE_SIZE << " ";
 		stream << "'/>\n";
 	}
 
@@ -349,7 +349,7 @@ public:
 		double t = timer_Time();
 		for (int i = 0; i < n; ++i)
 		{
-			ICmpPathfinder::Path path;
+			WaypointPath path;
 #if USE_JPS
 			cmpPathfinder->ComputePathJPS(x0, z0, goal, cmpPathfinder->GetPassabilityClass("default"), path);
 #else

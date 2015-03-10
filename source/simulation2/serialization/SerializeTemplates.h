@@ -205,13 +205,13 @@ struct SerializeBool
 
 struct SerializeWaypoint
 {
-	void operator()(ISerializer& serialize, const char* UNUSED(name), const ICmpPathfinder::Waypoint& value)
+	void operator()(ISerializer& serialize, const char* UNUSED(name), const Waypoint& value)
 	{
 		serialize.NumberFixed_Unbounded("waypoint x", value.x);
 		serialize.NumberFixed_Unbounded("waypoint z", value.z);
 	}
 
-	void operator()(IDeserializer& deserialize, const char* UNUSED(name), ICmpPathfinder::Waypoint& value)
+	void operator()(IDeserializer& deserialize, const char* UNUSED(name), Waypoint& value)
 	{
 		deserialize.NumberFixed_Unbounded("waypoint x", value.x);
 		deserialize.NumberFixed_Unbounded("waypoint z", value.z);

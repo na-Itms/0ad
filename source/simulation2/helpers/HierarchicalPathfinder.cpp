@@ -17,11 +17,10 @@
 
 #include "precompiled.h"
 
-#include "CCmpPathfinder_Common.h"
+#include "HierarchicalPathfinder.h"
 
-#include "renderer/Scene.h"
-#include "renderer/TerrainOverlay.h"
-#include "simulation2/helpers/Render.h"
+#include "graphics/Overlay.h"
+#include "ps/Profile.h"
 
 #define PATHFINDER_HIER_PROFILE 1
 #if PATHFINDER_HIER_PROFILE
@@ -31,174 +30,6 @@
 #else
 	#define	TIMER_ACCRUE(a) ;
 #endif
-
-class PathfinderHierOverlay;
-
-/**
- * Hierarchical pathfinder.
- *
- * Currently this doesn't actually find shortest paths, it just deals with
- * connectivity.
- *
- * The navcell-grid representation of the map is split into fixed-size chunks.
- * Within a chunks, each maximal set of adjacently-connected passable navcells
- * is defined as a region.
- * Each region is a vertex in the hierarchical pathfinder's graph.
- * When two regions in adjacent chunks are connected by passable navcells,
- * the graph contains an edge between the corresponding two vertexes.
- * (There will never be an edge between two regions in the same chunk.)
- *
- * Since regions are typically fairly large, it is possible to determine
- * connectivity between any two navcells by mapping them onto their appropriate
- * region and then doing a relatively small graph search.
- */
-class CCmpPathfinder_Hier
-{
-	NONCOPYABLE(CCmpPathfinder_Hier);
-
-	typedef ICmpPathfinder::pass_class_t pass_class_t;
-
-public:
-	struct RegionID
-	{
-		u8 ci, cj; // chunk ID
-		u16 r; // unique-per-chunk local region ID
-
-		RegionID(u8 ci, u8 cj, u16 r) : ci(ci), cj(cj), r(r) { }
-
-		bool operator<(RegionID b) const
-		{
-			// Sort by chunk ID, then by per-chunk region ID
-			if (ci < b.ci)
-				return true;
-			if (b.ci < ci)
-				return false;
-			if (cj < b.cj)
-				return true;
-			if (b.cj < cj)
-				return false;
-			return r < b.r;
-		}
-	};
-
-	CCmpPathfinder_Hier(CCmpPathfinder& pathfinder);
-	~CCmpPathfinder_Hier();
-
-	void Init(const std::vector<PathfinderPassability>& passClasses, Grid<NavcellData>* grid);
-
-	RegionID Get(u16 i, u16 j, pass_class_t passClass);
-
-	/**
-	 * Updates @p goal so that it's guaranteed to be reachable from the navcell
-	 * @p i0, @p j0 (which is assumed to be on a passable navcell).
-	 * If any part of the goal area is already reachable then
-	 * nothing is changed; otherwise the goal is replaced with a point goal
-	 * at the nearest reachable navcell to the original goal's center.
-	 * Returns true if the goal was replaced.
-	 */
-	bool MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass_class_t passClass);
-
-	/**
-	 * Updates @p i, @p j (which is assumed to be an impassable navcell)
-	 * to the nearest passable navcell.
-	 */
-	void FindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass);
-
-	void SetDebugOverlay(bool enabled);
-
-private:
-	static const u8 CHUNK_SIZE = 96; // number of navcells per side
-									 // TODO PATHFINDER: figure out best number. Probably 64 < n < 128
-
-	struct Chunk
-	{
-		u8 m_ChunkI, m_ChunkJ; // chunk ID
-		u16 m_NumRegions; // number of local region IDs (starting from 1)
-		u16 m_Regions[CHUNK_SIZE][CHUNK_SIZE]; // local region ID per navcell
-
-		cassert(CHUNK_SIZE*CHUNK_SIZE/2 < 65536); // otherwise we could overflow m_NumRegions with a checkerboard pattern
-
-		void InitRegions(int ci, int cj, Grid<NavcellData>* grid, pass_class_t passClass);
-
-		RegionID Get(int i, int j);
-
-		void RegionCenter(u16 r, int& i, int& j) const;
-
-		bool RegionContainsGoal(u16 r, const PathGoal& goal) const;
-
-		void RegionNavcellNearest(u16 r, int iGoal, int jGoal, int& iBest, int& jBest, u32& dist2Best) const;
-	};
-
-	typedef std::map<RegionID, std::set<RegionID> > EdgesMap;
-
-	void FindEdges(u8 ci, u8 cj, pass_class_t passClass, EdgesMap& edges);
-
-	void AddDebugEdges(pass_class_t passClass);
-
-	void FindReachableRegions(RegionID from, std::set<RegionID>& reachable, pass_class_t passClass);
-
-	void FindPassableRegions(std::set<RegionID>& regions, pass_class_t passClass);
-
-	/**
-	 * Updates @p iGoal and @p jGoal to the navcell that is the nearest to the
-	 * initial goal coordinates, in one of the given @p regions.
-	 * (Assumes @p regions is non-empty.)
-	 */
-	void FindNearestNavcellInRegions(const std::set<RegionID>& regions, u16& iGoal, u16& jGoal, pass_class_t passClass);
-
-	Chunk& GetChunk(u8 ci, u8 cj, pass_class_t passClass)
-	{
-		return m_Chunks[passClass].at(cj * m_ChunksW + ci);
-	}
-
-	PathfinderHierOverlay* m_DebugOverlay;
-
-	u16 m_ChunksW, m_ChunksH;
-	std::map<pass_class_t, std::vector<Chunk> > m_Chunks;
-
-	std::map<pass_class_t, EdgesMap> m_Edges;
-
-public:
-	CCmpPathfinder& m_Pathfinder;
-	std::vector<SOverlayLine> m_DebugOverlayLines;
-};
-
-class PathfinderHierOverlay : public TerrainTextureOverlay
-{
-public:
-	CCmpPathfinder_Hier& m_PathfinderHier;
-
-	PathfinderHierOverlay(CCmpPathfinder_Hier& pathfinderHier) :
-		TerrainTextureOverlay(ICmpObstructionManager::NAVCELLS_PER_TILE), m_PathfinderHier(pathfinderHier)
-	{
-	}
-
-	virtual void BuildTextureRGBA(u8* data, size_t w, size_t h)
-	{
-		ICmpPathfinder::pass_class_t passClass = m_PathfinderHier.m_Pathfinder.GetPassabilityClass("default");
-
-		for (size_t j = 0; j < h; ++j)
-		{
-			for (size_t i = 0; i < w; ++i)
-			{
-				SColor4ub color;
-
-				CCmpPathfinder_Hier::RegionID rid = m_PathfinderHier.Get(i, j, passClass);
-				if (rid.r == 0)
-					color = SColor4ub(0, 0, 0, 0);
-				else if (rid.r == 0xFFFF)
-					color = SColor4ub(255, 0, 255, 255);
-				else
-					color = GetColor(rid.r + rid.ci*5 + rid.cj*7, 127);
-
-				*data++ = color.R;
-				*data++ = color.G;
-				*data++ = color.B;
-				*data++ = color.A;
-			}
-		}
-	}
-};
 
 // Find the root ID of a region, used by InitRegions
 inline u16 RootID(u16 x, std::vector<u16> v)
@@ -215,7 +46,7 @@ inline u16 RootID(u16 x, std::vector<u16> v)
 	return x;
 }
 
-void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* grid, pass_class_t passClass)
+void HierarchicalPathfinder::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* grid, pass_class_t passClass)
 {
 	TIMER_ACCRUE(tc_InitRegions);
 	ENSURE(ci < 256 && cj < 256); // avoid overflows
@@ -307,7 +138,7 @@ void CCmpPathfinder_Hier::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* 
  * Returns a RegionID for the given global navcell coords
  * (which must be inside this chunk);
  */
-CCmpPathfinder_Hier::RegionID CCmpPathfinder_Hier::Chunk::Get(int i, int j)
+HierarchicalPathfinder::RegionID HierarchicalPathfinder::Chunk::Get(int i, int j)
 {
 	ENSURE(i < CHUNK_SIZE && j < CHUNK_SIZE);
 	return RegionID(m_ChunkI, m_ChunkJ, m_Regions[j][i]);
@@ -318,7 +149,7 @@ CCmpPathfinder_Hier::RegionID CCmpPathfinder_Hier::Chunk::Get(int i, int j)
  * center of the given region in this chunk.
  * (This is not guaranteed to be actually inside the region.)
  */
-void CCmpPathfinder_Hier::Chunk::RegionCenter(u16 r, int& i_out, int& j_out) const
+void HierarchicalPathfinder::Chunk::RegionCenter(u16 r, int& i_out, int& j_out) const
 {
 	// Find the mean of i,j coords of navcells in this region:
 
@@ -351,7 +182,7 @@ void CCmpPathfinder_Hier::Chunk::RegionCenter(u16 r, int& i_out, int& j_out) con
 /**
  * Returns whether any navcell in the given region is inside the goal.
  */
-bool CCmpPathfinder_Hier::Chunk::RegionContainsGoal(u16 r, const PathGoal& goal) const
+bool HierarchicalPathfinder::Chunk::RegionContainsGoal(u16 r, const PathGoal& goal) const
 {
 	// Inefficiently check every single navcell:
 	for (u16 j = 0; j < CHUNK_SIZE; ++j)
@@ -374,7 +205,7 @@ bool CCmpPathfinder_Hier::Chunk::RegionContainsGoal(u16 r, const PathGoal& goal)
  * navcell, of whichever navcell inside the given region is closest to
  * that goal.
  */
-void CCmpPathfinder_Hier::Chunk::RegionNavcellNearest(u16 r, int iGoal, int jGoal, int& iBest, int& jBest, u32& dist2Best) const
+void HierarchicalPathfinder::Chunk::RegionNavcellNearest(u16 r, int iGoal, int jGoal, int& iBest, int& jBest, u32& dist2Best) const
 {
 	iBest = 0;
 	jBest = 0;
@@ -400,35 +231,41 @@ void CCmpPathfinder_Hier::Chunk::RegionNavcellNearest(u16 r, int iGoal, int jGoa
 	}
 }
 
-CCmpPathfinder_Hier::CCmpPathfinder_Hier(CCmpPathfinder& pathfinder) :
-	m_Pathfinder(pathfinder)
+HierarchicalPathfinder::HierarchicalPathfinder()
 {
 	m_DebugOverlay = NULL;
 }
 
-CCmpPathfinder_Hier::~CCmpPathfinder_Hier()
+HierarchicalPathfinder::~HierarchicalPathfinder()
 {
 	SAFE_DELETE(m_DebugOverlay);
 }
 
-void CCmpPathfinder_Hier::SetDebugOverlay(bool enabled)
+void HierarchicalPathfinder::SetDebugOverlay(bool enabled, const CSimContext* simContext)
 {
 	if (enabled && !m_DebugOverlay)
 	{
-		m_DebugOverlay = new PathfinderHierOverlay(*this);
+		m_DebugOverlay = new HierarchicalOverlay(*this);
 		m_DebugOverlayLines.clear();
-		AddDebugEdges(m_Pathfinder.GetPassabilityClass("default"));
+		m_SimContext = simContext;
+		AddDebugEdges(GetPassabilityClass("default"));
 	}
 	else if (!enabled && m_DebugOverlay)
 	{
 		SAFE_DELETE(m_DebugOverlay);
 		m_DebugOverlayLines.clear();
+		m_SimContext = NULL;
 	}
 }
 
-void CCmpPathfinder_Hier::Init(const std::vector<PathfinderPassability>& passClasses, Grid<NavcellData>* grid)
+void HierarchicalPathfinder::Recompute(const std::map<std::string, pass_class_t>& passClassMasks, Grid<NavcellData>* grid)
 {
-	PROFILE3("hier init");
+	PROFILE3("Hierarchical Recompute");
+
+	m_PassClassMasks = passClassMasks;
+
+	m_MapW = grid->m_W / Pathfinding::NAVCELLS_PER_TILE;
+	m_MapW = grid->m_H / Pathfinding::NAVCELLS_PER_TILE;
 
 	// Divide grid into chunks with round-to-positive-infinity
 	m_ChunksW = (grid->m_W + CHUNK_SIZE - 1) / CHUNK_SIZE;
@@ -439,9 +276,9 @@ void CCmpPathfinder_Hier::Init(const std::vector<PathfinderPassability>& passCla
 	m_Chunks.clear();
 	m_Edges.clear();
 
-	for (size_t n = 0; n < passClasses.size(); ++n)
+	for (auto& passClassMask : passClassMasks)
 	{
-		pass_class_t passClass = passClasses[n].m_Mask;
+		pass_class_t passClass = passClassMask.second;
 
 		// Compute the regions within each chunk
 		m_Chunks[passClass].resize(m_ChunksW*m_ChunksH);
@@ -470,14 +307,14 @@ void CCmpPathfinder_Hier::Init(const std::vector<PathfinderPassability>& passCla
 	{
 		PROFILE("debug overlay");
 		m_DebugOverlayLines.clear();
-		AddDebugEdges(m_Pathfinder.GetPassabilityClass("default"));
+		AddDebugEdges(GetPassabilityClass("default"));
 	}
 }
 
 /**
  * Find edges between regions in this chunk and the adjacent below/left chunks.
  */
-void CCmpPathfinder_Hier::FindEdges(u8 ci, u8 cj, pass_class_t passClass, EdgesMap& edges)
+void HierarchicalPathfinder::FindEdges(u8 ci, u8 cj, pass_class_t passClass, EdgesMap& edges)
 {
 	std::vector<Chunk>& chunks = m_Chunks[passClass];
 
@@ -524,7 +361,7 @@ void CCmpPathfinder_Hier::FindEdges(u8 ci, u8 cj, pass_class_t passClass, EdgesM
 /**
  * Debug visualisation of graph edges between regions.
  */
-void CCmpPathfinder_Hier::AddDebugEdges(pass_class_t passClass)
+void HierarchicalPathfinder::AddDebugEdges(pass_class_t passClass)
 {
 	const EdgesMap& edges = m_Edges[passClass];
 	const std::vector<Chunk>& chunks = m_Chunks[passClass];
@@ -540,8 +377,8 @@ void CCmpPathfinder_Hier::AddDebugEdges(pass_class_t passClass)
 			chunks[rit->cj * m_ChunksW + rit->ci].RegionCenter(rit->r, i1, j1);
 
 			CFixedVector2D a, b;
-			m_Pathfinder.NavcellCenter(i0, j0, a.X, a.Y);
-			m_Pathfinder.NavcellCenter(i1, j1, b.X, b.Y);
+			Pathfinding::NavcellCenter(i0, j0, a.X, a.Y);
+			Pathfinding::NavcellCenter(i1, j1, b.X, b.Y);
 
 			// Push the endpoints inwards a little to avoid overlaps
 			CFixedVector2D d = b - a;
@@ -557,12 +394,12 @@ void CCmpPathfinder_Hier::AddDebugEdges(pass_class_t passClass)
 
 			m_DebugOverlayLines.push_back(SOverlayLine());
 			m_DebugOverlayLines.back().m_Color = CColor(1.0, 1.0, 1.0, 1.0);
-			SimRender::ConstructLineOnGround(m_Pathfinder.GetSimContext(), xz, m_DebugOverlayLines.back(), true);
+			SimRender::ConstructLineOnGround(*m_SimContext, xz, m_DebugOverlayLines.back(), true);
 		}
 	}
 }
 
-CCmpPathfinder_Hier::RegionID CCmpPathfinder_Hier::Get(u16 i, u16 j, pass_class_t passClass)
+HierarchicalPathfinder::RegionID HierarchicalPathfinder::Get(u16 i, u16 j, pass_class_t passClass)
 {
 	int ci = i / CHUNK_SIZE;
 	int cj = j / CHUNK_SIZE;
@@ -570,7 +407,7 @@ CCmpPathfinder_Hier::RegionID CCmpPathfinder_Hier::Get(u16 i, u16 j, pass_class_
 	return m_Chunks[passClass][cj*m_ChunksW + ci].Get(i % CHUNK_SIZE, j % CHUNK_SIZE);
 }
 
-bool CCmpPathfinder_Hier::MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass_class_t passClass)
+bool HierarchicalPathfinder::MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass_class_t passClass)
 {
 	TIMER_ACCRUE(tc_MakeGoalReachable);
 	RegionID source = Get(i0, j0, passClass);
@@ -588,10 +425,10 @@ bool CCmpPathfinder_Hier::MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass
 	for (std::set<RegionID>::const_iterator it = reachableRegions.begin(); it != reachableRegions.end(); ++it)
 	{
 		// Skip region if its chunk doesn't contain the goal area
-		entity_pos_t x0 = ICmpObstructionManager::NAVCELL_SIZE * (it->ci * CHUNK_SIZE);
-		entity_pos_t z0 = ICmpObstructionManager::NAVCELL_SIZE * (it->cj * CHUNK_SIZE);
-		entity_pos_t x1 = x0 + ICmpObstructionManager::NAVCELL_SIZE * CHUNK_SIZE;
-		entity_pos_t z1 = z0 + ICmpObstructionManager::NAVCELL_SIZE * CHUNK_SIZE;
+		entity_pos_t x0 = Pathfinding::NAVCELL_SIZE * (it->ci * CHUNK_SIZE);
+		entity_pos_t z0 = Pathfinding::NAVCELL_SIZE * (it->cj * CHUNK_SIZE);
+		entity_pos_t x1 = x0 + Pathfinding::NAVCELL_SIZE * CHUNK_SIZE;
+		entity_pos_t z1 = z0 + Pathfinding::NAVCELL_SIZE * CHUNK_SIZE;
 		if (!goal.RectContainsGoal(x0, z0, x1, z1))
 			continue;
 
@@ -605,27 +442,27 @@ bool CCmpPathfinder_Hier::MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass
 	// so find the navcell that's nearest to the goal's center
 
 	u16 iGoal, jGoal;
-	m_Pathfinder.NearestNavcell(goal.x, goal.z, iGoal, jGoal);
+	Pathfinding::NearestNavcell(goal.x, goal.z, iGoal, jGoal, m_MapW, m_MapH);
 
 	FindNearestNavcellInRegions(reachableRegions, iGoal, jGoal, passClass);
 
 	// Construct a new point goal at the nearest reachable navcell
 	PathGoal newGoal;
 	newGoal.type = PathGoal::POINT;
-	m_Pathfinder.NavcellCenter(iGoal, jGoal, newGoal.x, newGoal.z);
+	Pathfinding::NavcellCenter(iGoal, jGoal, newGoal.x, newGoal.z);
 	goal = newGoal;
 
 	return true;
 }
 
-void CCmpPathfinder_Hier::FindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass)
+void HierarchicalPathfinder::FindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass)
 {
 	std::set<RegionID> regions;
 	FindPassableRegions(regions, passClass);
 	FindNearestNavcellInRegions(regions, i, j, passClass);
 }
 
-void CCmpPathfinder_Hier::FindNearestNavcellInRegions(const std::set<RegionID>& regions, u16& iGoal, u16& jGoal, pass_class_t passClass)
+void HierarchicalPathfinder::FindNearestNavcellInRegions(const std::set<RegionID>& regions, u16& iGoal, u16& jGoal, pass_class_t passClass)
 {
 	// Find the navcell in the given regions that's nearest to the goal navcell:
 	// * For each region, record the (squared) minimal distance to the goal point
@@ -682,7 +519,7 @@ void CCmpPathfinder_Hier::FindNearestNavcellInRegions(const std::set<RegionID>& 
 	jGoal = jBest;
 }
 
-void CCmpPathfinder_Hier::FindReachableRegions(RegionID from, std::set<RegionID>& reachable, pass_class_t passClass)
+void HierarchicalPathfinder::FindReachableRegions(RegionID from, std::set<RegionID>& reachable, pass_class_t passClass)
 {
 	// Flood-fill the region graph, starting at 'from',
 	// collecting all the regions that are reachable via edges
@@ -707,7 +544,7 @@ void CCmpPathfinder_Hier::FindReachableRegions(RegionID from, std::set<RegionID>
 	}
 }
 
-void CCmpPathfinder_Hier::FindPassableRegions(std::set<RegionID>& regions, pass_class_t passClass)
+void HierarchicalPathfinder::FindPassableRegions(std::set<RegionID>& regions, pass_class_t passClass)
 {
 	// Construct a set of all regions of all chunks for this pass class
 
@@ -718,40 +555,4 @@ void CCmpPathfinder_Hier::FindPassableRegions(std::set<RegionID>& regions, pass_
 		for (int r = 1; r <= chunks[c].m_NumRegions; ++r)
 			regions.insert(RegionID(chunks[c].m_ChunkI, chunks[c].m_ChunkJ, r));
 	}
-}
-
-void CCmpPathfinder::PathfinderHierInit()
-{
-	m_PathfinderHier = new CCmpPathfinder_Hier(*this);
-}
-
-void CCmpPathfinder::PathfinderHierDeinit()
-{
-	SAFE_DELETE(m_PathfinderHier);
-}
-
-void CCmpPathfinder::PathfinderHierReload()
-{
-	m_PathfinderHier->Init(m_PassClasses, m_Grid);
-}
-
-void CCmpPathfinder::SetHierDebugOverlay(bool enabled)
-{
-	m_PathfinderHier->SetDebugOverlay(enabled);
-}
-
-void CCmpPathfinder::PathfinderHierRenderSubmit(SceneCollector& collector)
-{
-	for (size_t i = 0; i < m_PathfinderHier->m_DebugOverlayLines.size(); ++i)
-		collector.Submit(&m_PathfinderHier->m_DebugOverlayLines[i]);
-}
-
-bool CCmpPathfinder::PathfinderHierMakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass_class_t passClass)
-{
-	return m_PathfinderHier->MakeGoalReachable(i0, j0, goal, passClass);
-}
-
-void CCmpPathfinder::PathfinderHierFindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass)
-{
-	m_PathfinderHier->FindNearestPassableNavcell(i, j, passClass);
 }

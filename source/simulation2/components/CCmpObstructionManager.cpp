@@ -715,8 +715,8 @@ bool CCmpObstructionManager::TestUnitShape(const IObstructionTestFilter& filter,
  */
 static void NearestNavcell(entity_pos_t x, entity_pos_t z, u16& i, u16& j, u16 w, u16 h)
 {
-	i = (u16)clamp((x / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero(), 0, w-1);
-	j = (u16)clamp((z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToZero(), 0, h-1);
+	i = (u16)clamp((x / Pathfinding::NAVCELL_SIZE).ToInt_RoundToZero(), 0, w - 1);
+	j = (u16)clamp((z / Pathfinding::NAVCELL_SIZE).ToInt_RoundToZero(), 0, h - 1);
 }
 
 void CCmpObstructionManager::Rasterize(Grid<u16>& grid, entity_pos_t expand, ICmpObstructionManager::flags_t requireMask, u16 setMask)
@@ -743,7 +743,7 @@ void CCmpObstructionManager::Rasterize(Grid<u16>& grid, entity_pos_t expand, ICm
 		{
 			ObstructionSquare square = { shape.x, shape.z, shape.u, shape.v, shape.hw, shape.hh };
 			SimRasterize::Spans spans;
-			SimRasterize::RasterizeRectWithClearance(spans, square, expand, ICmpObstructionManager::NAVCELL_SIZE);
+			SimRasterize::RasterizeRectWithClearance(spans, square, expand, Pathfinding::NAVCELL_SIZE);
 			for (size_t k = 0; k < spans.size(); ++k)
 			{
 				i16 j = spans[k].j;
@@ -842,15 +842,15 @@ void CCmpObstructionManager::GetUnitsOnObstruction(const ObstructionSquare& squa
 	// so TODO: fix this properly.
 
 	SimRasterize::Spans spans;
-	SimRasterize::RasterizeRectWithClearance(spans, square, fixed::Zero(), ICmpObstructionManager::NAVCELL_SIZE);
+	SimRasterize::RasterizeRectWithClearance(spans, square, fixed::Zero(), Pathfinding::NAVCELL_SIZE);
 
 	for (std::map<u32, UnitShape>::iterator it = m_UnitShapes.begin(); it != m_UnitShapes.end(); ++it)
 	{
 		// Check whether the unit's center is on a navcell that's in
 		// any of the spans
 
-		u16 i = (it->second.x / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
-		u16 j = (it->second.z / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
+		u16 i = (it->second.x / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
+		u16 j = (it->second.z / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity();
 
 		for (size_t k = 0; k < spans.size(); ++k)
 		{

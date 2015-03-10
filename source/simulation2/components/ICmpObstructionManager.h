@@ -55,25 +55,6 @@ class ICmpObstructionManager : public IComponent
 {
 public:
 	/**
-	 * The pathfinders operate primarily over a navigation grid (a uniform-cost
-	 * 2D passability grid, with horizontal/vertical (not diagonal) connectivity).
-	 * This is based on the terrain tile passability, plus the rasterized shapes of
-	 * obstructions, all expanded outwards by the radius of the units.
-	 * Since units are much smaller than terrain tiles, the nav grid should be
-	 * higher resolution than the tiles.
-	 * We therefore split each terrain tile into NxN "nav cells" (for some integer N,
-	 * preferably a power of two).
-	 */
-	static const int NAVCELLS_PER_TILE = 4;
-
-	/**
-	 * Size of a navcell in metres ( = TERRAIN_TILE_SIZE / NAVCELLS_PER_TILE)
-	 */
-	static const fixed NAVCELL_SIZE;
-	static const int NAVCELL_SIZE_INT = 1;
-	static const int NAVCELL_SIZE_LOG2 = 0;
-
-	/**
 	 * External identifiers for shapes.
 	 * (This is a struct rather than a raw u32 for type-safety.)
 	 */

@@ -99,7 +99,7 @@ public:
 	CCmpPathfinder& m_Pathfinder;
 
 	PathfinderOverlay(CCmpPathfinder& pathfinder) :
-		TerrainTextureOverlay(ICmpObstructionManager::NAVCELLS_PER_TILE), m_Pathfinder(pathfinder)
+		TerrainTextureOverlay(Pathfinding::NAVCELLS_PER_TILE), m_Pathfinder(pathfinder)
 	{
 	}
 
@@ -150,12 +150,12 @@ public:
 		// Render the most recently generated path
 		if (m_Pathfinder.m_DebugPath && !m_Pathfinder.m_DebugPath->m_Waypoints.empty())
 		{
-			std::vector<ICmpPathfinder::Waypoint>& waypoints = m_Pathfinder.m_DebugPath->m_Waypoints;
+			std::vector<Waypoint>& waypoints = m_Pathfinder.m_DebugPath->m_Waypoints;
 			u16 ip = 0, jp = 0;
 			for (size_t k = 0; k < waypoints.size(); ++k)
 			{
 				u16 i, j;
-				m_Pathfinder.NearestNavcell(waypoints[k].x, waypoints[k].z, i, j);
+				Pathfinding::NearestNavcell(waypoints[k].x, waypoints[k].z, i, j, m_Pathfinder.m_MapSize, m_Pathfinder.m_MapSize);
 				if (k == 0)
 				{
 					ip = i;
@@ -204,7 +204,7 @@ void CCmpPathfinder::SetDebugPath(entity_pos_t x0, entity_pos_t z0, const PathGo
 
 	SAFE_DELETE(m_DebugGrid);
 	delete m_DebugPath;
-	m_DebugPath = new Path();
+	m_DebugPath = new WaypointPath();
 #if PATHFIND_USE_JPS
 	ComputePathJPS(x0, z0, goal, passClass, *m_DebugPath);
 #else
@@ -228,7 +228,7 @@ struct PathfinderState
 
 	u16 iGoal, jGoal; // goal tile
 
-	ICmpPathfinder::pass_class_t passClass;
+	pass_class_t passClass;
 
 	PriorityQueue open;
 	// (there's no explicit closed list; it's encoded in PathfindTile)
@@ -352,7 +352,7 @@ static void ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg, Pathfind
 #endif
 }
 
-void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, Path& path)
+void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
 {
 	UpdateGrid();
 
@@ -364,7 +364,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 
 	// Convert the start/end coordinates to tile indexes
 	u16 i0, j0;
-	NearestNavcell(x0, z0, i0, j0);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
 
 	// To be consistent with the JPS pathfinder (which requires passable source navcell),
 	// and to let us guarantee the goal is reachable from the source, we switch to
@@ -377,7 +377,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 
 	// Adjust the goal so that it's reachable from the source navcell
 	PathGoal goal = origGoal;
-	PathfinderHierMakeGoalReachable(i0, j0, goal, passClass);
+	m_PathfinderHier->MakeGoalReachable(i0, j0, goal, passClass);
 
 	// If we're already at the goal tile, then move directly to the exact goal coordinates
 	// XXX: this seems bogus for non-point goals, it should be the point on the current cell nearest the goal
@@ -389,7 +389,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 	}
 
 	// Store the navcell at the goal center, for A* heuristics
-	NearestNavcell(goal.x, goal.z, state.iGoal, state.jGoal);
+	Pathfinding::NearestNavcell(goal.x, goal.z, state.iGoal, state.jGoal, m_MapSize, m_MapSize);
 
 	state.passClass = passClass;
 
@@ -454,7 +454,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 	{
 		PathfindTile& n = state.tiles->get(ip, jp);
 		entity_pos_t x, z;
-		NavcellCenter(ip, jp, x, z);
+		Pathfinding::NavcellCenter(ip, jp, x, z);
 		Waypoint w = { x, z };
 		path.m_Waypoints.push_back(w);
 

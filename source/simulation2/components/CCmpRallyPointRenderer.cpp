@@ -68,9 +68,8 @@ struct SVisibilitySegment
 class CCmpRallyPointRenderer : public ICmpRallyPointRenderer
 {
 	// import some types for less verbosity
-	typedef ICmpPathfinder::Path Path;
+	typedef WaypointPath Path;
 	typedef PathGoal Goal;
-	typedef ICmpPathfinder::Waypoint Waypoint;
 	typedef ICmpRangeManager::CLosQuerier CLosQuerier;
 	typedef SOverlayTexturedLine::LineCapType LineCapType;
 
@@ -1074,7 +1073,7 @@ void CCmpRallyPointRenderer::ReduceSegmentsByVisibility(std::vector<CVector2D>& 
 	std::vector<CVector2D> newCoords;
 	StationaryOnlyObstructionFilter obstructionFilter;
 	entity_pos_t lineRadius = fixed::FromFloat(m_LineThickness);
-	ICmpPathfinder::pass_class_t passabilityClass = cmpPathFinder->GetPassabilityClass(m_LinePassabilityClass);
+	pass_class_t passabilityClass = cmpPathFinder->GetPassabilityClass(m_LinePassabilityClass);
 
 	newCoords.push_back(coords[0]); // save the first base node
 

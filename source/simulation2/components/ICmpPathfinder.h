@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -22,7 +22,7 @@
 
 #include "simulation2/components/ICmpObstruction.h"
 #include "simulation2/helpers/PathGoal.h"
-#include "simulation2/helpers/Position.h"
+#include "simulation2/helpers/Pathfinding.h"
 
 #include "maths/FixedVector2D.h"
 
@@ -49,21 +49,6 @@ template<typename T> class Grid;
 class ICmpPathfinder : public IComponent
 {
 public:
-	typedef u16 pass_class_t;
-
-	struct Waypoint
-	{
-		entity_pos_t x, z;
-	};
-
-	/**
-	 * Returned path.
-	 * Waypoints are in *reverse* order (the earliest is at the back of the list)
-	 */
-	struct Path
-	{
-		std::vector<Waypoint> m_Waypoints;
-	};
 
 	/**
 	 * Get the list of all known passability classes.
@@ -83,12 +68,12 @@ public:
 	 * The waypoints correspond to the centers of horizontally/vertically adjacent tiles
 	 * along the path.
 	 */
-	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, Path& ret) = 0;
+	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret) = 0;
 
 	/**
 	 * Equivalent to ComputePath, but using the JPS pathfinder.
 	 */
-	virtual void ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, Path& ret) = 0;
+	virtual void ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret) = 0;
 
 	/**
 	 * Asynchronous version of ComputePath.
@@ -109,7 +94,7 @@ public:
 	 * a unit of radius 'r' will be able to follow the path with no collisions.
 	 * The path is restricted to a box of radius 'range' from the starting point.
 	 */
-	virtual void ComputeShortPath(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, Path& ret) = 0;
+	virtual void ComputeShortPath(const IObstructionTestFilter& filter, entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret) = 0;
 
 	/**
 	 * Asynchronous version of ComputeShortPath (using ControlGroupObstructionFilter).

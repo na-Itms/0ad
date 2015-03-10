@@ -72,7 +72,7 @@ void CCmpPathfinder::Init(const CParamNode& UNUSED(paramNode))
 	m_DebugGridJPS = NULL;
 	m_DebugPath = NULL;
 
-	PathfinderHierInit();
+	m_PathfinderHier = new HierarchicalPathfinder;
 
 	m_SameTurnMovesCount = 0;
 
@@ -117,7 +117,7 @@ void CCmpPathfinder::Deinit()
 	SetDebugOverlay(false); // cleans up memory
 	ResetDebugPath();
 
-	PathfinderHierDeinit();
+	SAFE_DELETE(m_PathfinderHier);
 
 	SAFE_DELETE(m_Grid);
 	SAFE_DELETE(m_BaseGrid);
@@ -208,7 +208,7 @@ void CCmpPathfinder::RenderSubmit(SceneCollector& collector)
 }
 
 
-ICmpPathfinder::pass_class_t CCmpPathfinder::GetPassabilityClass(const std::string& name)
+pass_class_t CCmpPathfinder::GetPassabilityClass(const std::string& name)
 {
 	if (m_PassClassMasks.find(name) == m_PassClassMasks.end())
 	{
@@ -219,7 +219,7 @@ ICmpPathfinder::pass_class_t CCmpPathfinder::GetPassabilityClass(const std::stri
 	return m_PassClassMasks[name];
 }
 
-std::map<std::string, ICmpPathfinder::pass_class_t> CCmpPathfinder::GetPassabilityClasses()
+std::map<std::string, pass_class_t> CCmpPathfinder::GetPassabilityClasses()
 {
 	return m_PassClassMasks;
 }
@@ -250,7 +250,7 @@ const Grid<u16>& CCmpPathfinder::GetPassabilityGrid()
  * Euclidean distances; currently it effectively does dist=max(dx,dy) instead.
  * This would only really be a problem for big clearances.
  */
-static void ExpandImpassableCells(Grid<u16>& grid, u16 clearance, ICmpPathfinder::pass_class_t mask)
+static void ExpandImpassableCells(Grid<u16>& grid, u16 clearance, pass_class_t mask)
 {
 	PROFILE3("ExpandImpassableCells");
 
@@ -330,7 +330,7 @@ Grid<u16> CCmpPathfinder::ComputeShoreGrid()
 		for (u16 i = 0; i < m_MapSize; ++i)
 		{
 			fixed x, z;
-			TileCenter(i, j, x, z);
+			Pathfinding::TileCenter(i, j, x, z);
 
 			bool underWater = cmpWaterManager && (cmpWaterManager->GetWaterLevel(x, z) > terrain.GetExactGroundLevelFixed(x, z));
 			waterGrid.set(i, j, underWater ? 1 : 0);
@@ -435,17 +435,17 @@ void CCmpPathfinder::ComputeTerrainPassabilityGrid(const Grid<u16>& shoreGrid)
 	CTerrain& terrain = GetSimContext().GetTerrain();
 
 	// Compute initial terrain-dependent passability
-	for (int j = 0; j < m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE; ++j)
+	for (int j = 0; j < m_MapSize * Pathfinding::NAVCELLS_PER_TILE; ++j)
 	{
-		for (int i = 0; i < m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE; ++i)
+		for (int i = 0; i < m_MapSize * Pathfinding::NAVCELLS_PER_TILE; ++i)
 		{
 			// World-space coordinates for this navcell
 			fixed x, z;
-			NavcellCenter(i, j, x, z);
+			Pathfinding::NavcellCenter(i, j, x, z);
 
 			// Terrain-tile coordinates for this navcell
-			int itile = i / ICmpObstructionManager::NAVCELLS_PER_TILE;
-			int jtile = j / ICmpObstructionManager::NAVCELLS_PER_TILE;
+			int itile = i / Pathfinding::NAVCELLS_PER_TILE;
+			int jtile = j / Pathfinding::NAVCELLS_PER_TILE;
 
 			// Gather all the data potentially needed to determine passability:
 
@@ -497,8 +497,8 @@ void CCmpPathfinder::UpdateGrid()
 	if (!m_Grid)
 	{
 		m_MapSize = cmpTerrain->GetTilesPerSide();
-		m_Grid = new Grid<NavcellData>(m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE, m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE);
-		m_BaseGrid = new Grid<NavcellData>(m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE, m_MapSize * ICmpObstructionManager::NAVCELLS_PER_TILE);
+		m_Grid = new Grid<NavcellData>(m_MapSize * Pathfinding::NAVCELLS_PER_TILE, m_MapSize * Pathfinding::NAVCELLS_PER_TILE);
+		m_BaseGrid = new Grid<NavcellData>(m_MapSize * Pathfinding::NAVCELLS_PER_TILE, m_MapSize * Pathfinding::NAVCELLS_PER_TILE);
 		m_ObstructionGridDirtyID = 0;
 	}
 
@@ -530,7 +530,7 @@ void CCmpPathfinder::UpdateGrid()
 				PROFILE3("off-world passability");
 
 				// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
-				const int edgeSize = 3 * ICmpObstructionManager::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
+				const int edgeSize = 3 * Pathfinding::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
 
 				NavcellData edgeMask = 0;
 				for (size_t n = 0; n < m_PassClasses.size(); ++n)
@@ -565,7 +565,7 @@ void CCmpPathfinder::UpdateGrid()
 				{
 					// TODO: if multiple classes have the same clearance, we should
 					// only bother doing this once for them all
-					int clearance = (m_PassClasses[n].m_Clearance / ICmpObstructionManager::NAVCELL_SIZE).ToInt_RoundToInfinity();
+					int clearance = (m_PassClasses[n].m_Clearance / Pathfinding::NAVCELL_SIZE).ToInt_RoundToInfinity();
 					if (clearance > 0)
 						ExpandImpassableCells(*m_Grid, clearance, m_PassClasses[n].m_Mask);
 				}
@@ -593,7 +593,7 @@ void CCmpPathfinder::UpdateGrid()
 
 		++m_Grid->m_DirtyID;
 
-		PathfinderHierReload();
+		PathfinderHierRecompute();
 
 		PathfinderJPSMakeDirty();
 	}
@@ -645,7 +645,7 @@ void CCmpPathfinder::ProcessLongRequests(const std::vector<AsyncLongPathRequest>
 	{
 		TIMER_ACCRUE(tc_ProcessLongRequests_Loop);
 		const AsyncLongPathRequest& req = longRequests[i];
-		Path path;
+		WaypointPath path;
 #if PATHFIND_USE_JPS
 		ComputePathJPS(req.x0, req.z0, req.goal, req.passClass, path);
 #else
@@ -663,7 +663,7 @@ void CCmpPathfinder::ProcessShortRequests(const std::vector<AsyncShortPathReques
 	for (size_t i = 0; i < shortRequests.size(); ++i)
 	{
 		const AsyncShortPathRequest& req = shortRequests[i];
-		Path path;
+		WaypointPath path;
 		ControlGroupMovementObstructionFilter filter(req.avoidMovingUnits, req.group);
 		ComputeShortPath(filter, req.x0, req.z0, req.r, req.range, req.goal, req.passClass, path);
 		CMessagePathResult msg(req.ticket, path);
@@ -746,7 +746,7 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckUnitPlacement(const IObst
 	// Test against terrain and static obstructions:
 
 	u16 i, j;
-	NearestNavcell(x, z, i, j);
+	Pathfinding::NearestNavcell(x, z, i, j, m_MapSize, m_MapSize);
 	if (!IS_PASSABLE(m_Grid->get(i, j), passClass))
 		return ICmpObstruction::FOUNDATION_CHECK_FAIL_TERRAIN_CLASS;
 
@@ -792,7 +792,7 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const I
 		expand = passability->m_Clearance;
 
 	SimRasterize::Spans spans;
-	SimRasterize::RasterizeRectWithClearance(spans, square, expand, ICmpObstructionManager::NAVCELL_SIZE);
+	SimRasterize::RasterizeRectWithClearance(spans, square, expand, Pathfinding::NAVCELL_SIZE);
 	for (size_t k = 0; k < spans.size(); ++k)
 	{
 		i16 i0 = spans[k].i0;
@@ -815,13 +815,13 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const I
 
 //////////////////////////////////////////////////////////
 
-void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& UNUSED(origGoal), pass_class_t passClass, Path& path)
+void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& UNUSED(origGoal), pass_class_t passClass, WaypointPath& path)
 {
 	u16 i0, j0;
-	NearestNavcell(x0, z0, i0, j0);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
 	u16 iGoal = i0;
 	u16 jGoal = j0;
-	this->PathfinderHierFindNearestPassableNavcell(iGoal, jGoal, passClass);
+	m_PathfinderHier->FindNearestPassableNavcell(iGoal, jGoal, passClass);
 
 	int ip = iGoal;
 	int jp = jGoal;
@@ -830,7 +830,7 @@ void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, 
 	while (ip != i0 || jp != j0)
 	{
 		entity_pos_t x, z;
-		NavcellCenter(ip, jp, x, z);
+		Pathfinding::NavcellCenter(ip, jp, x, z);
 		Waypoint w = { x, z };
 		path.m_Waypoints.push_back(w);
 
@@ -848,7 +848,7 @@ void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, 
 	}
 }
 
-void CCmpPathfinder::NormalizePathWaypoints(Path& path)
+void CCmpPathfinder::NormalizePathWaypoints(WaypointPath& path)
 {
 	if (path.m_Waypoints.empty())
 		return;
@@ -856,7 +856,7 @@ void CCmpPathfinder::NormalizePathWaypoints(Path& path)
 	// Given the current list of waypoints, add intermediate waypoints
 	// in a straight line between them, so that the maximum gap between
 	// waypoints is within the (fairly arbitrary) limit
-	const fixed MAX_WAYPOINT_SEPARATION = ICmpObstructionManager::NAVCELL_SIZE * 4;
+	const fixed MAX_WAYPOINT_SEPARATION = Pathfinding::NAVCELL_SIZE * 4;
 
 	std::vector<Waypoint>& waypoints = path.m_Waypoints;
 	std::vector<Waypoint> newWaypoints;
@@ -883,7 +883,7 @@ void CCmpPathfinder::NormalizePathWaypoints(Path& path)
 	path.m_Waypoints.swap(newWaypoints);
 }
 
-void CCmpPathfinder::ImprovePathWaypoints(Path& path, pass_class_t passClass)
+void CCmpPathfinder::ImprovePathWaypoints(WaypointPath& path, pass_class_t passClass)
 {
 	if (path.m_Waypoints.size() < 2)
 		return;

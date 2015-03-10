@@ -520,7 +520,7 @@ public:
 		}
 
 		// Get passability class
-		ICmpPathfinder::pass_class_t passClass = cmpPathfinder->GetPassabilityClass(className);
+		pass_class_t passClass = cmpPathfinder->GetPassabilityClass(className);
 
 		// Ignore collisions within the same control group, or with other non-foundation-blocking shapes.
 		// Note that, since the control group for each entity defaults to the entity's ID, this is typically 

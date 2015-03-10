@@ -1748,10 +1748,10 @@ public:
 
 		// Currently this code doesn't support territory-tiles smaller than terrain-tiles
 		// (it will get scale==0 and break), or a non-integer multiple, so check that first
-		cassert(ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE >= ICmpObstructionManager::NAVCELLS_PER_TILE);
-		cassert(ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE % ICmpObstructionManager::NAVCELLS_PER_TILE == 0);
+		cassert(ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE >= Pathfinding::NAVCELLS_PER_TILE);
+		cassert(ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE % Pathfinding::NAVCELLS_PER_TILE == 0);
 
-		int scale = ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / ICmpObstructionManager::NAVCELLS_PER_TILE;
+		int scale = ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE / Pathfinding::NAVCELLS_PER_TILE;
 
 		ENSURE(grid.m_W*scale == m_TerrainVerticesPerSide-1 && grid.m_H*scale == m_TerrainVerticesPerSide-1);
 

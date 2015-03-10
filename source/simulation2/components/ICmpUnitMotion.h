@@ -120,7 +120,7 @@ public:
 	/**
 	 * Get the unit's passability class.
 	 */
-	virtual ICmpPathfinder::pass_class_t GetPassabilityClass() = 0;
+	virtual pass_class_t GetPassabilityClass() = 0;
 
 	/**
 	 * Get the passability class name (as defined in pathfinder.xml)

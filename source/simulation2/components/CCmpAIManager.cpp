@@ -1087,8 +1087,8 @@ private:
 		JS::RootedValue classesVal(cx);
 		scriptInterface.Eval("({})", &classesVal);
 
-		std::map<std::string, ICmpPathfinder::pass_class_t> classes = cmpPathfinder->GetPassabilityClasses();
-		for (std::map<std::string, ICmpPathfinder::pass_class_t>::iterator it = classes.begin(); it != classes.end(); ++it)
+		std::map<std::string, pass_class_t> classes = cmpPathfinder->GetPassabilityClasses();
+		for (std::map<std::string, pass_class_t>::iterator it = classes.begin(); it != classes.end(); ++it)
 			scriptInterface.SetProperty(classesVal, it->first.c_str(), it->second, true);
 
 		scriptInterface.SetProperty(state, "passabilityClasses", classesVal, true);

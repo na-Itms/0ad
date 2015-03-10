@@ -342,7 +342,7 @@ typedef PriorityQueueHeap<u16, fixed> PriorityQueue;
  */
 static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& vertexes,
 	int i0, int j0, int i1, int j1,
-	ICmpPathfinder::pass_class_t passClass, const Grid<NavcellData>& grid)
+	pass_class_t passClass, const Grid<NavcellData>& grid)
 {
 	PROFILE("AddTerrainEdges");
 
@@ -369,7 +369,7 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 				vert.status = Vertex::UNEXPLORED;
 				vert.quadOutward = QUADRANT_ALL;
 				vert.quadInward = QUADRANT_BL;
-				vert.p = CFixedVector2D(fixed::FromInt(i+1)+EDGE_EXPAND_DELTA, fixed::FromInt(j+1)+EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vert.p = CFixedVector2D(fixed::FromInt(i+1)+EDGE_EXPAND_DELTA, fixed::FromInt(j+1)+EDGE_EXPAND_DELTA).Multiply(Pathfinding::NAVCELL_SIZE);
 				vertexes.push_back(vert);
 			}
 
@@ -379,7 +379,7 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 				vert.status = Vertex::UNEXPLORED;
 				vert.quadOutward = QUADRANT_ALL;
 				vert.quadInward = QUADRANT_BR;
-				vert.p = CFixedVector2D(fixed::FromInt(i)-EDGE_EXPAND_DELTA, fixed::FromInt(j+1)+EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vert.p = CFixedVector2D(fixed::FromInt(i)-EDGE_EXPAND_DELTA, fixed::FromInt(j+1)+EDGE_EXPAND_DELTA).Multiply(Pathfinding::NAVCELL_SIZE);
 				vertexes.push_back(vert);
 			}
 
@@ -389,7 +389,7 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 				vert.status = Vertex::UNEXPLORED;
 				vert.quadOutward = QUADRANT_ALL;
 				vert.quadInward = QUADRANT_TL;
-				vert.p = CFixedVector2D(fixed::FromInt(i+1)+EDGE_EXPAND_DELTA, fixed::FromInt(j)-EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vert.p = CFixedVector2D(fixed::FromInt(i+1)+EDGE_EXPAND_DELTA, fixed::FromInt(j)-EDGE_EXPAND_DELTA).Multiply(Pathfinding::NAVCELL_SIZE);
 				vertexes.push_back(vert);
 			}
 
@@ -399,7 +399,7 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 				vert.status = Vertex::UNEXPLORED;
 				vert.quadOutward = QUADRANT_ALL;
 				vert.quadInward = QUADRANT_TR;
-				vert.p = CFixedVector2D(fixed::FromInt(i)-EDGE_EXPAND_DELTA, fixed::FromInt(j)-EDGE_EXPAND_DELTA).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+				vert.p = CFixedVector2D(fixed::FromInt(i)-EDGE_EXPAND_DELTA, fixed::FromInt(j)-EDGE_EXPAND_DELTA).Multiply(Pathfinding::NAVCELL_SIZE);
 				vertexes.push_back(vert);
 			}
 		}
@@ -433,8 +433,8 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 					++ib;
 				else
 				{
-					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(ia), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(ib), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(ia), fixed::FromInt(j+1)).Multiply(Pathfinding::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(ib), fixed::FromInt(j+1)).Multiply(Pathfinding::NAVCELL_SIZE);
 					Edge e = { v0, v1 };
 					edges.push_back(e);
 
@@ -455,8 +455,8 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 					++ib;
 				else
 				{
-					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(ib), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(ia), fixed::FromInt(j+1)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(ib), fixed::FromInt(j+1)).Multiply(Pathfinding::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(ia), fixed::FromInt(j+1)).Multiply(Pathfinding::NAVCELL_SIZE);
 					Edge e = { v0, v1 };
 					edges.push_back(e);
 
@@ -493,8 +493,8 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 					++jb;
 				else
 				{
-					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(ja)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(jb)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(ja)).Multiply(Pathfinding::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(jb)).Multiply(Pathfinding::NAVCELL_SIZE);
 					Edge e = { v0, v1 };
 					edges.push_back(e);
 
@@ -515,8 +515,8 @@ static void AddTerrainEdges(std::vector<Edge>& edges, std::vector<Vertex>& verte
 					++jb;
 				else
 				{
-					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(jb)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(ja)).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+					CFixedVector2D v0 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(jb)).Multiply(Pathfinding::NAVCELL_SIZE);
+					CFixedVector2D v1 = CFixedVector2D(fixed::FromInt(i+1), fixed::FromInt(ja)).Multiply(Pathfinding::NAVCELL_SIZE);
 					Edge e = { v0, v1 };
 					edges.push_back(e);
 
@@ -624,7 +624,7 @@ struct SquareSort
 
 void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	entity_pos_t x0, entity_pos_t z0, entity_pos_t r,
-	entity_pos_t range, const PathGoal& goal, pass_class_t passClass, Path& path)
+	entity_pos_t range, const PathGoal& goal, pass_class_t passClass, WaypointPath& path)
 {
 
 	PROFILE3("ComputeShortPath");
@@ -704,8 +704,8 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	// Add terrain obstructions
 	{
 		u16 i0, j0, i1, j1;
-		NearestNavcell(rangeXMin, rangeZMin, i0, j0);
-		NearestNavcell(rangeXMax, rangeZMax, i1, j1);
+		Pathfinding::NearestNavcell(rangeXMin, rangeZMin, i0, j0, m_MapSize, m_MapSize);
+		Pathfinding::NearestNavcell(rangeXMax, rangeZMax, i1, j1, m_MapSize, m_MapSize);
 		AddTerrainEdges(edges, vertexes, i0, j0, i1, j1, passClass, *m_Grid);
 	}
 
@@ -1054,8 +1054,8 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 	// vice versa).
 
 	u16 i0, j0, i1, j1;
-	NearestNavcell(x0, z0, i0, j0);
-	NearestNavcell(x1, z1, i1, j1);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(x1, z1, i1, j1, m_MapSize, m_MapSize);
 
 	// Find which direction the line heads in
 	int di = (i0 < i1 ? +1 : i1 < i0 ? -1 : 0);
@@ -1102,9 +1102,9 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 		// navcell, we simply need to test that the edge's endpoints are not both on the
 		// same side of the line.
 
-		entity_pos_t xia = entity_pos_t::FromInt(i).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-		entity_pos_t xib = entity_pos_t::FromInt(i+1).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
-		entity_pos_t zj = entity_pos_t::FromInt(j + (dj+1)/2).Multiply(ICmpObstructionManager::NAVCELL_SIZE);
+		entity_pos_t xia = entity_pos_t::FromInt(i).Multiply(Pathfinding::NAVCELL_SIZE);
+		entity_pos_t xib = entity_pos_t::FromInt(i+1).Multiply(Pathfinding::NAVCELL_SIZE);
+		entity_pos_t zj = entity_pos_t::FromInt(j + (dj+1)/2).Multiply(Pathfinding::NAVCELL_SIZE);
 
 		CFixedVector2D perp = CFixedVector2D(x1 - x0, z1 - z0).Perpendicular();
 		entity_pos_t dota = (CFixedVector2D(xia, zj) - CFixedVector2D(x0, z0)).Dot(perp);

@@ -21,10 +21,6 @@
 
 #include "simulation2/system/InterfaceScripted.h"
 
-#include "graphics/Terrain.h"
-
-const fixed ICmpObstructionManager::NAVCELL_SIZE = fixed::FromInt(TERRAIN_TILE_SIZE) / NAVCELLS_PER_TILE;
-
 BEGIN_INTERFACE_WRAPPER(ObstructionManager)
 DEFINE_INTERFACE_METHOD_1("SetPassabilityCircular", void, ICmpObstructionManager, SetPassabilityCircular, bool)
 DEFINE_INTERFACE_METHOD_1("SetDebugOverlay", void, ICmpObstructionManager, SetDebugOverlay, bool)

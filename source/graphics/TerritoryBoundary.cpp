@@ -21,7 +21,7 @@
 #include <algorithm> // for reverse
 
 #include "graphics/Terrain.h"
-#include "simulation2/components/ICmpObstructionManager.h"
+#include "simulation2/helpers/Pathfinding.h"
 #include "simulation2/components/ICmpTerritoryManager.h"
 
 std::vector<STerritoryBoundary> CTerritoryBoundaryCalculator::ComputeBoundaries(const Grid<u8>* territory)
@@ -125,7 +125,7 @@ std::vector<STerritoryBoundary> CTerritoryBoundaryCalculator::ComputeBoundaries(
 			u16 maxj = (u16)(grid.m_H-1);
 
 			// Size of a territory tile in metres
-			float territoryTileSize = (ICmpObstructionManager::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE).ToFloat();
+			float territoryTileSize = (Pathfinding::NAVCELL_SIZE * ICmpTerritoryManager::NAVCELLS_PER_TERRITORY_TILE).ToFloat();
 
 			while (true)
 			{
