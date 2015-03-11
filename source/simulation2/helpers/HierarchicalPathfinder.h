@@ -148,7 +148,7 @@ private:
 		return m_Chunks[passClass].at(cj * m_ChunksW + ci);
 	}
 
-	u16 m_MapW, m_MapH;
+	u16 m_W, m_H;
 	u16 m_ChunksW, m_ChunksH;
 	std::map<pass_class_t, std::vector<Chunk> > m_Chunks;
 

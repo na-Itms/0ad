@@ -746,7 +746,7 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckUnitPlacement(const IObst
 	// Test against terrain and static obstructions:
 
 	u16 i, j;
-	Pathfinding::NearestNavcell(x, z, i, j, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(x, z, i, j, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 	if (!IS_PASSABLE(m_Grid->get(i, j), passClass))
 		return ICmpObstruction::FOUNDATION_CHECK_FAIL_TERRAIN_CLASS;
 
@@ -818,7 +818,7 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const I
 void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& UNUSED(origGoal), pass_class_t passClass, WaypointPath& path)
 {
 	u16 i0, j0;
-	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 	u16 iGoal = i0;
 	u16 jGoal = j0;
 	m_PathfinderHier->FindNearestPassableNavcell(iGoal, jGoal, passClass);

@@ -710,15 +710,6 @@ bool CCmpObstructionManager::TestUnitShape(const IObstructionTestFilter& filter,
 		return false; // didn't collide, if we got this far
 }
 
-/**
- * Compute the navcell indexes on the grid nearest to a given point
- */
-static void NearestNavcell(entity_pos_t x, entity_pos_t z, u16& i, u16& j, u16 w, u16 h)
-{
-	i = (u16)clamp((x / Pathfinding::NAVCELL_SIZE).ToInt_RoundToZero(), 0, w - 1);
-	j = (u16)clamp((z / Pathfinding::NAVCELL_SIZE).ToInt_RoundToZero(), 0, h - 1);
-}
-
 void CCmpObstructionManager::Rasterize(Grid<u16>& grid, entity_pos_t expand, ICmpObstructionManager::flags_t requireMask, u16 setMask)
 {
 	PROFILE3("Rasterize");
@@ -767,8 +758,8 @@ void CCmpObstructionManager::Rasterize(Grid<u16>& grid, entity_pos_t expand, ICm
 			entity_pos_t r = it->second.r + expand;
 
 			u16 i0, j0, i1, j1;
-			NearestNavcell(center.X - r, center.Y - r, i0, j0, grid.m_W, grid.m_H);
-			NearestNavcell(center.X + r, center.Y + r, i1, j1, grid.m_W, grid.m_H);
+			Pathfinding::NearestNavcell(center.X - r, center.Y - r, i0, j0, grid.m_W, grid.m_H);
+			Pathfinding::NearestNavcell(center.X + r, center.Y + r, i1, j1, grid.m_W, grid.m_H);
 			for (u16 j = j0+1; j < j1; ++j)
 				for (u16 i = i0+1; i < i1; ++i)
 					grid.set(i, j, grid.get(i, j) | setMask);

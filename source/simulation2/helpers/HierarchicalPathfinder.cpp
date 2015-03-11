@@ -264,8 +264,8 @@ void HierarchicalPathfinder::Recompute(const std::map<std::string, pass_class_t>
 
 	m_PassClassMasks = passClassMasks;
 
-	m_MapW = grid->m_W / Pathfinding::NAVCELLS_PER_TILE;
-	m_MapW = grid->m_H / Pathfinding::NAVCELLS_PER_TILE;
+	m_W = grid->m_W;
+	m_H = grid->m_H;
 
 	// Divide grid into chunks with round-to-positive-infinity
 	m_ChunksW = (grid->m_W + CHUNK_SIZE - 1) / CHUNK_SIZE;
@@ -442,7 +442,7 @@ bool HierarchicalPathfinder::MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, p
 	// so find the navcell that's nearest to the goal's center
 
 	u16 iGoal, jGoal;
-	Pathfinding::NearestNavcell(goal.x, goal.z, iGoal, jGoal, m_MapW, m_MapH);
+	Pathfinding::NearestNavcell(goal.x, goal.z, iGoal, jGoal, m_W, m_H);
 
 	FindNearestNavcellInRegions(reachableRegions, iGoal, jGoal, passClass);
 

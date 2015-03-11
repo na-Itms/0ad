@@ -704,8 +704,8 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	// Add terrain obstructions
 	{
 		u16 i0, j0, i1, j1;
-		Pathfinding::NearestNavcell(rangeXMin, rangeZMin, i0, j0, m_MapSize, m_MapSize);
-		Pathfinding::NearestNavcell(rangeXMax, rangeZMax, i1, j1, m_MapSize, m_MapSize);
+		Pathfinding::NearestNavcell(rangeXMin, rangeZMin, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
+		Pathfinding::NearestNavcell(rangeXMax, rangeZMax, i1, j1, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 		AddTerrainEdges(edges, vertexes, i0, j0, i1, j1, passClass, *m_Grid);
 	}
 
@@ -1054,8 +1054,8 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 	// vice versa).
 
 	u16 i0, j0, i1, j1;
-	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
-	Pathfinding::NearestNavcell(x1, z1, i1, j1, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
+	Pathfinding::NearestNavcell(x1, z1, i1, j1, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 
 	// Find which direction the line heads in
 	int di = (i0 < i1 ? +1 : i1 < i0 ? -1 : 0);

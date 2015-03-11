@@ -887,7 +887,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 
 	// Convert the start coordinates to tile indexes
 	u16 i0, j0;
-	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 
 	if (!IS_PASSABLE(m_Grid->get(i0, j0), passClass))
 	{
@@ -911,7 +911,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 		return;
 	}
 
-	Pathfinding::NearestNavcell(state.goal.x, state.goal.z, state.iGoal, state.jGoal, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(state.goal.x, state.goal.z, state.iGoal, state.jGoal, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 
 	state.passClass = passClass;
 
@@ -1126,7 +1126,7 @@ void CCmpPathfinder::GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid)
 		return;
 
 	u16 iGoal, jGoal;
-	Pathfinding::NearestNavcell(m_DebugGoal.x, m_DebugGoal.z, iGoal, jGoal, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(m_DebugGoal.x, m_DebugGoal.z, iGoal, jGoal, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 
 	grid = Grid<u8>(m_DebugGridJPS->m_W, m_DebugGridJPS->m_H);
 	for (u16 j = 0; j < grid.m_H; ++j)

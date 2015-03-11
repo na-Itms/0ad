@@ -70,11 +70,12 @@ namespace Pathfinding
 
 	/**
 	 * Compute the navcell indexes on the grid nearest to a given point
+	 * w, h are the grid dimensions, i.e. the number of navcells per side
 	 */
-	inline void NearestNavcell(entity_pos_t x, entity_pos_t z, u16& i, u16& j, u16 mapW, u16 mapH)
+	inline void NearestNavcell(entity_pos_t x, entity_pos_t z, u16& i, u16& j, u16 w, u16 h)
 	{
-		i = (u16)clamp((x / NAVCELL_SIZE).ToInt_RoundToNegInfinity(), 0, mapW*NAVCELLS_PER_TILE - 1);
-		j = (u16)clamp((z / NAVCELL_SIZE).ToInt_RoundToNegInfinity(), 0, mapH*NAVCELLS_PER_TILE - 1);
+		i = (u16)clamp((x / NAVCELL_SIZE).ToInt_RoundToNegInfinity(), 0, w - 1);
+		j = (u16)clamp((z / NAVCELL_SIZE).ToInt_RoundToNegInfinity(), 0, h - 1);
 	}
 
 	/**

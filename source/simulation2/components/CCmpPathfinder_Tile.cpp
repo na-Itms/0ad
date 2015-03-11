@@ -155,7 +155,7 @@ public:
 			for (size_t k = 0; k < waypoints.size(); ++k)
 			{
 				u16 i, j;
-				Pathfinding::NearestNavcell(waypoints[k].x, waypoints[k].z, i, j, m_Pathfinder.m_MapSize, m_Pathfinder.m_MapSize);
+				Pathfinding::NearestNavcell(waypoints[k].x, waypoints[k].z, i, j, m_Pathfinder.m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_Pathfinder.m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 				if (k == 0)
 				{
 					ip = i;
@@ -364,7 +364,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 
 	// Convert the start/end coordinates to tile indexes
 	u16 i0, j0;
-	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 
 	// To be consistent with the JPS pathfinder (which requires passable source navcell),
 	// and to let us guarantee the goal is reachable from the source, we switch to
@@ -389,7 +389,7 @@ void CCmpPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoa
 	}
 
 	// Store the navcell at the goal center, for A* heuristics
-	Pathfinding::NearestNavcell(goal.x, goal.z, state.iGoal, state.jGoal, m_MapSize, m_MapSize);
+	Pathfinding::NearestNavcell(goal.x, goal.z, state.iGoal, state.jGoal, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
 
 	state.passClass = passClass;
 
