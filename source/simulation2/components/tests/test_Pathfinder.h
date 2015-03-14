@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -172,9 +172,8 @@ public:
 	void test_perf2()
 	{
 		CTerrain terrain;
-		std::shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(std::shared_ptr<ScriptRuntime>(), 128 * 1024 * 1024);
 
-		CSimulation2 sim2(NULL, rt, &terrain);
+		CSimulation2 sim2(NULL, g_ScriptRuntime, &terrain);
 		sim2.LoadDefaultScripts();
 		sim2.ResetState();
 
@@ -229,9 +228,7 @@ public:
 	{
 		CTerrain terrain;
 
-		std::shared_ptr<ScriptRuntime> rt = ScriptInterface::CreateRuntime(std::shared_ptr<ScriptRuntime>(), 128 * 1024 * 1024);
-
-		CSimulation2 sim2(NULL, rt, &terrain);
+		CSimulation2 sim2(NULL, g_ScriptRuntime, &terrain);
 		sim2.LoadDefaultScripts();
 		sim2.ResetState();
 
