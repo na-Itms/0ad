@@ -34,11 +34,12 @@ class TestCmpPathfinder : public CxxTest::TestSuite
 public:
 	void setUp()
 	{
-		CXeromyces::Startup();
-
 		g_VFS = CreateVfs(20 * MiB);
-		TS_ASSERT_OK(g_VFS->Mount(L"", DataDir()/"mods"/"public", VFS_MOUNT_MUST_EXIST));
-		TS_ASSERT_OK(g_VFS->Mount(L"cache/", DataDir()/"cache"));
+		TS_ASSERT_OK(g_VFS->Mount(L"", DataDir() / "mods" / "mod", VFS_MOUNT_MUST_EXIST));
+		TS_ASSERT_OK(g_VFS->Mount(L"", DataDir() / "mods" / "public", VFS_MOUNT_MUST_EXIST), 1);
+		TS_ASSERT_OK(g_VFS->Mount(L"cache/", DataDir() / "cache"));
+
+		CXeromyces::Startup();
 
 		// Need some stuff for terrain movement costs:
 		// (TODO: this ought to be independent of any graphics code)
@@ -324,6 +325,7 @@ public:
 		{
 			double dx = (path.m_Waypoints[i+1].x - path.m_Waypoints[i].x).ToDouble();
 			double dz = (path.m_Waypoints[i+1].z - path.m_Waypoints[i].z).ToDouble();
+			LOGWARNING("%f, %f, %f, %f", dx, dz, abs(dx), abs(dz));
 			ENSURE(dx == 0 || dz == 0 || abs(dx) == abs(dz));
 			length += sqrt(dx*dx + dz*dz);
 		}
