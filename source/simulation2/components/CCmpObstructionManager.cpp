@@ -30,7 +30,6 @@
 #include "graphics/Overlay.h"
 #include "graphics/Terrain.h"
 #include "maths/MathUtil.h"
-#include "ps/Overlay.h"
 #include "ps/Profile.h"
 #include "renderer/Scene.h"
 #include "ps/CLogger.h"

@@ -94,10 +94,12 @@ m.HQ.prototype.assignStartingEntities = function(gameState)
 
 		ent.setMetadata(PlayerID, "access", gameState.ai.accessibility.getAccessValue(pos));
 		var bestbase = undefined;
+		var territorypos = this.territoryMap.gamePosToMapPos(pos);
+		var territoryIndex = territorypos[0] + territorypos[1]*this.territoryMap.width;
 		for (var i = 1; i < this.baseManagers.length; ++i)
 		{
 			var base = this.baseManagers[i];
-			if (base.territoryIndices.indexOf(index) === -1)
+			if (base.territoryIndices.indexOf(territoryIndex) === -1)
 				continue;
 			base.assignEntity(gameState, ent);
 			bestbase = base;
@@ -449,7 +451,7 @@ m.HQ.prototype.configFirstBase = function(gameState)
 		if (newDP.quality > 40)
 		{
 			// if we start with enough workers, put our available resources in this first dropsite
-			// same thing if our pop exceed the allowed one, as we would need several houses
+			// same thing if our pop exceed the allowed one, as we will need several houses
 			let numWorkers = gameState.getOwnUnits().filter(API3.Filters.byClass("Worker")).length;
 			if ((numWorkers > 12 && newDP.quality > 60)
 				|| (gameState.getPopulation() > gameState.getPopulationLimit() + 20))
