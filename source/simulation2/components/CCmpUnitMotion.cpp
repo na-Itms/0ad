@@ -900,15 +900,14 @@ void CCmpUnitMotion::Move(fixed dt)
 				break;
 
 			// If we're heading towards the ultimate waypoint, request a short path
-			// towards the final goal
+			// towards the final goal whenever we're close enough
 			if (m_LongPath.m_Waypoints.size() == 1)
 			{
 				if (!m_ShortPath.m_Waypoints.empty())
 					m_LongPath.m_Waypoints.clear();
-				else
+				else if ((pos - CFixedVector2D(m_FinalGoal.x, m_FinalGoal.z)).CompareLength(SHORT_PATH_SEARCH_RANGE) <= 0)
 				{
-					PathGoal goal = { PathGoal::POINT, m_FinalGoal.x, m_FinalGoal.z };
-					RequestShortPath(pos, goal, true);
+					RequestShortPath(pos, m_FinalGoal, true);
 					m_PathState = PATHSTATE_FOLLOWING_REQUESTING_SHORT;
 				}
 			}
