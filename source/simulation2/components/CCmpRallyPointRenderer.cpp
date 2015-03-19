@@ -136,8 +136,14 @@ public:
 				"<LineThickness>0.75</LineThickness>"
 				"<LineStartCap>round</LineStartCap>"
 				"<LineEndCap>square</LineEndCap>"
+<<<<<<< HEAD
 				"<LineColour r='20' g='128' b='240'></LineColour>"
 				"<LineDashColour r='158' g='11' b='15'></LineDashColour>"
+=======
+				"<LineColor r='20' g='128' b='240'></LineColor>"
+				"<LineDashColor r='158' g='11' b='15'></LineDashColor>"
+				"<LineCostClass>default</LineCostClass>"
+>>>>>>> master
 				"<LinePassabilityClass>default</LinePassabilityClass>"
 			"</a:example>"
 			"<element name='MarkerTemplate' a:help='Template name for the rally point marker entity (typically a waypoint flag actor)'>"
@@ -146,13 +152,13 @@ public:
 			"<element name='LineTexture' a:help='Texture file to use for the rally point line'>"
 				"<text />"
 			"</element>"
-			"<element name='LineTextureMask' a:help='Texture mask to indicate where overlay colors are to be applied (see LineColour and LineDashColour)'>"
+			"<element name='LineTextureMask' a:help='Texture mask to indicate where overlay colors are to be applied (see LineColor and LineDashColor)'>"
 				"<text />"
 			"</element>"
 			"<element name='LineThickness' a:help='Thickness of the marker line connecting the entity to the rally point marker'>"
 				"<data type='decimal'/>"
 			"</element>"
-			"<element name='LineColour'>"
+			"<element name='LineColor'>"
 				"<attribute name='r'>"
 					"<data type='integer'><param name='minInclusive'>0</param><param name='maxInclusive'>255</param></data>"
 				"</attribute>"
@@ -163,7 +169,7 @@ public:
 					"<data type='integer'><param name='minInclusive'>0</param><param name='maxInclusive'>255</param></data>"
 				"</attribute>"
 			"</element>"
-			"<element name='LineDashColour'>"
+			"<element name='LineDashColor'>"
 				"<attribute name='r'>"
 					"<data type='integer'><param name='minInclusive'>0</param><param name='maxInclusive'>255</param></data>"
 				"</attribute>"
@@ -454,7 +460,7 @@ void CCmpRallyPointRenderer::Init(const CParamNode& paramNode)
 
 	m_MarkerTemplate = paramNode.GetChild("MarkerTemplate").ToString();
 
-	const CParamNode& lineColor = paramNode.GetChild("LineColour");
+	const CParamNode& lineColor = paramNode.GetChild("LineColor");
 	m_LineColor = CColor(
 		lineColor.GetChild("@r").ToInt()/255.f,
 		lineColor.GetChild("@g").ToInt()/255.f,
@@ -462,7 +468,7 @@ void CCmpRallyPointRenderer::Init(const CParamNode& paramNode)
 		1.f
 	);
 
-	const CParamNode& lineDashColor = paramNode.GetChild("LineDashColour");
+	const CParamNode& lineDashColor = paramNode.GetChild("LineDashColor");
 	m_LineDashColor = CColor(
 		lineDashColor.GetChild("@r").ToInt()/255.f,
 		lineDashColor.GetChild("@g").ToInt()/255.f,

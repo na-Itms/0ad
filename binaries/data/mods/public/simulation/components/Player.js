@@ -8,7 +8,7 @@ Player.prototype.Init = function()
 	this.playerID = undefined;
 	this.name = undefined;	// define defaults elsewhere (supporting other languages)
 	this.civ = undefined;
-	this.colour = { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 };
+	this.color = { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 };
 	this.popUsed = 0; // population of units owned or trained by this player
 	this.popBonuses = 0; // sum of population bonuses of player's entities
 	this.maxPop = 300; // maximum population
@@ -44,7 +44,7 @@ Player.prototype.Init = function()
 	}
 	this.disabledTemplates = {};
 	this.disabledTechnologies = {};
-	this.startingTechnologies = {};
+	this.startingTechnologies = [];
 };
 
 Player.prototype.SetPlayerID = function(id)
@@ -77,14 +77,14 @@ Player.prototype.GetCiv = function()
 	return this.civ;
 };
 
-Player.prototype.SetColour = function(r, g, b)
+Player.prototype.SetColor = function(r, g, b)
 {
-	this.colour = { "r": r/255.0, "g": g/255.0, "b": b/255.0, "a": 1.0 };
+	this.color = { "r": r/255.0, "g": g/255.0, "b": b/255.0, "a": 1.0 };
 };
 
-Player.prototype.GetColour = function()
+Player.prototype.GetColor = function()
 {
-	return this.colour;
+	return this.color;
 };
 
 // Try reserving num population slots. Returns 0 on success or number of missing slots otherwise.
@@ -577,7 +577,7 @@ Player.prototype.OnGlobalInitGame = function(msg)
 {
 	let cmpTechnologyManager = Engine.QueryInterface(this.entity, IID_TechnologyManager);
 	if (cmpTechnologyManager)
-		for (let tech in this.startingTechnologies)
+		for (let tech of this.startingTechnologies)
 			cmpTechnologyManager.ResearchTechnology(tech);
 
 	// Replace the "{civ}" code with this civ ID
@@ -740,7 +740,9 @@ Player.prototype.RemoveDisabledTemplate = function(template)
 
 Player.prototype.SetDisabledTemplates = function(templates)
 {
-	this.disabledTemplates = templates;
+	this.disabledTemplates = {};
+	for (let template of templates)
+		this.disabledTemplates[template] = true;
 	Engine.BroadcastMessage(MT_DisabledTemplatesChanged, {});
 	var cmpGuiInterface = Engine.QueryInterface(SYSTEM_ENTITY, IID_GuiInterface);
 	cmpGuiInterface.PushNotification({"type": "resetselectionpannel", "players": [this.GetPlayerID()]});
@@ -765,7 +767,9 @@ Player.prototype.RemoveDisabledTechnology = function(tech)
 
 Player.prototype.SetDisabledTechnologies = function(techs)
 {
-	this.disabledTechnologies = techs;
+	this.disabledTechnologies = {}
+	for (let tech of techs)
+		this.disabledTechnologies[tech] = true;
 	Engine.BroadcastMessage(MT_DisabledTechnologiesChanged, {});
 };
 
@@ -776,7 +780,8 @@ Player.prototype.GetDisabledTechnologies = function()
 
 Player.prototype.AddStartingTechnology = function(tech)
 {
-	this.startingTechnologies[tech] = true;
+	if (this.startingTechnologies.indexOf(tech) == -1)
+		this.startingTechnologies.push(tech);
 };
 
 Player.prototype.SetStartingTechnologies = function(techs)

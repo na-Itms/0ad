@@ -44,7 +44,7 @@ const fixed Pathfinding::NAVCELL_SIZE = fixed::FromInt(TERRAIN_TILE_SIZE) / Path
 // CTerrain constructor
 CTerrain::CTerrain()
 : m_Heightmap(0), m_Patches(0), m_MapSize(0), m_MapSizePatches(0),
-m_BaseColour(255, 255, 255, 255)
+m_BaseColor(255, 255, 255, 255)
 {
 }
 
