@@ -40,103 +40,15 @@
 #include "simulation2/helpers/Geometry.h"
 #include "simulation2/helpers/Grid.h"
 #include "simulation2/helpers/HierarchicalPathfinder.h"
+#include "simulation2/helpers/LongPathfinder.h"
 
-class PathfinderOverlay;
 class SceneCollector;
-struct PathfindTile;
-struct PathfindTileJPS;
-class JumpPointCache;
 
 #ifdef NDEBUG
 #define PATHFIND_DEBUG 0
 #else
 #define PATHFIND_DEBUG 1
 #endif
-
-#define PATHFIND_USE_JPS 1
-
-typedef SparseGrid<PathfindTile> PathfindTileGrid;
-typedef SparseGrid<PathfindTileJPS> PathfindTileJPSGrid;
-
-/**
- * Represents the 2D coordinates of a tile.
- * The i/j components are packed into a single u32, since we usually use these
- * objects for equality comparisons and the VC2010 optimizer doesn't seem to automatically
- * compare two u16s in a single operation.
- * TODO: maybe VC2012 will?
- */
-struct TileID
-{
-	TileID() { }
-
-	TileID(u16 i, u16 j) : data((i << 16) | j) { }
-
-	bool operator==(const TileID& b) const
-	{
-		return data == b.data;
-	}
-
-	/// Returns lexicographic order over (i,j)
-	bool operator<(const TileID& b) const
-	{
-		return data < b.data;
-	}
-
-	u16 i() const { return data >> 16; }
-	u16 j() const { return data & 0xFFFF; }
-
-private:
-	u32 data;
-};
-
-/**
- * Represents the cost of a path consisting of horizontal/vertical and
- * diagonal movements over a uniform-cost grid.
- * Maximum path length before overflow is about 45K steps.
- */
-struct PathCost
-{
-	PathCost() : data(0) { }
-
-	/// Construct from a number of horizontal/vertical and diagonal steps
-	PathCost(u16 hv, u16 d)
-		: data(hv*65536 + d*92682) // 2^16 * sqrt(2) == 92681.9
-	{
-	}
-
-	/// Construct for horizontal/vertical movement of given number of steps
-	static PathCost horizvert(u16 n)
-	{
-		return PathCost(n, 0);
-	}
-
-	/// Construct for diagonal movement of given number of steps
-	static PathCost diag(u16 n)
-	{
-		return PathCost(0, n);
-	}
-
-	PathCost operator+(const PathCost& a) const
-	{
-		PathCost c;
-		c.data = data + a.data;
-		return c;
-	}
-
-	bool operator<=(const PathCost& b) const { return data <= b.data; }
-	bool operator< (const PathCost& b) const { return data <  b.data; }
-	bool operator>=(const PathCost& b) const { return data >= b.data; }
-	bool operator> (const PathCost& b) const { return data >  b.data; }
-
-	u32 ToInt()
-	{
-		return data;
-	}
-
-private:
-	u32 data;
-};
-
 
 
 struct AsyncLongPathRequest
@@ -200,8 +112,6 @@ public:
 	Grid<NavcellData>* m_BaseGrid; // same as m_Grid, but only with terrain, to avoid some recomputations
 	size_t m_ObstructionGridDirtyID; // dirty ID for ICmpObstructionManager::NeedUpdate
 	bool m_TerrainDirty; // indicates if m_Grid has been updated since terrain changed
-	
-	std::map<pass_class_t, shared_ptr<JumpPointCache> > m_JumpPointCache; // for JPS pathfinder
 
 	// Interface to the hierarchical pathfinder.
 	HierarchicalPathfinder* m_PathfinderHier;
@@ -215,23 +125,14 @@ public:
 			collector.Submit(&m_PathfinderHier->m_DebugOverlayLines[i]);
 	}
 
-	void PathfinderJPSMakeDirty();
+	// Interface to the long-range pathfinder.
+	LongPathfinder* m_LongPathfinder;
 
 	// For responsiveness we will process some moves in the same turn they were generated in
 	
 	u16 m_MaxSameTurnMoves; // max number of moves that can be created and processed in the same turn
 
-	// Debugging - output from last pathfind operation:
-
-	PathfindTileGrid* m_DebugGrid;
-	PathfindTileJPSGrid* m_DebugGridJPS;
-	u32 m_DebugSteps;
-	double m_DebugTime;
-	PathGoal m_DebugGoal;
-	WaypointPath* m_DebugPath;
-	PathfinderOverlay* m_DebugOverlay;
-	pass_class_t m_DebugPassClass;
-
+	bool m_DebugOverlay;
 	std::vector<SOverlayLine> m_DebugOverlayShortPathLines;
 
 	static std::string GetSchema()
@@ -257,32 +158,10 @@ public:
 
 	virtual const Grid<u16>& GetPassabilityGrid();
 
-	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret);
-
-	virtual void ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret);
-
-	/**
-	 * Same kind of interface as ICmpPathfinder::ComputePath, but works when the
-	 * unit is starting on an impassable navcell. Returns a path heading directly
-	 * to the nearest passable navcell, then the goal.
-	 */
-	void ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path);
-
-	/**
-	 * Given a path with an arbitrary collection of waypoints, updates the
-	 * waypoints to be nicer. (In particular, the current implementation
-	 * ensures a consistent maximum distance between adjacent waypoints.
-	 * Might be nice to improve it to smooth the paths, etc.)
-	 */
-	void NormalizePathWaypoints(WaypointPath& path);
-
-	/**
-	 * Given a path with an arbitrary collection of waypoints, updates the
-	 * waypoints to be nicer. Calls "Testline" between waypoints
-	 * so that bended paths can become straight if there's nothing in between
-	 * (this happens because A* is 8-direction, and the map isn't actually a grid).
-	 */
-	void ImprovePathWaypoints(WaypointPath& path, pass_class_t passClass);
+	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret)
+	{
+		m_LongPathfinder->ComputePath(x0, z0, goal, passClass, ret);
+	}
 
 	virtual u32 ComputePathAsync(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, entity_id_t notify);
 
@@ -290,20 +169,26 @@ public:
 
 	virtual u32 ComputeShortPathAsync(entity_pos_t x0, entity_pos_t z0, entity_pos_t r, entity_pos_t range, const PathGoal& goal, pass_class_t passClass, bool avoidMovingUnits, entity_id_t controller, entity_id_t notify);
 
-	virtual void SetDebugPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass);
+	virtual void SetDebugPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass)
+	{
+		m_LongPathfinder->SetDebugPath(x0, z0, goal, passClass);
+	}
 
-	virtual void ResetDebugPath();
-
-	virtual void SetDebugOverlay(bool enabled);
+	virtual void SetDebugOverlay(bool enabled)
+	{
+		m_DebugOverlay = enabled;
+		m_LongPathfinder->SetDebugOverlay(enabled);
+	}
 
 	virtual void SetHierDebugOverlay(bool enabled)
 	{
 		m_PathfinderHier->SetDebugOverlay(enabled, &GetSimContext());
 	}
 
-	virtual void GetDebugData(u32& steps, double& time, Grid<u8>& grid);
-
-	virtual void GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid);
+	virtual void GetDebugData(u32& steps, double& time, Grid<u8>& grid)
+	{
+		m_LongPathfinder->GetDebugData(steps, time, grid);
+	}
 
 	virtual CFixedVector2D GetNearestPointOnGoal(CFixedVector2D pos, const PathGoal& goal);
 

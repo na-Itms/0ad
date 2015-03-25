@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -17,25 +17,14 @@
 
 #include "precompiled.h"
 
-#include "CCmpPathfinder_Common.h"
+#include "LongPathfinder.h"
 
 #include "lib/bits.h"
-#include "lib/sysdep/rtl.h"
 #include "ps/Profile.h"
-#include "renderer/TerrainOverlay.h"
-#include "simulation2/helpers/PriorityQueue.h"
-
-#define PATHFIND_STATS 0
-
-#define USE_JUMPPOINT_CACHE 0
-
-#define ACCEPT_DIAGONAL_GAPS 0
-
-typedef PriorityQueueHeap<TileID, PathCost> PriorityQueue;
 
 /**
  * Jump point cache.
- * 
+ *
  * The JPS algorithm wants to efficiently either find the first jump point
  * in some direction from some cell (not counting the cell itself),
  * if it is reachable without crossing any impassable cells;
@@ -45,7 +34,7 @@ typedef PriorityQueueHeap<TileID, PathCost> PriorityQueue;
  * significantly (especially on sparse maps).
  * Recalculation might be expensive but the underlying passability data
  * changes relatively rarely.
- * 
+ *
  * To allow the algorithm to detect goal cells, we want to treat them as
  * jump points too. (That means the algorithm will push those cells onto
  * its open queue, and will eventually pop a goal cell and realise it's done.)
@@ -58,7 +47,7 @@ typedef PriorityQueueHeap<TileID, PathCost> PriorityQueue;
  * can test whether the goal includes a cell that's closer than the first
  * (obstruction or real) jump point,
  * and treat the goal cell as a jump point in that case.
- * 
+ *
  * We only ever need to find the jump point relative to a passable cell;
  * the cache is allowed to return bogus values for impassable cells.
  */
@@ -167,8 +156,8 @@ class JumpPointCache
 
 			if (x0 < pivot)
 				ConstructTree(tree, x0, (x0 + pivot) / 2, pivot, (idx_tree << 1) + 1);
-			if (pivot+1 < x1)
-				ConstructTree(tree, pivot+1, (pivot + x1) / 2, x1, (idx_tree << 1) + 2);
+			if (pivot + 1 < x1)
+				ConstructTree(tree, pivot + 1, (pivot + x1) / 2, x1, (idx_tree << 1) + 2);
 		}
 
 		void Finish()
@@ -284,11 +273,11 @@ public:
 
 					// Check if we reached a jump point
 #if ACCEPT_DIAGONAL_GAPS
-					if ((!TERRAIN_IS_PASSABLE(i, j-1) && TERRAIN_IS_PASSABLE(i+1, j-1)) ||
-						(!TERRAIN_IS_PASSABLE(i, j+1) && TERRAIN_IS_PASSABLE(i+1, j+1)))
+					if ((!TERRAIN_IS_PASSABLE(i, j - 1) && TERRAIN_IS_PASSABLE(i + 1, j - 1)) ||
+						(!TERRAIN_IS_PASSABLE(i, j + 1) && TERRAIN_IS_PASSABLE(i + 1, j + 1)))
 #else
-					if ((!TERRAIN_IS_PASSABLE(i-1, j-1) && TERRAIN_IS_PASSABLE(i, j-1)) ||
-						(!TERRAIN_IS_PASSABLE(i-1, j+1) && TERRAIN_IS_PASSABLE(i, j+1)))
+					if ((!TERRAIN_IS_PASSABLE(i - 1, j - 1) && TERRAIN_IS_PASSABLE(i, j - 1)) ||
+						(!TERRAIN_IS_PASSABLE(i - 1, j + 1) && TERRAIN_IS_PASSABLE(i, j + 1)))
 #endif
 					{
 						rows[j].SetRange(i0, i, false);
@@ -344,7 +333,7 @@ public:
 		// Adjust ip to be a goal cell, if there is one closer than the jump point;
 		// and then return the new ip if there is a goal,
 		// or the old ip if there is a (non-obstruction) jump point
-		if (goal.NavcellRectContainsGoal(i+1, j, ip-1, j, &ip, NULL) || !obstruction)
+		if (goal.NavcellRectContainsGoal(i + 1, j, ip - 1, j, &ip, NULL) || !obstruction)
 			return ip;
 		return i;
 	}
@@ -353,9 +342,9 @@ public:
 	{
 		int mip; // mirrored value, because m_JumpPointsLeft is generated from a mirrored map
 		bool obstruction;
-		m_JumpPointsLeft[j].Get(m_Width-1 - i, mip, obstruction);
-		int ip = m_Width-1 - mip;
-		if (goal.NavcellRectContainsGoal(i-1, j, ip+1, j, &ip, NULL) || !obstruction)
+		m_JumpPointsLeft[j].Get(m_Width - 1 - i, mip, obstruction);
+		int ip = m_Width - 1 - mip;
+		if (goal.NavcellRectContainsGoal(i - 1, j, ip + 1, j, &ip, NULL) || !obstruction)
 			return ip;
 		return i;
 	}
@@ -365,7 +354,7 @@ public:
 		int jp;
 		bool obstruction;
 		m_JumpPointsUp[i].Get(j, jp, obstruction);
-		if (goal.NavcellRectContainsGoal(i, j+1, i, jp-1, NULL, &jp) || !obstruction)
+		if (goal.NavcellRectContainsGoal(i, j + 1, i, jp - 1, NULL, &jp) || !obstruction)
 			return jp;
 		return j;
 	}
@@ -374,135 +363,40 @@ public:
 	{
 		int mjp; // mirrored value
 		bool obstruction;
-		m_JumpPointsDown[i].Get(m_Height-1 - j, mjp, obstruction);
-		int jp = m_Height-1 - mjp;
-		if (goal.NavcellRectContainsGoal(i, j-1, i, jp+1, NULL, &jp) || !obstruction)
+		m_JumpPointsDown[i].Get(m_Height - 1 - j, mjp, obstruction);
+		int jp = m_Height - 1 - mjp;
+		if (goal.NavcellRectContainsGoal(i, j - 1, i, jp + 1, NULL, &jp) || !obstruction)
 			return jp;
 		return j;
 	}
 };
 
-/**
- * Tile data for A* computation.
- * (We store an array of one of these per terrain tile, so it ought to be optimised for size)
- */
-struct PathfindTileJPS
-{
-public:
-	enum {
-		STATUS_UNEXPLORED = 0,
-		STATUS_OPEN = 1,
-		STATUS_CLOSED = 2
-	};
-
-	bool IsUnexplored() { return GetStatus() == STATUS_UNEXPLORED; }
-	bool IsOpen() { return GetStatus() == STATUS_OPEN; }
-	bool IsClosed() { return GetStatus() == STATUS_CLOSED; }
-	void SetStatusOpen() { SetStatus(STATUS_OPEN); }
-	void SetStatusClosed() { SetStatus(STATUS_CLOSED); }
-
-	// Get pi,pj coords of predecessor to this tile on best path, given i,j coords of this tile
-	inline int GetPredI(int i) { return i + GetPredDI(); }
-	inline int GetPredJ(int j) { return j + GetPredDJ(); }
-
-	inline PathCost GetCost() const { return g; }
-	inline void SetCost(PathCost cost) { g = cost; }
-
-private:
-	PathCost g; // cost to reach this tile
-	u32 data; // 2-bit status; 15-bit PredI; 15-bit PredJ; packed for storage efficiency
-
-public:
-	inline u8 GetStatus() const
-	{
-		return data & 3;
-	}
-
-	inline void SetStatus(u8 s)
-	{
-		ASSERT(s < 4);
-		data &= ~3;
-		data |= (s & 3);
-	}
-
-	int GetPredDI() const
-	{
-		return (i32)data >> 17;
-	}
-
-	int GetPredDJ() const
-	{
-		return ((i32)data << 15) >> 17;
-	}
-
-	// Set the pi,pj coords of predecessor, given i,j coords of this tile
-	inline void SetPred(int pi, int pj, int i, int j)
-	{
-		int di = pi - i;
-		int dj = pj - j;
-		ASSERT(-16384 <= di && di < 16384);
-		ASSERT(-16384 <= dj && dj < 16384);
-		data &= 3;
-		data |= (((u32)di & 0x7FFF) << 17) | (((u32)dj & 0x7FFF) << 2);
-	}
-};
-
 //////////////////////////////////////////////////////////
 
-struct PathfinderStateJPS
-{
-	u32 steps; // number of algorithm iterations
-
-	PathGoal goal;
-
-	u16 iGoal, jGoal; // goal tile
-
-	pass_class_t passClass;
-
-	PriorityQueue open;
-	// (there's no explicit closed list; it's encoded in PathfindTile)
-
-	PathfindTileJPSGrid* tiles;
-	Grid<NavcellData>* terrain;
-
-	PathCost hBest; // heuristic of closest discovered tile to goal
-	u16 iBest, jBest; // closest tile
-
-	JumpPointCache* jpc;
-
-#if PATHFIND_STATS
-	// Performance debug counters
-	size_t numProcessed;
-	size_t numImproveOpen;
-	size_t numAddToOpen;
-	size_t sumOpenSize;
-#endif
-};
+#define PASSABLE(i, j) IS_PASSABLE(state.terrain->get(i, j), state.passClass)
 
 // Calculate heuristic cost from tile i,j to goal
 // (This ought to be an underestimate for correctness)
-static PathCost CalculateHeuristic(int i, int j, int iGoal, int jGoal)
+PathCost LongPathfinder::CalculateHeuristic(int i, int j, int iGoal, int jGoal)
 {
 	int di = abs(i - iGoal);
 	int dj = abs(j - jGoal);
 	int diag = std::min(di, dj);
-	return PathCost(di-diag + dj-diag, diag);
+	return PathCost(di - diag + dj - diag, diag);
 }
 
-
 // Do the A* processing for a neighbour tile i,j.
-// TODO: it'd be nice to not duplicate so much code with CCmpPathfinder_Tile.cpp
-static void ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg, PathfinderStateJPS& state)
+void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg, PathfinderState& state)
 {
 #if PATHFIND_STATS
 	state.numProcessed++;
 #endif
 
 	// Reject impassable tiles
-	if (!IS_PASSABLE(state.terrain->get(i, j), state.passClass))
+	if (!PASSABLE(i, j))
 		return;
 
-	PathfindTileJPS& n = state.tiles->get(i, j);
+	PathfindTile& n = state.tiles->get(i, j);
 
 	if (n.IsClosed())
 		return;
@@ -568,8 +462,6 @@ static void ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg, Pathfind
 #endif
 }
 
-#define PASSABLE(i, j) IS_PASSABLE(state.terrain->get(i, j), state.passClass)
-
 /*
  * In the JPS algorithm, after a tile is taken off the open queue,
  * we don't process every adjacent neighbour (as in standard A*).
@@ -589,7 +481,7 @@ inline bool OnTheWay(int i, int j, int di, int dj, const PathGoal& goal)
 	entity_pos_t hw, hh; // half width/height of goal bounding box
 	CFixedVector2D hbb = Geometry::GetHalfBoundingBox(goal.u, goal.v, CFixedVector2D(goal.hw, goal.hh));
 
-	switch(goal.type)
+	switch (goal.type)
 	{
 	case PathGoal::POINT:
 		hw = fixed::Zero();
@@ -619,7 +511,7 @@ inline bool OnTheWay(int i, int j, int di, int dj, const PathGoal& goal)
 	else
 	{
 		if (j < ((goal.z - hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity() ||
-			j > ((goal.z + hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
+			j >((goal.z + hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
 			return false;
 	}
 
@@ -633,180 +525,178 @@ inline bool OnTheWay(int i, int j, int di, int dj, const PathGoal& goal)
 	else
 	{
 		if (i < ((goal.x - hw) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity() ||
-			i > ((goal.x + hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
+			i >((goal.x + hh) / Pathfinding::NAVCELL_SIZE).ToInt_RoundToNegInfinity())
 			return false;
 	}
 
 	return true;
 }
 
-#if USE_JUMPPOINT_CACHE
 
-// Use the jump-point cache to find the jump points:
-
-static void AddJumpedHoriz(int i, int j, int di, PathCost g, PathfinderStateJPS& state)
+void LongPathfinder::AddJumpedHoriz(int i, int j, int di, PathCost g, PathfinderState& state, bool detectGoal)
 {
-	int jump;
-	if (di > 0)
-		jump = state.jpc->GetJumpPointRight(i, j, state.goal);
-	else
-		jump = state.jpc->GetJumpPointLeft(i, j, state.goal);
-
-	if (jump != i)
-		ProcessNeighbour(i, j, jump, j, g, state);
-}
-
-static bool HasJumpedHoriz(int i, int j, int di, PathfinderStateJPS& state)
-{
-	int jump;
-	if (di > 0)
-		jump = state.jpc->GetJumpPointRight(i, j, state.goal);
-	else
-		jump = state.jpc->GetJumpPointLeft(i, j, state.goal);
-
-	return (jump != i);
-}
-
-static void AddJumpedVert(int i, int j, int dj, PathCost g, PathfinderStateJPS& state)
-{
-	int jump;
-	if (dj > 0)
-		jump = state.jpc->GetJumpPointUp(i, j, state.goal);
-	else
-		jump = state.jpc->GetJumpPointDown(i, j, state.goal);
-
-	if (jump != j)
-		ProcessNeighbour(i, j, i, jump, g, state);
-}
-
-static bool HasJumpedVert(int i, int j, int dj, PathfinderStateJPS& state)
-{
-	int jump;
-	if (dj > 0)
-		jump = state.jpc->GetJumpPointUp(i, j, state.goal);
-	else
-		jump = state.jpc->GetJumpPointDown(i, j, state.goal);
-
-	return (jump != j);
-}
-
-#else // USE_JUMPPOINT_CACHE
-
-// Find the jump points by scanning along the map:
-
-static void AddJumpedHoriz(int i, int j, int di, PathCost g, PathfinderStateJPS& state, bool detectGoal)
-{
-	ASSERT(di == 1 || di == -1);
-	int ni = i + di;
-	while (true)
+	if (m_UseJPSCache)
 	{
-		if (!PASSABLE(ni, j))
-			break;
+		int jump;
+		if (di > 0)
+			jump = state.jpc->GetJumpPointRight(i, j, state.goal);
+		else
+			jump = state.jpc->GetJumpPointLeft(i, j, state.goal);
 
-		if ((detectGoal && state.goal.NavcellContainsGoal(ni, j)) || // XXX
-#if ACCEPT_DIAGONAL_GAPS
-			(!PASSABLE(ni, j-1) && PASSABLE(ni+di, j-1)) ||
-			(!PASSABLE(ni, j+1) && PASSABLE(ni+di, j+1)))
-#else
-			(!PASSABLE(ni-di, j-1) && PASSABLE(ni, j-1)) ||
-			(!PASSABLE(ni-di, j+1) && PASSABLE(ni, j+1)))
-#endif
+		if (jump != i)
+			ProcessNeighbour(i, j, jump, j, g, state);
+	}
+	else
+	{
+		ASSERT(di == 1 || di == -1);
+		int ni = i + di;
+		while (true)
 		{
-			ProcessNeighbour(i, j, ni, j, g, state);
-			break;
-		}
+			if (!PASSABLE(ni, j))
+				break;
 
-		ni += di;
+			if ((detectGoal && state.goal.NavcellContainsGoal(ni, j)) || // XXX
+#if ACCEPT_DIAGONAL_GAPS
+				(!PASSABLE(ni, j - 1) && PASSABLE(ni + di, j - 1)) ||
+				(!PASSABLE(ni, j + 1) && PASSABLE(ni + di, j + 1)))
+#else
+				(!PASSABLE(ni - di, j - 1) && PASSABLE(ni, j - 1)) ||
+				(!PASSABLE(ni - di, j + 1) && PASSABLE(ni, j + 1)))
+#endif
+			{
+				ProcessNeighbour(i, j, ni, j, g, state);
+				break;
+			}
+
+			ni += di;
+		}
 	}
 }
 
-static bool HasJumpedHoriz(int i, int j, int di, PathfinderStateJPS& state, bool detectGoal)
+bool LongPathfinder::HasJumpedHoriz(int i, int j, int di, PathfinderState& state, bool detectGoal)
 {
-	ASSERT(di == 1 || di == -1);
-	int ni = i + di;
-	while (true)
+	if (m_UseJPSCache)
 	{
-		if (!PASSABLE(ni, j))
-			return false;
+		int jump;
+		if (di > 0)
+			jump = state.jpc->GetJumpPointRight(i, j, state.goal);
+		else
+			jump = state.jpc->GetJumpPointLeft(i, j, state.goal);
 
-		if ((detectGoal && state.goal.NavcellContainsGoal(ni, j)) || // XXX
-#if ACCEPT_DIAGONAL_GAPS
-			(!PASSABLE(ni, j-1) && PASSABLE(ni+di, j-1)) ||
-			(!PASSABLE(ni, j+1) && PASSABLE(ni+di, j+1)))
-#else
-			(!PASSABLE(ni-di, j-1) && PASSABLE(ni, j-1)) ||
-			(!PASSABLE(ni-di, j+1) && PASSABLE(ni, j+1)))
-#endif
+		return (jump != i);
+	}
+	else
+	{
+		ASSERT(di == 1 || di == -1);
+		int ni = i + di;
+		while (true)
 		{
-			return true;
-		}
+			if (!PASSABLE(ni, j))
+				return false;
 
-		ni += di;
+			if ((detectGoal && state.goal.NavcellContainsGoal(ni, j)) || // XXX
+#if ACCEPT_DIAGONAL_GAPS
+				(!PASSABLE(ni, j - 1) && PASSABLE(ni + di, j - 1)) ||
+				(!PASSABLE(ni, j + 1) && PASSABLE(ni + di, j + 1)))
+#else
+				(!PASSABLE(ni - di, j - 1) && PASSABLE(ni, j - 1)) ||
+				(!PASSABLE(ni - di, j + 1) && PASSABLE(ni, j + 1)))
+#endif
+			{
+				return true;
+			}
+
+			ni += di;
+		}
 	}
 }
 
-static void AddJumpedVert(int i, int j, int dj, PathCost g, PathfinderStateJPS& state, bool detectGoal)
+void LongPathfinder::AddJumpedVert(int i, int j, int dj, PathCost g, PathfinderState& state, bool detectGoal)
 {
-	ASSERT(dj == 1 || dj == -1);
-	int nj = j + dj;
-	while (true)
+	if (m_UseJPSCache)
 	{
-		if (!PASSABLE(i, nj))
-			break;
+		int jump;
+		if (dj > 0)
+			jump = state.jpc->GetJumpPointUp(i, j, state.goal);
+		else
+			jump = state.jpc->GetJumpPointDown(i, j, state.goal);
 
-		if ((detectGoal && state.goal.NavcellContainsGoal(i, nj)) || // XXX
-#if ACCEPT_DIAGONAL_GAPS
-			(!PASSABLE(i-1, nj) && PASSABLE(i-1, nj+dj)) ||
-			(!PASSABLE(i+1, nj) && PASSABLE(i+1, nj+dj)))
-#else
-			(!PASSABLE(i-1, nj-dj) && PASSABLE(i-1, nj)) ||
-			(!PASSABLE(i+1, nj-dj) && PASSABLE(i+1, nj)))
-#endif
+		if (jump != j)
+			ProcessNeighbour(i, j, i, jump, g, state);
+	}
+	else
+	{
+		ASSERT(dj == 1 || dj == -1);
+		int nj = j + dj;
+		while (true)
 		{
-			ProcessNeighbour(i, j, i, nj, g, state);
-			break;
-		}
+			if (!PASSABLE(i, nj))
+				break;
 
-		nj += dj;
+			if ((detectGoal && state.goal.NavcellContainsGoal(i, nj)) || // XXX
+#if ACCEPT_DIAGONAL_GAPS
+				(!PASSABLE(i - 1, nj) && PASSABLE(i - 1, nj + dj)) ||
+				(!PASSABLE(i + 1, nj) && PASSABLE(i + 1, nj + dj)))
+#else
+				(!PASSABLE(i - 1, nj - dj) && PASSABLE(i - 1, nj)) ||
+				(!PASSABLE(i + 1, nj - dj) && PASSABLE(i + 1, nj)))
+#endif
+			{
+				ProcessNeighbour(i, j, i, nj, g, state);
+				break;
+			}
+
+			nj += dj;
+		}
 	}
 }
 
-static bool HasJumpedVert(int i, int j, int dj, PathfinderStateJPS& state, bool detectGoal)
+bool LongPathfinder::HasJumpedVert(int i, int j, int dj, PathfinderState& state, bool detectGoal)
 {
-	ASSERT(dj == 1 || dj == -1);
-	int nj = j + dj;
-	while (true)
+	if (m_UseJPSCache)
 	{
-		if (!PASSABLE(i, nj))
-			return false;
+		int jump;
+		if (dj > 0)
+			jump = state.jpc->GetJumpPointUp(i, j, state.goal);
+		else
+			jump = state.jpc->GetJumpPointDown(i, j, state.goal);
 
-		if ((detectGoal && state.goal.NavcellContainsGoal(i, nj)) || // XXX
-#if ACCEPT_DIAGONAL_GAPS
-			(!PASSABLE(i-1, nj) && PASSABLE(i-1, nj+dj)) ||
-			(!PASSABLE(i+1, nj) && PASSABLE(i+1, nj+dj)))
-#else
-			(!PASSABLE(i-1, nj-dj) && PASSABLE(i-1, nj)) ||
-			(!PASSABLE(i+1, nj-dj) && PASSABLE(i+1, nj)))
-#endif
+		return (jump != j);
+	}
+	else
+	{
+		ASSERT(dj == 1 || dj == -1);
+		int nj = j + dj;
+		while (true)
 		{
-			return true;
-		}
+			if (!PASSABLE(i, nj))
+				return false;
 
-		nj += dj;
+			if ((detectGoal && state.goal.NavcellContainsGoal(i, nj)) || // XXX
+#if ACCEPT_DIAGONAL_GAPS
+				(!PASSABLE(i - 1, nj) && PASSABLE(i - 1, nj + dj)) ||
+				(!PASSABLE(i + 1, nj) && PASSABLE(i + 1, nj + dj)))
+#else
+				(!PASSABLE(i - 1, nj - dj) && PASSABLE(i - 1, nj)) ||
+				(!PASSABLE(i + 1, nj - dj) && PASSABLE(i + 1, nj)))
+#endif
+			{
+				return true;
+			}
+
+			nj += dj;
+		}
 	}
 }
-
-#endif // USE_JUMPPOINT_CACHE
-
 
 /*
- * We don't cache diagonal jump points - they're usually so frequent that
+ * We never cache diagonal jump points - they're usually so frequent that
  * a linear search is about as cheap and avoids the setup cost and memory cost.
  */
-static void AddJumpedDiag(int i, int j, int di, int dj, PathCost g, PathfinderStateJPS& state)
+void LongPathfinder::AddJumpedDiag(int i, int j, int di, int dj, PathCost g, PathfinderState& state)
 {
-// 	ProcessNeighbour(i, j, i + di, j + dj, g, state);
-// 	return;
+	// 	ProcessNeighbour(i, j, i + di, j + dj, g, state);
+	// 	return;
 
 	ASSERT(di == 1 || di == -1);
 	ASSERT(dj == 1 || dj == -1);
@@ -843,13 +733,8 @@ static void AddJumpedDiag(int i, int j, int di, int dj, PathCost g, PathfinderSt
 		}
 #endif
 
-#if USE_JUMPPOINT_CACHE
-		int fi = HasJumpedHoriz(ni, nj, di, state);
-		int fj = HasJumpedVert(ni, nj, dj, state);
-#else
 		int fi = HasJumpedHoriz(ni, nj, di, state, detectGoal ? OnTheWay(ni, nj, di, 0, state.goal) : false);
 		int fj = HasJumpedVert(ni, nj, dj, state, detectGoal ? OnTheWay(ni, nj, 0, dj, state.goal) : false);
-#endif
 		if (fi || fj)
 		{
 			ProcessNeighbour(i, j, ni, nj, g, state);
@@ -861,33 +746,151 @@ static void AddJumpedDiag(int i, int j, int di, int dj, PathCost g, PathfinderSt
 	}
 }
 
-
-void CCmpPathfinder::PathfinderJPSMakeDirty()
+void LongPathfinder::ComputeTilePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
 {
-	m_JumpPointCache.clear();
+	double time = timer_Time();
+
+	PathfinderState state = { 0 };
+
+	// Convert the start/end coordinates to tile indexes
+	u16 i0, j0;
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_GridSize, m_GridSize);
+
+	// To be consistent with the JPS pathfinder (which requires passable source navcell),
+	// and to let us guarantee the goal is reachable from the source, we switch to
+	// the escape-from-impassability mode if currently on an impassable navcell
+	if (!IS_PASSABLE(m_Grid->get(i0, j0), passClass))
+	{
+		ComputePathOffImpassable(x0, z0, origGoal,passClass, path);
+		return;
+	}
+
+	// Adjust the goal so that it's reachable from the source navcell
+	PathGoal goal = origGoal;
+	m_PathfinderHier->MakeGoalReachable(i0, j0, goal, passClass);
+
+	// If we're already at the goal tile, then move directly to the exact goal coordinates
+	// XXX: this seems bogus for non-point goals, it should be the point on the current cell nearest the goal
+	if (goal.NavcellContainsGoal(i0, j0))
+	{
+		Waypoint w = { goal.x, goal.z };
+		path.m_Waypoints.push_back(w);
+		return;
+	}
+
+	// Store the navcell at the goal center, for A* heuristics
+	Pathfinding::NearestNavcell(goal.x, goal.z, state.iGoal, state.jGoal, m_GridSize, m_GridSize);
+
+	state.passClass = passClass;
+
+	state.steps = 0;
+
+	state.tiles = new PathfindTileGrid(m_Grid->m_W, m_Grid->m_H);
+	state.terrain = m_Grid;
+
+	state.iBest = i0;
+	state.jBest = j0;
+	state.hBest = CalculateHeuristic(i0, j0, state.iGoal, state.jGoal);
+
+	PriorityQueue::Item start = { TileID(i0, j0), PathCost() };
+	state.open.push(start);
+	state.tiles->get(i0, j0).SetStatusOpen();
+	state.tiles->get(i0, j0).SetPred(i0, j0, i0, j0);
+	state.tiles->get(i0, j0).SetCost(PathCost());
+
+	while (1)
+	{
+		++state.steps;
+
+		// If we ran out of tiles to examine, give up
+		if (state.open.empty())
+			break;
+
+#if PATHFIND_STATS
+		state.sumOpenSize += state.open.size();
+#endif
+
+		// Move best tile from open to closed
+		PriorityQueue::Item curr = state.open.pop();
+		u16 i = curr.id.i();
+		u16 j = curr.id.j();
+		state.tiles->get(i, j).SetStatusClosed();
+
+		// If we've reached the destination, stop
+		if (goal.NavcellContainsGoal(i, j))
+		{
+			state.iBest = i;
+			state.jBest = j;
+			state.hBest = PathCost();
+			break;
+		}
+
+		PathCost g = state.tiles->get(i, j).GetCost();
+
+		// Try all 8 neighbors
+		ProcessNeighbour(i, j, i-1, j-1, g, state);
+		ProcessNeighbour(i, j, i+1, j-1, g, state);
+		ProcessNeighbour(i, j, i-1, j+1, g, state);
+		ProcessNeighbour(i, j, i+1, j+1, g, state);
+		ProcessNeighbour(i, j, i-1, j, g, state);
+		ProcessNeighbour(i, j, i+1, j, g, state);
+		ProcessNeighbour(i, j, i, j-1, g, state);
+		ProcessNeighbour(i, j, i, j+1, g, state);
+	}
+
+	// Reconstruct the path (in reverse)
+	u16 ip = state.iBest, jp = state.jBest;
+	while (ip != i0 || jp != j0)
+	{
+		PathfindTile& n = state.tiles->get(ip, jp);
+		entity_pos_t x, z;
+		Pathfinding::NavcellCenter(ip, jp, x, z);
+		Waypoint w = { x, z };
+		path.m_Waypoints.push_back(w);
+
+		// Follow the predecessor link
+		ip = n.GetPredI(ip);
+		jp = n.GetPredJ(jp);
+	}
+
+	NormalizePathWaypoints(path);
+
+	// Save this grid for debug display
+	m_DebugTime = timer_Time() - time;
+	delete m_DebugGrid;
+	m_DebugGrid = state.tiles;
+	m_DebugSteps = state.steps;
+	m_DebugGoal = goal;
+
+	PROFILE2_ATTR("from: (%d, %d)", i0, j0);
+	PROFILE2_ATTR("to: (%d, %d)", state.iGoal, state.jGoal);
+	PROFILE2_ATTR("reached: (%d, %d)", state.iBest, state.jBest);
+	PROFILE2_ATTR("steps: %u", state.steps);
+
+#if PATHFIND_STATS
+	debug_printf("PATHFINDER: steps=%d avgo=%d proc=%d impc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveClosed, state.numImproveOpen, state.numAddToOpen);
+#endif
 }
 
-void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
+void LongPathfinder::ComputeJPSPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
 {
-	PathfinderStateJPS state = { 0 };
+	PROFILE3("ComputePathJPS");
+	//TIMER(L"ComputePathJPS");
+
+	PathfinderState state = { 0 };
 
 	state.jpc = m_JumpPointCache[passClass].get();
-#if USE_JUMPPOINT_CACHE
-	if (!state.jpc)
+	if (m_UseJPSCache && !state.jpc)
 	{
 		state.jpc = new JumpPointCache;
 		state.jpc->reset(m_Grid, passClass);
 		debug_printf("PATHFINDER: JPC memory: %d kB\n", (int)state.jpc->GetMemoryUsage() / 1024);
 		m_JumpPointCache[passClass] = shared_ptr<JumpPointCache>(state.jpc);
 	}
-#endif
-
-	PROFILE3("ComputePathJPS");
-	//TIMER(L"ComputePathJPS");
 
 	// Convert the start coordinates to tile indexes
 	u16 i0, j0;
-	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_GridSize, m_GridSize);
 
 	if (!IS_PASSABLE(m_Grid->get(i0, j0), passClass))
 	{
@@ -911,13 +914,13 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 		return;
 	}
 
-	Pathfinding::NearestNavcell(state.goal.x, state.goal.z, state.iGoal, state.jGoal, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
+	Pathfinding::NearestNavcell(state.goal.x, state.goal.z, state.iGoal, state.jGoal, m_GridSize, m_GridSize);
 
 	state.passClass = passClass;
 
 	state.steps = 0;
 
-	state.tiles = new PathfindTileJPSGrid(m_Grid->m_W, m_Grid->m_H);
+	state.tiles = new PathfindTileGrid(m_Grid->m_W, m_Grid->m_H);
 	state.terrain = m_Grid;
 
 	state.iBest = i0;
@@ -957,7 +960,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 			break;
 		}
 
-		PathfindTileJPS tile = state.tiles->get(i, j);
+		PathfindTile tile = state.tiles->get(i, j);
 		PathCost g = tile.GetCost();
 
 		// Get the direction of the predecessor tile from this tile
@@ -978,27 +981,15 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 			if (!IS_PASSABLE(state.terrain->get(i + dpi, j-1), state.passClass))
 			{
 				AddJumpedDiag(i, j, -dpi, -1, g, state);
-#if USE_JUMPPOINT_CACHE
-				AddJumpedVert(i, j, -1, g, state);
-#else
 				AddJumpedVert(i, j, -1, g, state, OnTheWay(i, j, 0, -1, state.goal));
-#endif
 			}
 			if (!IS_PASSABLE(state.terrain->get(i + dpi, j+1), state.passClass))
 			{
 				AddJumpedDiag(i, j, -dpi, +1, g, state);
-#if USE_JUMPPOINT_CACHE
-				AddJumpedVert(i, j, +1, g, state);
-#else
 				AddJumpedVert(i, j, +1, g, state, OnTheWay(i, j, 0, +1, state.goal));
-#endif
 			}
 #endif	
-#if USE_JUMPPOINT_CACHE
-			AddJumpedHoriz(i, j, -dpi, g, state);
-#else
 			AddJumpedHoriz(i, j, -dpi, g, state, OnTheWay(i, j, -dpi, 0, state.goal));
-#endif
 		}
 		else if (dpi == 0 && dpj != 0)
 		{
@@ -1012,27 +1003,15 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 			if (!IS_PASSABLE(state.terrain->get(i-1, j + dpj), state.passClass))
 			{
 				AddJumpedDiag(i, j, -1, -dpj, g, state);
-#if USE_JUMPPOINT_CACHE
-				AddJumpedHoriz(i, j, -1, g, state);
-#else
 				AddJumpedHoriz(i, j, -1, g, state,OnTheWay(i, j, -1, 0, state.goal));
-#endif
 			}
 			if (!IS_PASSABLE(state.terrain->get(i+1, j + dpj), state.passClass))
 			{
 				AddJumpedDiag(i, j, +1, -dpj, g, state);
-#if USE_JUMPPOINT_CACHE
-				AddJumpedHoriz(i, j, +1, g, state);
-#else
 				AddJumpedHoriz(i, j, +1, g, state,OnTheWay(i, j, +1, 0, state.goal));
-#endif
 			}
-#endif	
-#if USE_JUMPPOINT_CACHE
-			AddJumpedVert(i, j, -dpj, g, state);
-#else
-			AddJumpedVert(i, j, -dpj, g, state, OnTheWay(i, j, 0, -dpj, state.goal));
 #endif
+			AddJumpedVert(i, j, -dpj, g, state, OnTheWay(i, j, 0, -dpj, state.goal));
 		}
 		else if (dpi != 0 && dpj != 0)
 		{
@@ -1043,13 +1022,8 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 			if (!IS_PASSABLE(state.terrain->get(i, j + dpj), state.passClass))
 				AddJumpedDiag(i, j, -dpi, dpj, g, state);
 #endif
-#if USE_JUMPPOINT_CACHE
-			AddJumpedHoriz(i, j, -dpi, g, state);
-			AddJumpedVert(i, j, -dpj, g, state);
-#else
 			AddJumpedHoriz(i, j, -dpi, g, state, OnTheWay(i, j, -dpi, 0, state.goal));
 			AddJumpedVert(i, j, -dpj, g, state, OnTheWay(i, j, 0, -dpj, state.goal));
-#endif
 			AddJumpedDiag(i, j, -dpi, -dpj, g, state);
 		}
 		else
@@ -1087,7 +1061,7 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 	u16 ip = state.iBest, jp = state.jBest;
 	while (ip != i0 || jp != j0)
 	{
-		PathfindTileJPS& n = state.tiles->get(ip, jp);
+		PathfindTile& n = state.tiles->get(ip, jp);
 		entity_pos_t x, z;
 		Pathfinding::NavcellCenter(ip, jp, x, z);
 		Waypoint w = { x, z };
@@ -1098,12 +1072,11 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 		jp = n.GetPredJ(jp);
 	}
 
-	//NormalizePathWaypoints(path);
 	ImprovePathWaypoints(path, passClass);
 
 	// Save this grid for debug display
-	delete m_DebugGridJPS;
-	m_DebugGridJPS = state.tiles;
+	delete m_DebugGrid;
+	m_DebugGrid = state.tiles;
 	m_DebugSteps = state.steps;
 	m_DebugGoal = state.goal;
 
@@ -1117,26 +1090,243 @@ void CCmpPathfinder::ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const Path
 #endif
 }
 
-void CCmpPathfinder::GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid)
+void LongPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& UNUSED(origGoal), pass_class_t passClass, WaypointPath& path)
+{
+	u16 i0, j0;
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_GridSize, m_GridSize);
+	u16 iGoal = i0;
+	u16 jGoal = j0;
+	m_PathfinderHier->FindNearestPassableNavcell(iGoal, jGoal, passClass);
+
+	int ip = iGoal;
+	int jp = jGoal;
+
+	// Reconstruct the path (in reverse)
+	while (ip != i0 || jp != j0)
+	{
+		entity_pos_t x, z;
+		Pathfinding::NavcellCenter(ip, jp, x, z);
+		Waypoint w = { x, z };
+		path.m_Waypoints.push_back(w);
+
+		// Move diagonally/horizontally/vertically towards the start navcell
+
+		if (ip > i0)
+			ip--;
+		else if (ip < i0)
+			ip++;
+
+		if (jp > j0)
+			jp--;
+		else if (jp < j0)
+			jp++;
+	}
+}
+
+void LongPathfinder::NormalizePathWaypoints(WaypointPath& path)
+{
+	if (path.m_Waypoints.empty())
+		return;
+
+	// Given the current list of waypoints, add intermediate waypoints
+	// in a straight line between them, so that the maximum gap between
+	// waypoints is within the (fairly arbitrary) limit
+	const fixed MAX_WAYPOINT_SEPARATION = Pathfinding::NAVCELL_SIZE * 4;
+
+	std::vector<Waypoint>& waypoints = path.m_Waypoints;
+	std::vector<Waypoint> newWaypoints;
+
+	newWaypoints.push_back(waypoints.front());
+	for (size_t k = 1; k < waypoints.size(); ++k)
+	{
+		CFixedVector2D prev(waypoints[k - 1].x, waypoints[k - 1].z);
+		CFixedVector2D curr(waypoints[k].x, waypoints[k].z);
+		fixed dist = (curr - prev).Length();
+		if (dist > MAX_WAYPOINT_SEPARATION)
+		{
+			int segments = (dist / MAX_WAYPOINT_SEPARATION).ToInt_RoundToInfinity();
+			for (int i = 1; i < segments; ++i)
+			{
+				CFixedVector2D p = prev + ((curr - prev)*i) / segments;
+				Waypoint wp = { p.X, p.Y };
+				newWaypoints.push_back(wp);
+			}
+		}
+		newWaypoints.push_back(waypoints[k]);
+	}
+
+	path.m_Waypoints.swap(newWaypoints);
+}
+
+void LongPathfinder::ImprovePathWaypoints(WaypointPath& path, pass_class_t passClass)
+{
+	if (path.m_Waypoints.size() < 2)
+		return;
+
+	std::vector<Waypoint>& waypoints = path.m_Waypoints;
+	std::vector<Waypoint> newWaypoints;
+
+	CFixedVector2D prev(waypoints.front().x, waypoints.front().z);
+	newWaypoints.push_back(waypoints.front());
+	for (size_t k = 1; k < waypoints.size() - 1; ++k)
+	{
+		CFixedVector2D ahead(waypoints[k + 1].x, waypoints[k + 1].z);
+		CFixedVector2D curr(waypoints[k].x, waypoints[k].z);
+		// If we're mostly straight, don't even bother.
+		if ((ahead - curr).Perpendicular().Dot(curr - prev).Absolute() <= fixed::Epsilon() * 100)
+		{
+			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
+			continue;
+		}
+
+		if (!CheckLineMovement(prev.X, prev.Y, ahead.X, ahead.Y, passClass))
+		{
+			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
+			newWaypoints.push_back(waypoints[k]);
+		}
+	}
+	newWaypoints.push_back(waypoints.back());
+	path.m_Waypoints.swap(newWaypoints);
+}
+
+bool LongPathfinder::CheckLineMovement(entity_pos_t x0, entity_pos_t z0, entity_pos_t x1, entity_pos_t z1, pass_class_t passClass)
+{
+	// We shouldn't allow lines between diagonally-adjacent navcells.
+	// It doesn't matter whether we allow lines precisely along the edge
+	// of an impassable navcell.
+
+	// To rasterise the line:
+	// If the line is (e.g.) aiming up-right, then we start at the navcell
+	// containing the start point and the line must either end in that navcell
+	// or else exit along the top edge or the right edge (or through the top-right corner,
+	// which we'll arbitrary treat as the horizontal edge).
+	// So we jump into the adjacent navcell across that edge, and continue.
+
+	// To handle the special case of units that are stuck on impassable cells,
+	// we allow them to move from an impassable to a passable cell (but not
+	// vice versa).
+
+	u16 i0, j0, i1, j1;
+	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_GridSize, m_GridSize);
+	Pathfinding::NearestNavcell(x1, z1, i1, j1, m_GridSize, m_GridSize);
+
+	// Find which direction the line heads in
+	int di = (i0 < i1 ? +1 : i1 < i0 ? -1 : 0);
+	int dj = (j0 < j1 ? +1 : j1 < j0 ? -1 : 0);
+
+	u16 i = i0;
+	u16 j = j0;
+
+// 	debug_printf("(%f,%f)..(%f,%f) [%d,%d]..[%d,%d]\n", x0.ToFloat(), z0.ToFloat(), x1.ToFloat(), z1.ToFloat(), i0, j0, i1, j1);
+
+	bool currentlyOnImpassable = !IS_PASSABLE(m_Grid->get(i0, j0), passClass);
+
+	while (true)
+	{
+		// Fail if we're moving onto an impassable navcell
+		bool passable = IS_PASSABLE(m_Grid->get(i, j), passClass);
+		if (passable)
+			currentlyOnImpassable = false;
+		else if (!currentlyOnImpassable)
+			return false;
+
+		// Succeed if we're at the target
+		if (i == i1 && j == j1)
+			return true;
+
+		// If we can only move horizontally/vertically, then just move in that direction
+		if (di == 0)
+		{
+			j += dj;
+			continue;
+		}
+		else if (dj == 0)
+		{
+			i += di;
+			continue;
+		}
+
+		// Otherwise we need to check which cell to move into:
+
+		// Check whether the line intersects the horizontal (top/bottom) edge of
+		// the current navcell.
+		// Horizontal edge is (i, j + (dj>0?1:0)) .. (i + 1, j + (dj>0?1:0))
+		// Since we already know the line is moving from this navcell into a different
+		// navcell, we simply need to test that the edge's endpoints are not both on the
+		// same side of the line.
+
+		entity_pos_t xia = entity_pos_t::FromInt(i).Multiply(Pathfinding::NAVCELL_SIZE);
+		entity_pos_t xib = entity_pos_t::FromInt(i+1).Multiply(Pathfinding::NAVCELL_SIZE);
+		entity_pos_t zj = entity_pos_t::FromInt(j + (dj+1)/2).Multiply(Pathfinding::NAVCELL_SIZE);
+
+		CFixedVector2D perp = CFixedVector2D(x1 - x0, z1 - z0).Perpendicular();
+		entity_pos_t dota = (CFixedVector2D(xia, zj) - CFixedVector2D(x0, z0)).Dot(perp);
+		entity_pos_t dotb = (CFixedVector2D(xib, zj) - CFixedVector2D(x0, z0)).Dot(perp);
+
+// 		debug_printf("(%f,%f)-(%f,%f) :: %f %f\n", xia.ToFloat(), zj.ToFloat(), xib.ToFloat(), zj.ToFloat(), dota.ToFloat(), dotb.ToFloat());
+
+		if ((dota < entity_pos_t::Zero() && dotb < entity_pos_t::Zero()) ||
+		    (dota > entity_pos_t::Zero() && dotb > entity_pos_t::Zero()))
+		{
+			// Horizontal edge is fully on one side of the line, so the line doesn't
+			// intersect it, so we should move across the vertical edge instead
+			i += di;
+		}
+		else
+		{
+			j += dj;
+		}
+	}
+}
+
+void LongPathfinder::GetDebugDataTile(u32& steps, double& time, Grid<u8>& grid)
 {
 	steps = m_DebugSteps;
 	time = m_DebugTime;
 
-	if (!m_DebugGridJPS)
+	if (!m_DebugGrid)
+		return;
+
+	grid = Grid<u8>(m_DebugGrid->m_W, m_DebugGrid->m_H);
+	for (u16 j = 0; j < grid.m_H; ++j)
+	{
+		for (u16 i = 0; i < grid.m_W; ++i)
+		{
+			PathfindTile t = m_DebugGrid->get(i, j);
+			grid.set(i, j, (t.IsOpen() ? 1 : 0) | (t.IsClosed() ? 2 : 0));
+		}
+	}
+}
+
+void LongPathfinder::GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid)
+{
+	steps = m_DebugSteps;
+	time = m_DebugTime;
+
+	if (!m_DebugGrid)
 		return;
 
 	u16 iGoal, jGoal;
-	Pathfinding::NearestNavcell(m_DebugGoal.x, m_DebugGoal.z, iGoal, jGoal, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
+	Pathfinding::NearestNavcell(m_DebugGoal.x, m_DebugGoal.z, iGoal, jGoal, m_GridSize, m_GridSize);
 
-	grid = Grid<u8>(m_DebugGridJPS->m_W, m_DebugGridJPS->m_H);
+	grid = Grid<u8>(m_DebugGrid->m_W, m_DebugGrid->m_H);
 	for (u16 j = 0; j < grid.m_H; ++j)
 	{
 		for (u16 i = 0; i < grid.m_W; ++i)
 		{
 			if (i == iGoal && j == jGoal)
 				continue;
-			PathfindTileJPS t = m_DebugGridJPS->get(i, j);
+			PathfindTile t = m_DebugGrid->get(i, j);
 			grid.set(i, j, (t.IsOpen() ? 1 : 0) | (t.IsClosed() ? 2 : 0));
 		}
 	}
 }
+
+void LongPathfinder::SetDebugOverlay(bool enabled)
+{
+	if (enabled && !m_DebugOverlay)
+		m_DebugOverlay = new LongOverlay(*this);
+	else if (!enabled && m_DebugOverlay)
+		SAFE_DELETE(m_DebugOverlay);
+}
+

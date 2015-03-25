@@ -71,11 +71,6 @@ public:
 	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret) = 0;
 
 	/**
-	 * Equivalent to ComputePath, but using the JPS pathfinder.
-	 */
-	virtual void ComputePathJPS(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret) = 0;
-
-	/**
 	 * Asynchronous version of ComputePath.
 	 * The result will be sent as CMessagePathResult to 'notify'.
 	 * Returns a unique non-zero number, which will match the 'ticket' in the result,
@@ -172,11 +167,6 @@ public:
 	 * Returns some stats about the last ComputePath.
 	 */
 	virtual void GetDebugData(u32& steps, double& time, Grid<u8>& grid) = 0;
-
-	/**
-	 * Returns some stats about the last ComputePathJPS.
-	 */
-	virtual void GetDebugDataJPS(u32& steps, double& time, Grid<u8>& grid) = 0;
 
 	DECLARE_INTERFACE_TYPE(Pathfinder)
 };

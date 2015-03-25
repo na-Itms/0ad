@@ -1,19 +1,19 @@
 /* Copyright (C) 2015 Wildfire Games.
-* This file is part of 0 A.D.
-*
-* 0 A.D. is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 2 of the License, or
-* (at your option) any later version.
-*
-* 0 A.D. is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with 0 A.D.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * This file is part of 0 A.D.
+ *
+ * 0 A.D. is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * 0 A.D. is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with 0 A.D.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef INCLUDED_PATHFINDING
 #define INCLUDED_PATHFINDING
@@ -40,6 +40,54 @@ struct Waypoint
 struct WaypointPath
 {
 	std::vector<Waypoint> m_Waypoints;
+};
+
+/**
+ * Represents the cost of a path consisting of horizontal/vertical and
+ * diagonal movements over a uniform-cost grid.
+ * Maximum path length before overflow is about 45K steps.
+ */
+struct PathCost
+{
+	PathCost() : data(0) { }
+
+	/// Construct from a number of horizontal/vertical and diagonal steps
+	PathCost(u16 hv, u16 d)
+		: data(hv * 65536 + d * 92682) // 2^16 * sqrt(2) == 92681.9
+	{
+	}
+
+	/// Construct for horizontal/vertical movement of given number of steps
+	static PathCost horizvert(u16 n)
+	{
+		return PathCost(n, 0);
+	}
+
+	/// Construct for diagonal movement of given number of steps
+	static PathCost diag(u16 n)
+	{
+		return PathCost(0, n);
+	}
+
+	PathCost operator+(const PathCost& a) const
+	{
+		PathCost c;
+		c.data = data + a.data;
+		return c;
+	}
+
+	bool operator<=(const PathCost& b) const { return data <= b.data; }
+	bool operator< (const PathCost& b) const { return data <  b.data; }
+	bool operator>=(const PathCost& b) const { return data >= b.data; }
+	bool operator>(const PathCost& b) const { return data >  b.data; }
+
+	u32 ToInt()
+	{
+		return data;
+	}
+
+private:
+	u32 data;
 };
 
 typedef u16 NavcellData; // 1 bit per passability class (up to PASS_CLASS_BITS)

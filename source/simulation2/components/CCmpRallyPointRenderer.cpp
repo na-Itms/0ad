@@ -636,7 +636,7 @@ void CCmpRallyPointRenderer::RecomputeRallyPointPath(size_t index, CmpPtr<ICmpPo
 		start.X = m_RallyPoints[index-1].X;
 		start.Y = m_RallyPoints[index-1].Y;
 	}
-	cmpPathfinder->ComputePathJPS(start.X, start.Y, goal, cmpPathfinder->GetPassabilityClass(m_LinePassabilityClass),path);
+	cmpPathfinder->ComputePath(start.X, start.Y, goal, cmpPathfinder->GetPassabilityClass(m_LinePassabilityClass), path);
 
 	// Check if we got a path back; if not we probably have two markers less than one tile apart.
 	if (path.m_Waypoints.size() < 2)

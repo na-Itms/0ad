@@ -67,12 +67,10 @@ void CCmpPathfinder::Init(const CParamNode& UNUSED(paramNode))
 	m_TerrainDirty = true;
 	m_NextAsyncTicket = 1;
 
-	m_DebugOverlay = NULL;
-	m_DebugGrid = NULL;
-	m_DebugGridJPS = NULL;
-	m_DebugPath = NULL;
+	m_DebugOverlay = false;
 
 	m_PathfinderHier = new HierarchicalPathfinder;
+	m_LongPathfinder = new LongPathfinder(m_PathfinderHier);
 
 	m_SameTurnMovesCount = 0;
 
@@ -115,8 +113,8 @@ void CCmpPathfinder::Init(const CParamNode& UNUSED(paramNode))
 void CCmpPathfinder::Deinit()
 {
 	SetDebugOverlay(false); // cleans up memory
-	ResetDebugPath();
 
+	SAFE_DELETE(m_LongPathfinder);
 	SAFE_DELETE(m_PathfinderHier);
 
 	SAFE_DELETE(m_Grid);
@@ -595,7 +593,7 @@ void CCmpPathfinder::UpdateGrid()
 
 		PathfinderHierRecompute();
 
-		PathfinderJPSMakeDirty();
+		m_LongPathfinder->Reload(m_Grid);
 	}
 }
 
@@ -646,11 +644,7 @@ void CCmpPathfinder::ProcessLongRequests(const std::vector<AsyncLongPathRequest>
 		TIMER_ACCRUE(tc_ProcessLongRequests_Loop);
 		const AsyncLongPathRequest& req = longRequests[i];
 		WaypointPath path;
-#if PATHFIND_USE_JPS
-		ComputePathJPS(req.x0, req.z0, req.goal, req.passClass, path);
-#else
 		ComputePath(req.x0, req.z0, req.goal, req.passClass, path);
-#endif
 		CMessagePathResult msg(req.ticket, path);
 		GetSimContext().GetComponentManager().PostMessage(req.notify, msg);
 	}
@@ -813,109 +807,3 @@ ICmpObstruction::EFoundationCheck CCmpPathfinder::CheckBuildingPlacement(const I
 	return ICmpObstruction::FOUNDATION_CHECK_SUCCESS;
 }
 
-//////////////////////////////////////////////////////////
-
-void CCmpPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& UNUSED(origGoal), pass_class_t passClass, WaypointPath& path)
-{
-	u16 i0, j0;
-	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
-	u16 iGoal = i0;
-	u16 jGoal = j0;
-	m_PathfinderHier->FindNearestPassableNavcell(iGoal, jGoal, passClass);
-
-	int ip = iGoal;
-	int jp = jGoal;
-
-	// Reconstruct the path (in reverse)
-	while (ip != i0 || jp != j0)
-	{
-		entity_pos_t x, z;
-		Pathfinding::NavcellCenter(ip, jp, x, z);
-		Waypoint w = { x, z };
-		path.m_Waypoints.push_back(w);
-
-		// Move diagonally/horizontally/vertically towards the start navcell
-
-		if (ip > i0)
-			ip--;
-		else if (ip < i0)
-			ip++;
-
-		if (jp > j0)
-			jp--;
-		else if (jp < j0)
-			jp++;
-	}
-}
-
-void CCmpPathfinder::NormalizePathWaypoints(WaypointPath& path)
-{
-	if (path.m_Waypoints.empty())
-		return;
-
-	// Given the current list of waypoints, add intermediate waypoints
-	// in a straight line between them, so that the maximum gap between
-	// waypoints is within the (fairly arbitrary) limit
-	const fixed MAX_WAYPOINT_SEPARATION = Pathfinding::NAVCELL_SIZE * 4;
-
-	std::vector<Waypoint>& waypoints = path.m_Waypoints;
-	std::vector<Waypoint> newWaypoints;
-
-	newWaypoints.push_back(waypoints.front());
-	for (size_t k = 1; k < waypoints.size(); ++k)
-	{
-		CFixedVector2D prev(waypoints[k-1].x, waypoints[k-1].z);
-		CFixedVector2D curr(waypoints[k].x, waypoints[k].z);
-		fixed dist = (curr - prev).Length();
-		if (dist > MAX_WAYPOINT_SEPARATION)
-		{
-			int segments = (dist / MAX_WAYPOINT_SEPARATION).ToInt_RoundToInfinity();
-			for (int i = 1; i < segments; ++i)
-			{
-				CFixedVector2D p = prev + ((curr - prev)*i) / segments;
-				Waypoint wp = { p.X, p.Y };
-				newWaypoints.push_back(wp);
-			}
-		}
-		newWaypoints.push_back(waypoints[k]);
-	}
-
-	path.m_Waypoints.swap(newWaypoints);
-}
-
-void CCmpPathfinder::ImprovePathWaypoints(WaypointPath& path, pass_class_t passClass)
-{
-	if (path.m_Waypoints.size() < 2)
-		return;
-
-	std::vector<Waypoint>& waypoints = path.m_Waypoints;
-	std::vector<Waypoint> newWaypoints;
-
-	CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSimContext(), SYSTEM_ENTITY);
-	if (!cmpObstructionManager)
-		return;
-
-	StationaryOnlyObstructionFilter filter;
-	CFixedVector2D prev(waypoints.front().x, waypoints.front().z);
-	newWaypoints.push_back(waypoints.front());
-	for (size_t k = 1; k < waypoints.size()-1; ++k)
-	{
-		CFixedVector2D ahead(waypoints[k+1].x, waypoints[k+1].z);
-		CFixedVector2D curr(waypoints[k].x, waypoints[k].z);
-		// If we're mostly straight, don't even bother.
-		if ( (ahead-curr).Perpendicular().Dot(curr-prev).Absolute() <= fixed::Epsilon()*100)
-		{
-			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
-			continue;
-		}
-
-		// TODO: add proper width.
-		if (!CheckMovement(filter, prev.X, prev.Y, ahead.X, ahead.Y, fixed::FromInt(4), passClass))
-		{
-			prev = CFixedVector2D(waypoints[k].x, waypoints[k].z);
-			newWaypoints.push_back(waypoints[k]);
-		}
-	}
-	newWaypoints.push_back(waypoints.back());
-	path.m_Waypoints.swap(newWaypoints);
-}

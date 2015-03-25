@@ -168,8 +168,6 @@ public:
 		}
 	}
 
-#define USE_JPS 1
-
 	void test_perf2()
 	{
 		CTerrain terrain;
@@ -290,20 +288,12 @@ public:
 		PathGoal goal = { PathGoal::POINT, x1, z1 };
 
 		WaypointPath path;
-#if USE_JPS
-		cmpPathfinder->ComputePathJPS(x0, z0, goal, cmpPathfinder->GetPassabilityClass("default"), path);
-#else
 		cmpPathfinder->ComputePath(x0, z0, goal, cmpPathfinder->GetPassabilityClass("default"), path);
-#endif
 
 		u32 debugSteps;
 		double debugTime;
 		Grid<u8> debugGrid;
-#if USE_JPS
-		cmpPathfinder->GetDebugDataJPS(debugSteps, debugTime, debugGrid);
-#else
 		cmpPathfinder->GetDebugData(debugSteps, debugTime, debugGrid);
-#endif
 // 		stream << " <g style='visibility:hidden'>\n";
 
 		stream << " <g>\n";
@@ -349,11 +339,7 @@ public:
 		for (int i = 0; i < n; ++i)
 		{
 			WaypointPath path;
-#if USE_JPS
-			cmpPathfinder->ComputePathJPS(x0, z0, goal, cmpPathfinder->GetPassabilityClass("default"), path);
-#else
 			cmpPathfinder->ComputePath(x0, z0, goal, cmpPathfinder->GetPassabilityClass("default"), path);
-#endif
 		}
 		t = timer_Time() - t;
 		debug_printf("### RepeatPath %fms each (%fs total)\n", 1000*t / n, t);

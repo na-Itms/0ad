@@ -333,7 +333,7 @@ CFixedVector2D CCmpPathfinder::GetNearestPointOnGoal(CFixedVector2D pos, const P
 	// cost of a virtual call inside ComputeShortPath)
 }
 
-typedef PriorityQueueHeap<u16, fixed> PriorityQueue;
+typedef PriorityQueueHeap<u16, fixed> VertexPriorityQueue;
 
 /**
  * Add edges and vertexes to represent the boundaries between passable and impassable
@@ -861,8 +861,8 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 
 	PROFILE_START("A*");
 
-	PriorityQueue open;
-	PriorityQueue::Item qiStart = { START_VERTEX_ID, start.h };
+	VertexPriorityQueue open;
+	VertexPriorityQueue::Item qiStart = { START_VERTEX_ID, start.h };
 	open.push(qiStart);
 
 	u16 idBest = START_VERTEX_ID;
@@ -871,7 +871,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	while (!open.empty())
 	{
 		// Move best tile from open to closed
-		PriorityQueue::Item curr = open.pop();
+		VertexPriorityQueue::Item curr = open.pop();
 		vertexes[curr.id].status = Vertex::CLOSED;
 
 		// If we've reached the destination, stop
@@ -976,7 +976,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 					if (n == GOAL_VERTEX_ID)
 						vertexes[n].p = npos; // remember the new best goal position
 
-					PriorityQueue::Item t = { (u16)n, g + vertexes[n].h };
+					VertexPriorityQueue::Item t = { (u16)n, g + vertexes[n].h };
 					open.push(t);
 
 					// Remember the heuristically best vertex we've seen so far, in case we never actually reach the target
@@ -1036,92 +1036,6 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 		return false;
 
 	// Test against the passability grid.
-	// This should ignore r, and just check that the line (x0,z0)-(x1,z1)
-	// does not intersect any impassable navcells.
-	// We shouldn't allow lines between diagonally-adjacent navcells.
-	// It doesn't matter whether we allow lines precisely along the edge
-	// of an impassable navcell.
-
-	// To rasterise the line:
-	// If the line is (e.g.) aiming up-right, then we start at the navcell
-	// containing the start point and the line must either end in that navcell
-	// or else exit along the top edge or the right edge (or through the top-right corner,
-	// which we'll arbitrary treat as the horizontal edge).
-	// So we jump into the adjacent navcell across that edge, and continue.
-
-	// To handle the special case of units that are stuck on impassable cells,
-	// we allow them to move from an impassable to a passable cell (but not
-	// vice versa).
-
-	u16 i0, j0, i1, j1;
-	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
-	Pathfinding::NearestNavcell(x1, z1, i1, j1, m_MapSize*Pathfinding::NAVCELLS_PER_TILE, m_MapSize*Pathfinding::NAVCELLS_PER_TILE);
-
-	// Find which direction the line heads in
-	int di = (i0 < i1 ? +1 : i1 < i0 ? -1 : 0);
-	int dj = (j0 < j1 ? +1 : j1 < j0 ? -1 : 0);
-
-	u16 i = i0;
-	u16 j = j0;
-
-// 	debug_printf("(%f,%f)..(%f,%f) [%d,%d]..[%d,%d]\n", x0.ToFloat(), z0.ToFloat(), x1.ToFloat(), z1.ToFloat(), i0, j0, i1, j1);
-
-	bool currentlyOnImpassable = !IS_PASSABLE(m_Grid->get(i0, j0), passClass);
-
-	while (true)
-	{
-		// Fail if we're moving onto an impassable navcell
-		bool passable = IS_PASSABLE(m_Grid->get(i, j), passClass);
-		if (passable)
-			currentlyOnImpassable = false;
-		else if (!currentlyOnImpassable)
-			return false;
-
-		// Succeed if we're at the target
-		if (i == i1 && j == j1)
-			return true;
-
-		// If we can only move horizontally/vertically, then just move in that direction
-		if (di == 0)
-		{
-			j += dj;
-			continue;
-		}
-		else if (dj == 0)
-		{
-			i += di;
-			continue;
-		}
-
-		// Otherwise we need to check which cell to move into:
-
-		// Check whether the line intersects the horizontal (top/bottom) edge of
-		// the current navcell.
-		// Horizontal edge is (i, j + (dj>0?1:0)) .. (i + 1, j + (dj>0?1:0))
-		// Since we already know the line is moving from this navcell into a different
-		// navcell, we simply need to test that the edge's endpoints are not both on the
-		// same side of the line.
-
-		entity_pos_t xia = entity_pos_t::FromInt(i).Multiply(Pathfinding::NAVCELL_SIZE);
-		entity_pos_t xib = entity_pos_t::FromInt(i+1).Multiply(Pathfinding::NAVCELL_SIZE);
-		entity_pos_t zj = entity_pos_t::FromInt(j + (dj+1)/2).Multiply(Pathfinding::NAVCELL_SIZE);
-
-		CFixedVector2D perp = CFixedVector2D(x1 - x0, z1 - z0).Perpendicular();
-		entity_pos_t dota = (CFixedVector2D(xia, zj) - CFixedVector2D(x0, z0)).Dot(perp);
-		entity_pos_t dotb = (CFixedVector2D(xib, zj) - CFixedVector2D(x0, z0)).Dot(perp);
-
-// 		debug_printf("(%f,%f)-(%f,%f) :: %f %f\n", xia.ToFloat(), zj.ToFloat(), xib.ToFloat(), zj.ToFloat(), dota.ToFloat(), dotb.ToFloat());
-
-		if ((dota < entity_pos_t::Zero() && dotb < entity_pos_t::Zero()) ||
-		    (dota > entity_pos_t::Zero() && dotb > entity_pos_t::Zero()))
-		{
-			// Horizontal edge is fully on one side of the line, so the line doesn't
-			// intersect it, so we should move across the vertical edge instead
-			i += di;
-		}
-		else
-		{
-			j += dj;
-		}
-	}
+	// This ignores r.
+	return m_LongPathfinder->CheckLineMovement(x0, z0, x1, z1, passClass);
 }
