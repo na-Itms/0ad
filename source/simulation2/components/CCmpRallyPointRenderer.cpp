@@ -136,14 +136,8 @@ public:
 				"<LineThickness>0.75</LineThickness>"
 				"<LineStartCap>round</LineStartCap>"
 				"<LineEndCap>square</LineEndCap>"
-<<<<<<< HEAD
-				"<LineColour r='20' g='128' b='240'></LineColour>"
-				"<LineDashColour r='158' g='11' b='15'></LineDashColour>"
-=======
 				"<LineColor r='20' g='128' b='240'></LineColor>"
 				"<LineDashColor r='158' g='11' b='15'></LineDashColor>"
-				"<LineCostClass>default</LineCostClass>"
->>>>>>> master
 				"<LinePassabilityClass>default</LinePassabilityClass>"
 			"</a:example>"
 			"<element name='MarkerTemplate' a:help='Template name for the rally point marker entity (typically a waypoint flag actor)'>"
