@@ -320,7 +320,7 @@ static CFixedVector2D NearestPointOnGoal(CFixedVector2D pos, const PathGoal& goa
 	}
 
 	default:
-		debug_warn("invalid type");
+		debug_warn(L"invalid type");
 		return CFixedVector2D();
 	}
 }
