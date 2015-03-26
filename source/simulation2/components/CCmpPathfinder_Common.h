@@ -20,11 +20,12 @@
 
 /**
  * @file
- * Declares CCmpPathfinder, whose implementation is split into multiple source files,
- * and provides common code needed for more than one of those files.
- * CCmpPathfinder includes two pathfinding algorithms (one tile-based, one vertex-based)
- * with some shared state and functionality, so the code is split into
- * CCmpPathfinder_Vertex.cpp, CCmpPathfinder_Tile.cpp and CCmpPathfinder.cpp
+ * Declares CCmpPathfinder. Its implementation is mainly done in CCmpPathfinder.cpp,
+ * but the short-range (vertex) pathfinding is done in CCmpPathfinder_Vertex.cpp.
+ * This file provides common code needed for both files.
+ *
+ * The long-range pathfinding is done by a LongPathfinder and a HierarchicalPathfinder
+ * and the interface code with these objects can be found in this file and in CCmpPathfinder.cpp
  */
 
 #include "simulation2/system/Component.h"
