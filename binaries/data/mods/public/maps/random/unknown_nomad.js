@@ -579,8 +579,10 @@ else if (md == 5) //rivers and lake
 				setHeight(ix, iz, 3);
 		}
 	}
-	var mdd1 = randInt(1,2);
-	if (mdd1 == 1) //lake
+
+	var mdd1 = randInt(1,3);
+
+	if (mdd1 < 3) //lake
 	{
 		var fx = fractionToTiles(0.5);
 		var fz = fractionToTiles(0.5);
@@ -602,7 +604,7 @@ else if (md == 5) //rivers and lake
 		createArea(placer, [terrainPainter, elevationPainter, paintClass(clWater)], null);
 	}
 
-	if (randInt(1,2) == 1) //rivers
+	if (mdd1 > 1) //rivers
 	{
 		//create rivers
 		log ("Creating rivers...");
@@ -645,7 +647,7 @@ else if (md == 5) //rivers and lake
 		createArea(placer, [terrainPainter, elevationPainter, paintClass(clWater)], null);
 	}
 	
-	if ((randInt(1,3) == 1)&&(mdd1 == 1))//island
+	if (randInt(1,3) == 1 && mdd1 < 3)//island
 	{
 		var placer = new ClumpPlacer(mapArea * 0.006 * lSize, 0.7, 0.1, 10, ix, iz);
 		var terrainPainter = new LayeredPainter(
@@ -1326,11 +1328,53 @@ for (var i = 0; i < numPlayers; i++)
 	var iz = playerZ[i];
 	var civEntities = getStartingEntities(id-1);
 	var angle = randFloat(0, TWO_PI);
-	
-	var pEntities = [civEntities[1].Template, civEntities[1].Template, civEntities[2].Template, civEntities[2].Template, civEntities[3].Template];
-	
-	for (var p = 0; p < 5; ++p)
-		placeObject(ix+(2*cos(angle + p * TWO_PI / 5)), iz+(2*sin(angle + p * TWO_PI / 5)), pEntities[p], id, randFloat(0,TWO_PI));
+	for (var j = 1; j < 4; ++j)
+	{
+		var count = (civEntities[j].Count !== undefined ? civEntities[j].Count : 1);
+		var jx = ix + 2 * cos(angle);
+		var jz = iz + 2 * sin(angle);
+		var kAngle = randFloat(0, TWO_PI);
+		for (var k = 0; k < count; ++k)
+			placeObject(jx + cos(kAngle + k*TWO_PI/count), jz + sin(kAngle + k*TWO_PI/count), civEntities[j].Template, id, randFloat(0, TWO_PI));
+		angle += TWO_PI / 3;
+	}
+
+	if (md > 9)  // maps without water, so we must have enough resources to build a cc
+	{
+		if (g_MapSettings.StartingResources < 500)
+		{
+			var loop = (g_MapSettings.StartingResources < 200) ? 2 : 1;
+			for (let l = 0; l < loop; ++l)
+			{
+				var angle = randFloat(0, TWO_PI);
+				var rad = randFloat(3, 5);
+				var jx = ix + rad * cos(angle);
+				var jz = iz + rad * sin(angle);
+				placeObject(jx, jz, "gaia/special_treasure_wood", 0, randFloat(0, TWO_PI));
+				var angle = randFloat(0, TWO_PI);
+				var rad = randFloat(3, 5);
+				var jx = ix + rad * cos(angle);
+				var jz = iz + rad * sin(angle);
+				placeObject(jx, jz, "gaia/special_treasure_stone", 0, randFloat(0, TWO_PI));
+				var angle = randFloat(0, TWO_PI);
+				var rad = randFloat(3, 5);
+				var jx = ix + rad * cos(angle);
+				var jz = iz + rad * sin(angle);
+				placeObject(jx, jz, "gaia/special_treasure_metal", 0, randFloat(0, TWO_PI));
+			}
+		}
+	}
+	else    // we must have enough resources to build a dock
+	{
+		if (g_MapSettings.StartingResources < 200)
+		{
+			var angle = randFloat(0, TWO_PI);
+			var rad = randFloat(3, 5);
+			var jx = ix + rad * cos(angle);
+			var jz = iz + rad * sin(angle);
+			placeObject(jx, jz, "gaia/special_treasure_wood", 0, randFloat(0, TWO_PI));
+		}
+	}
 }
 
 for (var i = 0; i < numPlayers; i++)
