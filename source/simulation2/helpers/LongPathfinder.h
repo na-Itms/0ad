@@ -123,6 +123,12 @@ public:
 	}
 };
 
+struct CircularRegion
+{
+	CircularRegion(entity_pos_t x, entity_pos_t z, entity_pos_t r) : x(x), z(z), r(r) {}
+	entity_pos_t x, z, r;
+};
+
 typedef PriorityQueueHeap<TileID, PathCost> PriorityQueue;
 typedef SparseGrid<PathfindTile> PathfindTileGrid;
 
@@ -212,13 +218,24 @@ public:
 	 * The waypoints correspond to the centers of horizontally/vertically adjacent tiles
 	 * along the path.
 	 */
-	void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
+	void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, 
+		pass_class_t passClass, WaypointPath& path)
 	{
 		if (m_UseJPS)
 			ComputeJPSPath(x0, z0, origGoal, passClass, path);
 		else
 			ComputeTilePath(x0, z0, origGoal, passClass, path);
 	}
+
+	/**
+	 * Compute a tile-based path from the given point to the goal, excluding the regions
+	 * specified in excludedRegions (which are treated as impassable) and return the set of waypoints.
+	 * The waypoints correspond to the centers of horizontally/vertically adjacent tiles
+	 * along the path.
+	 */
+	void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, 
+		pass_class_t passClass, std::vector<CircularRegion> excludedRegions, WaypointPath& path);
+
 	void GetDebugData(u32& steps, double& time, Grid<u8>& grid)
 	{
 		if (m_UseJPS)
@@ -297,6 +314,12 @@ private:
 	 * (this happens because A* is 8-direction, and the map isn't actually a grid).
 	 */
 	void ImprovePathWaypoints(WaypointPath& path, pass_class_t passClass);
+
+	/**
+	 * Generate a passability map, stored in the 16th bit of navcells, based on passClass,
+	 * but with a set of impassable circular regions.
+	 */
+	void GenerateSpecialMap(pass_class_t passClass, std::vector<CircularRegion> excludedRegions);
 
 	bool m_UseJPS;
 	bool m_UseJPSCache;

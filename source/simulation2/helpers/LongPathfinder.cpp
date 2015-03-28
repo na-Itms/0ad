@@ -1330,3 +1330,44 @@ void LongPathfinder::SetDebugOverlay(bool enabled)
 		SAFE_DELETE(m_DebugOverlay);
 }
 
+void LongPathfinder::ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, 
+	pass_class_t passClass, std::vector<CircularRegion> excludedRegions, WaypointPath& path)
+{
+	GenerateSpecialMap(passClass, excludedRegions);
+	ComputePath(x0, z0, origGoal, SPECIAL_PASS_CLASS, path);
+}
+
+inline bool InRegion(u16 i, u16 j, CircularRegion region)
+{
+	fixed cellX = Pathfinding::NAVCELL_SIZE * i;
+	fixed cellZ = Pathfinding::NAVCELL_SIZE * j;
+
+	return CFixedVector2D(cellX - region.x, cellZ - region.z).CompareLength(region.r) <= 0;
+}
+
+void LongPathfinder::GenerateSpecialMap(pass_class_t passClass, std::vector<CircularRegion> excludedRegions)
+{
+	for (u16 j = 0; j < m_Grid->m_H; ++j)
+	{
+		for (u16 i = 0; i < m_Grid->m_W; ++i)
+		{
+			NavcellData n = m_Grid->get(i, j);
+			if (!IS_PASSABLE(n, passClass))
+			{
+				n |= SPECIAL_PASS_CLASS;
+				m_Grid->set(i, j, n);
+				continue;
+			}
+
+			for (CircularRegion& region : excludedRegions)
+			{
+				if (!InRegion(i, j, region))
+					continue;
+
+				n |= SPECIAL_PASS_CLASS;
+				break;
+			}
+			m_Grid->set(i, j, n);
+		}
+	}
+}
