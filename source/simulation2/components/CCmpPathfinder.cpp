@@ -69,9 +69,6 @@ void CCmpPathfinder::Init(const CParamNode& UNUSED(paramNode))
 
 	m_DebugOverlay = false;
 
-	m_PathfinderHier = new HierarchicalPathfinder;
-	m_LongPathfinder = new LongPathfinder(m_PathfinderHier);
-
 	m_SameTurnMovesCount = 0;
 
 	// Since this is used as a system component (not loaded from an entity template),
@@ -113,9 +110,6 @@ void CCmpPathfinder::Init(const CParamNode& UNUSED(paramNode))
 void CCmpPathfinder::Deinit()
 {
 	SetDebugOverlay(false); // cleans up memory
-
-	SAFE_DELETE(m_LongPathfinder);
-	SAFE_DELETE(m_PathfinderHier);
 
 	SAFE_DELETE(m_Grid);
 	SAFE_DELETE(m_BaseGrid);
@@ -202,7 +196,7 @@ void CCmpPathfinder::RenderSubmit(SceneCollector& collector)
 	for (size_t i = 0; i < m_DebugOverlayShortPathLines.size(); ++i)
 		collector.Submit(&m_DebugOverlayShortPathLines[i]);
 
-	PathfinderHierRenderSubmit(collector);
+	m_LongPathfinder.HierarchicalRenderSubmit(collector);
 }
 
 
@@ -591,9 +585,7 @@ void CCmpPathfinder::UpdateGrid()
 
 		++m_Grid->m_DirtyID;
 
-		PathfinderHierRecompute();
-
-		m_LongPathfinder->Reload(m_Grid);
+		m_LongPathfinder.Reload(m_PassClassMasks, m_Grid);
 	}
 }
 

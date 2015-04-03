@@ -767,7 +767,7 @@ void LongPathfinder::ComputeTilePath(entity_pos_t x0, entity_pos_t z0, const Pat
 
 	// Adjust the goal so that it's reachable from the source navcell
 	PathGoal goal = origGoal;
-	m_PathfinderHier->MakeGoalReachable(i0, j0, goal, passClass);
+	m_PathfinderHier.MakeGoalReachable(i0, j0, goal, passClass);
 
 	// If we're already at the goal tile, then move directly to the exact goal coordinates
 	// XXX: this seems bogus for non-point goals, it should be the point on the current cell nearest the goal
@@ -899,11 +899,11 @@ void LongPathfinder::ComputeJPSPath(entity_pos_t x0, entity_pos_t z0, const Path
 		// state specially
 		//ComputePathOffImpassable(x0, z0, origGoal, passClass, path);
 		//return;
-		m_PathfinderHier->FindNearestPassableNavcell(i0, j0, passClass);
+		m_PathfinderHier.FindNearestPassableNavcell(i0, j0, passClass);
 	}
 
 	state.goal = origGoal;
-	m_PathfinderHier->MakeGoalReachable(i0, j0, state.goal, passClass);
+	m_PathfinderHier.MakeGoalReachable(i0, j0, state.goal, passClass);
 
 	// If we're already at the goal tile, then move directly to the exact goal coordinates
 	// XXX: this seems bogus for non-point goals, it should be the point on the current cell nearest the goal
@@ -1096,7 +1096,7 @@ void LongPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, 
 	Pathfinding::NearestNavcell(x0, z0, i0, j0, m_GridSize, m_GridSize);
 	u16 iGoal = i0;
 	u16 jGoal = j0;
-	m_PathfinderHier->FindNearestPassableNavcell(iGoal, jGoal, passClass);
+	m_PathfinderHier.FindNearestPassableNavcell(iGoal, jGoal, passClass);
 
 	int ip = iGoal;
 	int jp = jGoal;

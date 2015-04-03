@@ -1037,5 +1037,5 @@ bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
 
 	// Test against the passability grid.
 	// This ignores r.
-	return m_LongPathfinder->CheckLineMovement(x0, z0, x1, z1, passClass);
+	return m_LongPathfinder.CheckLineMovement(x0, z0, x1, z1, passClass);
 }

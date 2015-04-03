@@ -22,6 +22,8 @@
 #include "HierarchicalPathfinder.h"
 
 #include "PriorityQueue.h"
+#include "graphics/Overlay.h"
+#include "renderer/Scene.h"
 
 #define PATHFIND_STATS 0
 
@@ -169,9 +171,8 @@ class LongOverlay;
 class LongPathfinder
 {
 public:
-	LongPathfinder(HierarchicalPathfinder* pathfinderHier)
+	LongPathfinder()
 	{
-		m_PathfinderHier = pathfinderHier;
 		m_UseJPS = true;
 		m_UseJPSCache = false;
 		
@@ -192,6 +193,11 @@ public:
 
 	void SetDebugOverlay(bool enabled);
 
+	void SetHierDebugOverlay(bool enabled, const CSimContext *simContext)
+	{
+		m_PathfinderHier.SetDebugOverlay(enabled, simContext);
+	}
+
 	void SetDebugPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass)
 	{
 		if (!m_DebugOverlay)
@@ -204,13 +210,21 @@ public:
 		m_DebugPassClass = passClass;
 	}
 
-	void Reload(Grid<NavcellData>* passabilityGrid)
+	void Reload(std::map<std::string, pass_class_t> passClassMasks, Grid<NavcellData>* passabilityGrid)
 	{
 		m_Grid = passabilityGrid;
 		ASSERT(passabilityGrid->m_H == passabilityGrid->m_W);
 		m_GridSize = passabilityGrid->m_W;
 
 		m_JumpPointCache.clear();
+
+		m_PathfinderHier.Recompute(passClassMasks, passabilityGrid);
+	}
+
+	void HierarchicalRenderSubmit(SceneCollector& collector)
+	{
+		for (size_t i = 0; i < m_PathfinderHier.m_DebugOverlayLines.size(); ++i)
+			collector.Submit(&m_PathfinderHier.m_DebugOverlayLines[i]);
 	}
 
 	/**
@@ -325,7 +339,7 @@ private:
 	bool m_UseJPSCache;
 	std::map<pass_class_t, shared_ptr<JumpPointCache> > m_JumpPointCache;
 
-	HierarchicalPathfinder* m_PathfinderHier;
+	HierarchicalPathfinder m_PathfinderHier;
 };
 
 /**

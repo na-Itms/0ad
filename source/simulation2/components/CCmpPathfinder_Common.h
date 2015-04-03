@@ -24,8 +24,7 @@
  * but the short-range (vertex) pathfinding is done in CCmpPathfinder_Vertex.cpp.
  * This file provides common code needed for both files.
  *
- * The long-range pathfinding is done by a LongPathfinder and a HierarchicalPathfinder
- * and the interface code with these objects can be found in this file and in CCmpPathfinder.cpp
+ * The long-range pathfinding is done by a LongPathfinder object.
  */
 
 #include "simulation2/system/Component.h"
@@ -36,11 +35,8 @@
 #include "graphics/Terrain.h"
 #include "maths/MathUtil.h"
 #include "ps/CLogger.h"
-#include "renderer/Scene.h"
 #include "simulation2/components/ICmpObstructionManager.h"
 #include "simulation2/helpers/Geometry.h"
-#include "simulation2/helpers/Grid.h"
-#include "simulation2/helpers/HierarchicalPathfinder.h"
 #include "simulation2/helpers/LongPathfinder.h"
 
 class SceneCollector;
@@ -114,20 +110,8 @@ public:
 	size_t m_ObstructionGridDirtyID; // dirty ID for ICmpObstructionManager::NeedUpdate
 	bool m_TerrainDirty; // indicates if m_Grid has been updated since terrain changed
 
-	// Interface to the hierarchical pathfinder.
-	HierarchicalPathfinder* m_PathfinderHier;
-	void PathfinderHierRecompute()
-	{
-		m_PathfinderHier->Recompute(m_PassClassMasks, m_Grid);
-	}
-	void PathfinderHierRenderSubmit(SceneCollector& collector)
-	{
-		for (size_t i = 0; i < m_PathfinderHier->m_DebugOverlayLines.size(); ++i)
-			collector.Submit(&m_PathfinderHier->m_DebugOverlayLines[i]);
-	}
-
 	// Interface to the long-range pathfinder.
-	LongPathfinder* m_LongPathfinder;
+	LongPathfinder m_LongPathfinder;
 
 	// For responsiveness we will process some moves in the same turn they were generated in
 	
@@ -161,7 +145,7 @@ public:
 
 	virtual void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, WaypointPath& ret)
 	{
-		m_LongPathfinder->ComputePath(x0, z0, goal, passClass, ret);
+		m_LongPathfinder.ComputePath(x0, z0, goal, passClass, ret);
 	}
 
 	virtual u32 ComputePathAsync(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass, entity_id_t notify);
@@ -172,23 +156,23 @@ public:
 
 	virtual void SetDebugPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& goal, pass_class_t passClass)
 	{
-		m_LongPathfinder->SetDebugPath(x0, z0, goal, passClass);
+		m_LongPathfinder.SetDebugPath(x0, z0, goal, passClass);
 	}
 
 	virtual void SetDebugOverlay(bool enabled)
 	{
 		m_DebugOverlay = enabled;
-		m_LongPathfinder->SetDebugOverlay(enabled);
+		m_LongPathfinder.SetDebugOverlay(enabled);
 	}
 
 	virtual void SetHierDebugOverlay(bool enabled)
 	{
-		m_PathfinderHier->SetDebugOverlay(enabled, &GetSimContext());
+		m_LongPathfinder.SetHierDebugOverlay(enabled, &GetSimContext());
 	}
 
 	virtual void GetDebugData(u32& steps, double& time, Grid<u8>& grid)
 	{
-		m_LongPathfinder->GetDebugData(steps, time, grid);
+		m_LongPathfinder.GetDebugData(steps, time, grid);
 	}
 
 	virtual CFixedVector2D GetNearestPointOnGoal(CFixedVector2D pos, const PathGoal& goal);
