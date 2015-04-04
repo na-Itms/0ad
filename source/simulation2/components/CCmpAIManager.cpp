@@ -36,7 +36,7 @@
 #include "simulation2/components/ICmpTemplateManager.h"
 #include "simulation2/components/ICmpTechnologyTemplateManager.h"
 #include "simulation2/components/ICmpTerritoryManager.h"
-#include "simulation2/helpers/Grid.h"
+#include "simulation2/helpers/LongPathfinder.h"
 #include "simulation2/serialization/DebugSerializer.h"
 #include "simulation2/serialization/StdDeserializer.h"
 #include "simulation2/serialization/StdSerializer.h"
@@ -465,7 +465,7 @@ public:
 		
 		return true;
 	}
-	void StartComputation(const shared_ptr<ScriptInterface::StructuredClone>& gameState, const Grid<u16>& passabilityMap, const Grid<u8>& territoryMap, bool territoryMapDirty)
+	void StartComputation(const shared_ptr<ScriptInterface::StructuredClone>& gameState, const Grid<u16>& passabilityMap, const Grid<u8>& territoryMap, bool territoryMapDirty, std::map<std::string, pass_class_t> passClassMasks)
 	{
 		ENSURE(m_CommandsComputed);
 
@@ -475,6 +475,7 @@ public:
 		if (passabilityMap.m_DirtyID != m_PassabilityMap.m_DirtyID)
 		{
 			m_PassabilityMap = passabilityMap;
+			m_LongPathfinder.Reload(passClassMasks, &m_PassabilityMap);
 			ScriptInterface::ToJSVal(cx, &m_PassabilityMapVal, m_PassabilityMap);
 		}
 
@@ -802,6 +803,8 @@ private:
 	Grid<u8> m_TerritoryMap;
 	JS::PersistentRootedValue m_TerritoryMapVal;
 
+	LongPathfinder m_LongPathfinder;
+
 	bool m_CommandsComputed;
 
 	shared_ptr<ObjectIdCache<std::wstring> > m_SerializablePrototypes;
@@ -997,8 +1000,11 @@ public:
 		}
 
 		LoadPathfinderClasses(state);
+		std::map<std::string, pass_class_t> passClassMasks;
+		if (cmpPathfinder)
+			passClassMasks = cmpPathfinder->GetPassabilityClasses();
 
-		m_Worker.StartComputation(scriptInterface.WriteStructuredClone(state), *passabilityMap, *territoryMap, territoryMapDirty);
+		m_Worker.StartComputation(scriptInterface.WriteStructuredClone(state), *passabilityMap, *territoryMap, territoryMapDirty, passClassMasks);
 		
 		m_JustDeserialized = false;
 	}
