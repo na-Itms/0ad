@@ -315,8 +315,6 @@ public:
 		{
 			double dx = (path.m_Waypoints[i+1].x - path.m_Waypoints[i].x).ToDouble();
 			double dz = (path.m_Waypoints[i+1].z - path.m_Waypoints[i].z).ToDouble();
-			LOGWARNING("%f, %f, %f, %f", dx, dz, abs(dx), abs(dz));
-			ENSURE(dx == 0 || dz == 0 || abs(dx) == abs(dz));
 			length += sqrt(dx*dx + dz*dz);
 		}
 		stream << " title='length: " << length << "; tiles explored: " << debugSteps << "; time: " << debugTime*1000 << " msec'";
