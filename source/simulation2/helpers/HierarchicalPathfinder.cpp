@@ -556,3 +556,38 @@ void HierarchicalPathfinder::FindPassableRegions(std::set<RegionID>& regions, pa
 			regions.insert(RegionID(chunks[c].m_ChunkI, chunks[c].m_ChunkJ, r));
 	}
 }
+
+Grid<u16> HierarchicalPathfinder::GetConnectivityGrid(pass_class_t passClass)
+{
+	Grid<u16> connectivityGrid(m_W, m_H);
+	connectivityGrid.reset();
+
+	u16 idx = 1;
+
+	for (size_t j1 = 0; j1 < m_H; ++j1)
+	{
+		for (size_t i1 = 0; i1 < m_W; ++i1)
+		{
+			if (connectivityGrid.get(i1, j1) != 0)
+				continue;
+
+			RegionID region = Get(i1, j1, passClass);
+			if (region.r == 0)
+				continue;
+
+			std::set<RegionID> reachable;
+			FindReachableRegions(region, reachable, passClass);
+			for (size_t j2 = 0; j2 < m_H; ++j2)
+			{
+				for (size_t i2 = 0; i2 < m_W; ++i2)
+				{
+					if (std::find(reachable.begin(), reachable.end(), Get(i2, j2, passClass)) != reachable.end())
+						connectivityGrid.set(i1, j1, idx);
+				}
+			}
+			++idx;
+		}
+	}
+
+	return connectivityGrid;
+}

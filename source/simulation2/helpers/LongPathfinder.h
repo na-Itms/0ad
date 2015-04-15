@@ -250,6 +250,11 @@ public:
 	void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, 
 		pass_class_t passClass, std::vector<CircularRegion> excludedRegions, WaypointPath& path);
 
+	Grid<u16> GetConnectivityGrid(pass_class_t passClass)
+	{
+		return m_PathfinderHier.GetConnectivityGrid(passClass);
+	}
+
 	void GetDebugData(u32& steps, double& time, Grid<u8>& grid)
 	{
 		if (m_UseJPS)

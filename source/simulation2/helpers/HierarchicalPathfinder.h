@@ -67,6 +67,11 @@ public:
 				return false;
 			return r < b.r;
 		}
+
+		bool operator==(RegionID b) const
+		{
+			return ((ci == b.ci) && (cj == b.cj) && (r == b.r));
+		}
 	};
 
 	HierarchicalPathfinder();
@@ -93,6 +98,11 @@ public:
 	 * to the nearest passable navcell.
 	 */
 	void FindNearestPassableNavcell(u16& i, u16& j, pass_class_t passClass);
+
+	/**
+	 * Generates the connectivity grid associated with the given pass_class
+	 */
+	Grid<u16> GetConnectivityGrid(pass_class_t passClass);
 
 	pass_class_t GetPassabilityClass(const std::string& name)
 	{
