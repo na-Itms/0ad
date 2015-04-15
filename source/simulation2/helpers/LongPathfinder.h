@@ -131,7 +131,7 @@ struct CircularRegion
 	entity_pos_t x, z, r;
 };
 
-typedef PriorityQueueHeap<TileID, PathCost> PriorityQueue;
+typedef PriorityQueueHeap<TileID, PathCost, PathCost> PriorityQueue;
 typedef SparseGrid<PathfindTile> PathfindTileGrid;
 
 class JumpPointCache;

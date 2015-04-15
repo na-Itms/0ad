@@ -443,7 +443,7 @@ void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg,
 			PathCost gprev = n.GetCost();
 			n.SetCost(g);
 			n.SetPred(pi, pj, i, j);
-			state.open.promote(TileID(i, j), gprev + h, g + h);
+			state.open.promote(TileID(i, j), gprev + h, g + h, h);
 #if PATHFIND_STATS
 			state.numImproveOpen++;
 #endif
@@ -455,7 +455,7 @@ void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg,
 	n.SetStatusOpen();
 	n.SetCost(g);
 	n.SetPred(pi, pj, i, j);
-	PriorityQueue::Item t = { TileID(i, j), g + h };
+	PriorityQueue::Item t = { TileID(i, j), g + h, h };
 	state.open.push(t);
 #if PATHFIND_STATS
 	state.numAddToOpen++;
@@ -792,7 +792,7 @@ void LongPathfinder::ComputeTilePath(entity_pos_t x0, entity_pos_t z0, const Pat
 	state.jBest = j0;
 	state.hBest = CalculateHeuristic(i0, j0, state.iGoal, state.jGoal);
 
-	PriorityQueue::Item start = { TileID(i0, j0), PathCost() };
+	PriorityQueue::Item start = { TileID(i0, j0), PathCost(), PathCost() };
 	state.open.push(start);
 	state.tiles->get(i0, j0).SetStatusOpen();
 	state.tiles->get(i0, j0).SetPred(i0, j0, i0, j0);
