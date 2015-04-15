@@ -443,7 +443,7 @@ void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg,
 			PathCost gprev = n.GetCost();
 			n.SetCost(g);
 			n.SetPred(pi, pj, i, j);
-			state.open.promote(TileID(i, j), gprev + h, g + h);
+			state.open.promote(TileID(i, j), gprev + h, g + h, h);
 #if PATHFIND_STATS
 			state.numImproveOpen++;
 #endif
@@ -455,7 +455,7 @@ void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg,
 	n.SetStatusOpen();
 	n.SetCost(g);
 	n.SetPred(pi, pj, i, j);
-	PriorityQueue::Item t = { TileID(i, j), g + h };
+	PriorityQueue::Item t = { TileID(i, j), g + h, h };
 	state.open.push(t);
 #if PATHFIND_STATS
 	state.numAddToOpen++;
@@ -555,7 +555,14 @@ void LongPathfinder::AddJumpedHoriz(int i, int j, int di, PathCost g, Pathfinder
 			if (!PASSABLE(ni, j))
 				break;
 
-			if ((detectGoal && state.goal.NavcellContainsGoal(ni, j)) || // XXX
+			if (detectGoal && state.goal.NavcellContainsGoal(ni, j))
+			{
+				state.open.clear();
+				ProcessNeighbour(i, j, ni, j, g, state);
+				break;
+			}
+
+			if (
 #if ACCEPT_DIAGONAL_GAPS
 				(!PASSABLE(ni, j - 1) && PASSABLE(ni + di, j - 1)) ||
 				(!PASSABLE(ni, j + 1) && PASSABLE(ni + di, j + 1)))
@@ -573,7 +580,9 @@ void LongPathfinder::AddJumpedHoriz(int i, int j, int di, PathCost g, Pathfinder
 	}
 }
 
-bool LongPathfinder::HasJumpedHoriz(int i, int j, int di, PathfinderState& state, bool detectGoal)
+int LongPathfinder::HasJumpedHoriz(int i, int j, int di, PathfinderState& state, bool detectGoal)
+// returns i value of JP if JP exist.
+// Else returns i.
 {
 	if (m_UseJPSCache)
 	{
@@ -583,7 +592,7 @@ bool LongPathfinder::HasJumpedHoriz(int i, int j, int di, PathfinderState& state
 		else
 			jump = state.jpc->GetJumpPointLeft(i, j, state.goal);
 
-		return (jump != i);
+		return jump;
 	}
 	else
 	{
@@ -592,9 +601,15 @@ bool LongPathfinder::HasJumpedHoriz(int i, int j, int di, PathfinderState& state
 		while (true)
 		{
 			if (!PASSABLE(ni, j))
-				return false;
+				return i;
 
-			if ((detectGoal && state.goal.NavcellContainsGoal(ni, j)) || // XXX
+			if (detectGoal && state.goal.NavcellContainsGoal(ni, j))
+			{
+				state.open.clear();
+				return ni;
+			}
+
+			if (
 #if ACCEPT_DIAGONAL_GAPS
 				(!PASSABLE(ni, j - 1) && PASSABLE(ni + di, j - 1)) ||
 				(!PASSABLE(ni, j + 1) && PASSABLE(ni + di, j + 1)))
@@ -603,7 +618,7 @@ bool LongPathfinder::HasJumpedHoriz(int i, int j, int di, PathfinderState& state
 				(!PASSABLE(ni - di, j + 1) && PASSABLE(ni, j + 1)))
 #endif
 			{
-				return true;
+				return ni;
 			}
 
 			ni += di;
@@ -633,7 +648,14 @@ void LongPathfinder::AddJumpedVert(int i, int j, int dj, PathCost g, PathfinderS
 			if (!PASSABLE(i, nj))
 				break;
 
-			if ((detectGoal && state.goal.NavcellContainsGoal(i, nj)) || // XXX
+			if (detectGoal && state.goal.NavcellContainsGoal(i, nj))
+			{
+				state.open.clear();
+				ProcessNeighbour(i, j, i, nj, g, state);
+				break;
+			}
+
+			if (
 #if ACCEPT_DIAGONAL_GAPS
 				(!PASSABLE(i - 1, nj) && PASSABLE(i - 1, nj + dj)) ||
 				(!PASSABLE(i + 1, nj) && PASSABLE(i + 1, nj + dj)))
@@ -651,7 +673,9 @@ void LongPathfinder::AddJumpedVert(int i, int j, int dj, PathCost g, PathfinderS
 	}
 }
 
-bool LongPathfinder::HasJumpedVert(int i, int j, int dj, PathfinderState& state, bool detectGoal)
+int LongPathfinder::HasJumpedVert(int i, int j, int dj, PathfinderState& state, bool detectGoal)
+// returns j value of JP if JP exist.
+// Else returns j.
 {
 	if (m_UseJPSCache)
 	{
@@ -661,7 +685,7 @@ bool LongPathfinder::HasJumpedVert(int i, int j, int dj, PathfinderState& state,
 		else
 			jump = state.jpc->GetJumpPointDown(i, j, state.goal);
 
-		return (jump != j);
+		return jump;
 	}
 	else
 	{
@@ -670,9 +694,15 @@ bool LongPathfinder::HasJumpedVert(int i, int j, int dj, PathfinderState& state,
 		while (true)
 		{
 			if (!PASSABLE(i, nj))
-				return false;
+				return j;	
 
-			if ((detectGoal && state.goal.NavcellContainsGoal(i, nj)) || // XXX
+			if (detectGoal && state.goal.NavcellContainsGoal(i, nj))
+			{
+				state.open.clear();
+				return nj;
+			}
+
+			if (
 #if ACCEPT_DIAGONAL_GAPS
 				(!PASSABLE(i - 1, nj) && PASSABLE(i - 1, nj + dj)) ||
 				(!PASSABLE(i + 1, nj) && PASSABLE(i + 1, nj + dj)))
@@ -681,7 +711,7 @@ bool LongPathfinder::HasJumpedVert(int i, int j, int dj, PathfinderState& state,
 				(!PASSABLE(i + 1, nj - dj) && PASSABLE(i + 1, nj)))
 #endif
 			{
-				return true;
+				return nj;
 			}
 
 			nj += dj;
@@ -720,6 +750,7 @@ void LongPathfinder::AddJumpedDiag(int i, int j, int di, int dj, PathCost g, Pat
 		// Process this cell if it's at the goal
 		if (detectGoal && state.goal.NavcellContainsGoal(ni, nj))
 		{
+			state.open.clear();
 			ProcessNeighbour(i, j, ni, nj, g, state);
 			return;
 		}
@@ -735,9 +766,18 @@ void LongPathfinder::AddJumpedDiag(int i, int j, int di, int dj, PathCost g, Pat
 
 		int fi = HasJumpedHoriz(ni, nj, di, state, detectGoal ? OnTheWay(ni, nj, di, 0, state.goal) : false);
 		int fj = HasJumpedVert(ni, nj, dj, state, detectGoal ? OnTheWay(ni, nj, 0, dj, state.goal) : false);
-		if (fi || fj)
+	
+		if (fi != ni || fj != nj)
 		{
 			ProcessNeighbour(i, j, ni, nj, g, state);
+			g += PathCost::diag(abs(ni - i));
+
+			if (fi != ni)
+				ProcessNeighbour(ni, nj, fi, nj, g, state);
+
+			if (fj != nj)
+				ProcessNeighbour(ni, nj, ni, fj, g, state);
+
 			return;
 		}
 
@@ -792,7 +832,7 @@ void LongPathfinder::ComputeTilePath(entity_pos_t x0, entity_pos_t z0, const Pat
 	state.jBest = j0;
 	state.hBest = CalculateHeuristic(i0, j0, state.iGoal, state.jGoal);
 
-	PriorityQueue::Item start = { TileID(i0, j0), PathCost() };
+	PriorityQueue::Item start = { TileID(i0, j0), PathCost(), PathCost() };
 	state.open.push(start);
 	state.tiles->get(i0, j0).SetStatusOpen();
 	state.tiles->get(i0, j0).SetPred(i0, j0, i0, j0);

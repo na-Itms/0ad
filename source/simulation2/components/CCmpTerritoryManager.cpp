@@ -295,7 +295,7 @@ of extending to each neighbour (based on radius-determining 'falloff' value,
 adjusted by terrain movement cost), and repeating until all tiles are processed.
 */
 
-typedef PriorityQueueHeap<std::pair<u16, u16>, u32, std::greater<u32> > OpenQueue;
+typedef PriorityQueueHeap<std::pair<u16, u16>, u32, u32, std::greater<u32> > OpenQueue;
 
 static void ProcessNeighbour(u32 falloff, int i, int j, u32 pg, bool diagonal,
 		Grid<u32>& grid, OpenQueue& queue, const Grid<u8>& costGrid)
@@ -312,7 +312,7 @@ static void ProcessNeighbour(u32 falloff, int i, int j, u32 pg, bool diagonal,
 	u32 g = pg - dg; // cost to this tile = cost to predecessor - falloff from predecessor
 
 	grid.set(i, j, g);
-	OpenQueue::Item tile = { std::make_pair((u16)i, (u16)j), g };
+	OpenQueue::Item tile = { std::make_pair((u16)i, (u16)j), g, g };
 	queue.push(tile);
 }
 
@@ -498,7 +498,7 @@ void CCmpTerritoryManager::CalculateTerritories()
 			// Initialise the tile under the entity
 			entityGrid.set(i, j, weight);
 			OpenQueue openTiles;
-			OpenQueue::Item tile = { std::make_pair((u16)i, (i16)j), weight };
+			OpenQueue::Item tile = { std::make_pair((u16)i, (i16)j), weight, weight };
 			openTiles.push(tile);
 
 			// Expand influences outwards

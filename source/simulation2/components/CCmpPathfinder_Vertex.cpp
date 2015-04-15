@@ -333,7 +333,7 @@ CFixedVector2D CCmpPathfinder::GetNearestPointOnGoal(CFixedVector2D pos, const P
 	// cost of a virtual call inside ComputeShortPath)
 }
 
-typedef PriorityQueueHeap<u16, fixed> VertexPriorityQueue;
+typedef PriorityQueueHeap<u16, fixed, fixed> VertexPriorityQueue;
 
 /**
  * Add edges and vertexes to represent the boundaries between passable and impassable
@@ -862,7 +862,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	PROFILE_START("A*");
 
 	VertexPriorityQueue open;
-	VertexPriorityQueue::Item qiStart = { START_VERTEX_ID, start.h };
+	VertexPriorityQueue::Item qiStart = { START_VERTEX_ID, start.h, start.h };
 	open.push(qiStart);
 
 	u16 idBest = START_VERTEX_ID;
@@ -976,7 +976,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 					if (n == GOAL_VERTEX_ID)
 						vertexes[n].p = npos; // remember the new best goal position
 
-					VertexPriorityQueue::Item t = { (u16)n, g + vertexes[n].h };
+					VertexPriorityQueue::Item t = { (u16)n, g + vertexes[n].h, vertexes[n].h };
 					open.push(t);
 
 					// Remember the heuristically best vertex we've seen so far, in case we never actually reach the target
@@ -1006,7 +1006,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 					if (n == GOAL_VERTEX_ID)
 						vertexes[n].p = npos; // remember the new best goal position
 
-					open.promote((u16)n, gprev + vertexes[n].h, g + vertexes[n].h);
+					open.promote((u16)n, gprev + vertexes[n].h, g + vertexes[n].h, vertexes[n].h);
 				}
 			}
 		}

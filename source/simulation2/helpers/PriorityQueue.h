@@ -39,6 +39,10 @@ struct QueueItemPriority
 		if (CMP()(a.rank, b.rank))
 			return false;
 		// Need to tie-break to get a consistent ordering
+		if (CMP()(b.h, a.h)) // higher heuristic costs are lower priority
+			return true;
+		if (CMP()(a.h, b.h))
+			return false;
 		if (a.id < b.id)
 			return true;
 		if (b.id < a.id)
@@ -56,7 +60,7 @@ struct QueueItemPriority
  * This is quite dreadfully slow in MSVC's debug STL implementation,
  * so we shouldn't use it unless we reimplement the heap functions more efficiently.
  */
-template <typename ID, typename R, typename CMP = std::less<R> >
+template <typename ID, typename R, typename H, typename CMP = std::less<R> >
 class PriorityQueueHeap
 {
 public:
@@ -64,6 +68,7 @@ public:
 	{
 		ID id;
 		R rank; // f = g+h (estimated total cost of path through here)
+		H h; // heulistic cost
 	};
 
 	void push(const Item& item)
@@ -72,7 +77,7 @@ public:
 		push_heap(m_Heap.begin(), m_Heap.end(), QueueItemPriority<Item, CMP>());
 	}
 
-	void promote(ID id, R UNUSED(oldrank), R newrank)
+	void promote(ID id, R UNUSED(oldrank), R newrank, H newh)
 	{
 		// Loop backwards since it seems a little faster in practice
 		for (ssize_t n = m_Heap.size() - 1; n >= 0; --n)
@@ -83,7 +88,8 @@ public:
 				ENSURE(m_Heap[n].rank > newrank);
 #endif
 				m_Heap[n].rank = newrank;
-				push_heap(m_Heap.begin(), m_Heap.begin()+n+1, QueueItemPriority<Item, CMP>());
+				m_Heap[n].h = newh;
+				push_heap(m_Heap.begin(), m_Heap.begin() + n + 1, QueueItemPriority<Item, CMP>());
 				return;
 			}
 		}
@@ -110,6 +116,11 @@ public:
 		return m_Heap.size();
 	}
 
+	void clear()
+	{
+		m_Heap.clear();
+	}
+
 	std::vector<Item> m_Heap;
 };
 
@@ -120,7 +131,7 @@ public:
  * It seems fractionally slower than a binary heap in optimised builds, but is
  * much simpler and less susceptible to MSVC's painfully slow debug STL.
  */
-template <typename ID, typename R, typename CMP = std::less<R> >
+template <typename ID, typename R, typename H, typename CMP = std::less<R> >
 class PriorityQueueList
 {
 public:
@@ -128,6 +139,7 @@ public:
 	{
 		ID id;
 		R rank; // f = g+h (estimated total cost of path through here)
+		H h; // heulistic cost
 	};
 
 	void push(const Item& item)
@@ -145,9 +157,10 @@ public:
 		return NULL;
 	}
 
-	void promote(ID id, R UNUSED(oldrank), R newrank)
+	void promote(ID id, R UNUSED(oldrank), R newrank, H newh)
 	{
 		find(id)->rank = newrank;
+		find(id)->h = newh;
 	}
 
 	Item pop()
@@ -183,6 +196,11 @@ public:
 		return m_List.size();
 	}
 
+
+	void clear()
+	{
+		m_List.clear();
+	}
 	std::vector<Item> m_List;
 };
 
