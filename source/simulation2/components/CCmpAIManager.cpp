@@ -223,6 +223,8 @@ public:
 		m_ScriptInterface->RegisterFunction<void, std::wstring, CAIWorker::IncludeModule>("IncludeModule");
 		m_ScriptInterface->RegisterFunction<void, CAIWorker::DumpHeap>("DumpHeap");
 		m_ScriptInterface->RegisterFunction<void, CAIWorker::ForceGC>("ForceGC");
+
+		m_ScriptInterface->RegisterFunction<JS::Value, JS::HandleValue, JS::HandleValue, pass_class_t, CAIWorker::ComputePath>("ComputePath");
 		
 		m_ScriptInterface->RegisterFunction<void, std::wstring, std::vector<u32>, u32, u32, u32, CAIWorker::DumpImage>("DumpImage");
 	}
@@ -288,6 +290,40 @@ public:
 		
 		LOGERROR("Invalid playerid in PostCommand!");	
 	}
+
+	static JS::Value ComputePath(ScriptInterface::CxPrivate* pCxPrivate,
+		JS::HandleValue position, JS::HandleValue goal, pass_class_t passClass)
+	{
+		ENSURE(pCxPrivate->pCBData);
+		CAIWorker* self = static_cast<CAIWorker*> (pCxPrivate->pCBData);
+		JSContext* cx(self->m_ScriptInterface->GetContext());
+
+		CFixedVector2D pos, goalPos;
+		std::vector<CFixedVector2D> waypoints;
+		JS::RootedValue retVal(cx);
+
+		self->m_ScriptInterface->FromJSVal<CFixedVector2D>(cx, position, pos);
+		self->m_ScriptInterface->FromJSVal<CFixedVector2D>(cx, goal, goalPos);
+
+		self->ComputePath(pos, goalPos, passClass, waypoints);
+		self->m_ScriptInterface->ToJSVal<std::vector<CFixedVector2D> >(cx, &retVal, waypoints);
+
+		return retVal;
+	}
+
+	void ComputePath(const CFixedVector2D& pos, const CFixedVector2D& goal, pass_class_t passClass, std::vector<CFixedVector2D>& waypoints)
+	{
+		PathGoal pathGoal;
+		pathGoal.type = PathGoal::POINT;
+		pathGoal.x = goal.X;
+		pathGoal.z = goal.Y;
+
+		WaypointPath ret;
+		m_LongPathfinder.ComputePath(pos.X, pos.Y, pathGoal, passClass, ret);
+		for (auto& wp : ret.m_Waypoints)
+			waypoints.push_back(CFixedVector2D(wp.x, wp.z));
+	}
+
 	// The next two ought to be implmeneted someday but for now as it returns "null" it can't
 	static void DumpHeap(ScriptInterface::CxPrivate* pCxPrivate)
 	{

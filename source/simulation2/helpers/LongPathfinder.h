@@ -235,6 +235,12 @@ public:
 	void ComputePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, 
 		pass_class_t passClass, WaypointPath& path)
 	{
+		if (!m_Grid)
+		{
+			LOGERROR("The pathfinder grid hasn't been setup yet, aborting ComputePath");
+			return;
+		}
+
 		if (m_UseJPS)
 			ComputeJPSPath(x0, z0, origGoal, passClass, path);
 		else
