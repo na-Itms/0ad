@@ -76,9 +76,8 @@ struct PathCost
 		return c;
 	}
 
-	PathCost operator+=(const PathCost& a)
+	PathCost& operator+=(const PathCost& a)
 	{
-		PathCost c;
 		data += a.data;
 		return *this;
 	}
