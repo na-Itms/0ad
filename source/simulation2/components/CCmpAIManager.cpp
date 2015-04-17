@@ -225,6 +225,7 @@ public:
 		m_ScriptInterface->RegisterFunction<void, CAIWorker::ForceGC>("ForceGC");
 
 		m_ScriptInterface->RegisterFunction<JS::Value, JS::HandleValue, JS::HandleValue, pass_class_t, CAIWorker::ComputePath>("ComputePath");
+		m_ScriptInterface->RegisterFunction<JS::Value, pass_class_t, CAIWorker::GetConnectivityGrid>("GetConnectivityGrid");
 		
 		m_ScriptInterface->RegisterFunction<void, std::wstring, std::vector<u32>, u32, u32, u32, CAIWorker::DumpImage>("DumpImage");
 	}
@@ -322,6 +323,17 @@ public:
 		m_LongPathfinder.ComputePath(pos.X, pos.Y, pathGoal, passClass, ret);
 		for (auto& wp : ret.m_Waypoints)
 			waypoints.push_back(CFixedVector2D(wp.x, wp.z));
+	}
+
+	static JS::Value GetConnectivityGrid(ScriptInterface::CxPrivate* pCxPrivate, pass_class_t passClass)
+	{
+		ENSURE(pCxPrivate->pCBData);
+		CAIWorker* self = static_cast<CAIWorker*> (pCxPrivate->pCBData);
+		JSContext* cx(self->m_ScriptInterface->GetContext());
+
+		JS::RootedValue retVal(cx);
+		self->m_ScriptInterface->ToJSVal<Grid<u16> >(cx, &retVal, self->m_LongPathfinder.GetConnectivityGrid(passClass));
+		return retVal;
 	}
 
 	// The next two ought to be implmeneted someday but for now as it returns "null" it can't
