@@ -197,7 +197,7 @@ m.TradeManager.prototype.setTradingGoods = function(gameState)
 // only once per turn because the info doesn't update between a turn and fixing isn't worth it.
 m.TradeManager.prototype.performBarter = function(gameState)
 {
-	var barterers = gameState.getOwnStructures().filter(API3.Filters.and(API3.Filters.byClass("BarterMarket"), API3.Filters.not(API3.Filters.isFoundation()))).toEntityArray();
+	var barterers = gameState.getOwnEntitiesByClass("BarterMarket", true).filter(API3.Filters.isBuilt()).toEntityArray();
 	if (barterers.length === 0)
 		return false;
 
@@ -533,7 +533,13 @@ m.TradeManager.prototype.prospectForNewMarket = function(gameState, queues)
 			API3.warn("turn " + gameState.ai.playedTurn + "we could have a first route with gain "
 				+ marketPos[3]);
 	}
-	queues.economicBuilding.addItem(new m.ConstructionPlan(gameState, "structures/{civ}_market"));
+
+	if (!this.tradeRoute)
+		gameState.ai.queueManager.changePriority("economicBuilding", 2*this.Config.priorities.economicBuilding);
+	let plan = new m.ConstructionPlan(gameState, "structures/{civ}_market");
+	if (!this.tradeRoute)
+		plan.onStart = function(gameState) { gameState.ai.queueManager.changePriority("economicBuilding", gameState.ai.Config.priorities.economicBuilding); };
+	queues.economicBuilding.addItem(plan);
 };
 
 m.TradeManager.prototype.isNewMarketWorth = function(expectedGain)

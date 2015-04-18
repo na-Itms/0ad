@@ -46,6 +46,70 @@ m.AttackManager.prototype.setRushes = function()
 	}
 };
 
+m.AttackManager.prototype.checkEvents = function(gameState, events)
+{
+	let PlayerEvents = events["AttackRequest"];
+	let answer = false;
+	let other = undefined;
+	let targetPlayer = undefined;
+	for (let evt of PlayerEvents)
+	{
+		if (evt.source === PlayerID || !gameState.isPlayerAlly(evt.source) || !gameState.isPlayerEnemy(evt.target))
+			continue;
+		targetPlayer = evt.target;
+		let available = 0;
+		for (let attackType in this.upcomingAttacks)
+		{
+			for (let attack of this.upcomingAttacks[attackType])
+			{
+				if (attack.state === "completing")
+				{
+					if (attack.targetPlayer && attack.targetPlayer === targetPlayer)
+						available += attack.unitCollection.length;
+					else if (attack.targetPlayer && attack.targetPlayer !== targetPlayer)
+						other = attack.targetPlayer;
+					continue;
+				}
+				if (!attack.targetPlayer || attack.targetPlayer !== targetPlayer)
+				{
+					let oldTargetPlayer = attack.targetPlayer;
+					let oldTarget = attack.target;
+					attack.targetPlayer = targetPlayer;
+					attack.target = attack.getNearestTarget(gameState, attack.rallyPoint);
+					if (!attack.target)
+					{
+						attack.targetPlayer = oldTargetPlayer;
+						attack.target = oldTarget;
+						continue;
+					}
+					attack.targetPos = attack.target.position();
+				}
+				if (attack.targetPlayer && attack.targetPlayer === targetPlayer)
+					available += attack.unitCollection.length;
+			}
+		}
+
+		if (available > 12)	// launch the attack immediately
+		{
+			for (let attackType in this.upcomingAttacks)
+			{
+				for (let attack of this.upcomingAttacks[attackType])
+				{
+					if (attack.state !== "completing" && attack.targetPlayer && attack.targetPlayer === targetPlayer)
+					{
+						attack.forceStart();
+						attack.requested = true;
+					}
+				}
+			}
+			answer = true;
+		}
+		break;  // take only the first attack request into account
+	}
+	if (targetPlayer)
+		m.chatAnswerRequestAttack(gameState, targetPlayer, answer, other);
+};
+
 // Some functions are run every turn
 // Others once in a while
 m.AttackManager.prototype.update = function(gameState, queues, events)
@@ -64,52 +128,46 @@ m.AttackManager.prototype.update = function(gameState, queues, events)
 		API3.warn(" ==================================");
 	}
 
-	for (var attackType in this.upcomingAttacks)
+	this.checkEvents(gameState, events);
+
+	let unexecutedAttacks = {"Rush": 0, "Raid": 0, "Attack": 0, "HugeAttack": 0};
+	for (let attackType in this.upcomingAttacks)
 	{
-		for (var i = 0; i < this.upcomingAttacks[attackType].length; ++i)
+		for (let i = 0; i < this.upcomingAttacks[attackType].length; ++i)
 		{
-			var attack = this.upcomingAttacks[attackType][i];
+			let attack = this.upcomingAttacks[attackType][i];
 			attack.checkEvents(gameState, events);
 
-			// okay so we'll get the support plan
-			if (!attack.isStarted())
+			if (attack.isStarted())
+				API3.warn("Petra problem in attackManager: attack in preparation has already started ???");
+
+			let updateStep = attack.updatePreparation(gameState);
+			// now we're gonna check if the preparation time is over
+			if (updateStep === 1 || attack.isPaused() )
 			{
-				var updateStep = attack.updatePreparation(gameState, events);
-					
-				// now we're gonna check if the preparation time is over
-				if (updateStep === 1 || attack.isPaused() )
-				{
-					// just chillin'
-				}
-				else if (updateStep === 0 || updateStep === 3)
-				{
-					if (this.Config.debug > 1)
-						API3.warn("Attack Manager: " + attack.getType() + " plan " + attack.getName() + " aborted.");
-					attack.Abort(gameState, this);
-					this.upcomingAttacks[attackType].splice(i--,1);
-				}
-				else if (updateStep === 2)
-				{
-					if (attack.StartAttack(gameState,this))
-					{
-						if (this.Config.debug > 1)
-							API3.warn("Attack Manager: Starting " + attack.getType() + " plan " + attack.getName());
-						if (this.Config.chat)
-							m.chatLaunchAttack(gameState, attack.targetPlayer);
-						this.startedAttacks[attackType].push(attack);
-					}
-					else
-						attack.Abort(gameState, this);
-					this.upcomingAttacks[attackType].splice(i--,1);
-				}
+				// just chillin'
+				if (attack.state === "unexecuted")
+					++unexecutedAttacks[attackType];
 			}
-			else
+			else if (updateStep === 0 || updateStep === 3)
 			{
 				if (this.Config.debug > 1)
-					API3.warn("Attack Manager: Starting " + attack.getType() + " plan " + attack.getName());
-				if (this.Config.chat)
-					m.chatLaunchAttack(gameState, attack.targetPlayer);
-				this.startedAttacks[attackType].push(attack);
+					API3.warn("Attack Manager: " + attack.getType() + " plan " + attack.getName() + " aborted.");
+				attack.Abort(gameState);
+				this.upcomingAttacks[attackType].splice(i--,1);
+			}
+			else if (updateStep === 2)
+			{
+				if (attack.StartAttack(gameState))
+				{
+					if (this.Config.debug > 1)
+						API3.warn("Attack Manager: Starting " + attack.getType() + " plan " + attack.getName());
+					if (this.Config.chat)
+						m.chatLaunchAttack(gameState, attack.targetPlayer);
+					this.startedAttacks[attackType].push(attack);
+				}
+				else
+					attack.Abort(gameState);
 				this.upcomingAttacks[attackType].splice(i--,1);
 			}
 		}
@@ -137,9 +195,10 @@ m.AttackManager.prototype.update = function(gameState, queues, events)
 
 	// creating plans after updating because an aborted plan might be reused in that case.
 
-	if (this.rushNumber < this.maxRushes && gameState.countEntitiesByType(gameState.applyCiv("structures/{civ}_barracks"), true) >= 1)
+	var barracksNb = gameState.getOwnEntitiesByClass("Barracks", true).filter(API3.Filters.isBuilt()).length;
+	if (this.rushNumber < this.maxRushes && barracksNb >= 1)
 	{
-		if (this.upcomingAttacks["Rush"].length === 0)
+		if (unexecutedAttacks["Rush"] === 0)
 		{
 			// we have a barracks and we want to rush, rush.
 			var data = { "targetSize": this.rushSize[this.rushNumber] };
@@ -155,11 +214,10 @@ m.AttackManager.prototype.update = function(gameState, queues, events)
 			this.rushNumber++;
 		}
 	}
-	else if (this.upcomingAttacks["Attack"].length === 0 && this.upcomingAttacks["HugeAttack"].length === 0
+	else if (unexecutedAttacks["Attack"] === 0 && unexecutedAttacks["HugeAttack"] === 0
 		&& (this.startedAttacks["Attack"].length + this.startedAttacks["HugeAttack"].length < Math.round(gameState.getPopulationMax()/100)))
 	{
-		if ((gameState.countEntitiesByType(gameState.applyCiv("structures/{civ}_barracks"), true) >= 1
-				&& (gameState.currentPhase() > 1 || gameState.isResearching(gameState.townPhase())))
+		if ((barracksNb >= 1 && (gameState.currentPhase() > 1 || gameState.isResearching(gameState.townPhase())))
 			|| !gameState.ai.HQ.baseManagers[1])	// if we have no base ... nothing else to do than attack
 		{
 			if (this.attackNumber < 2 || this.startedAttacks["HugeAttack"].length > 0)
@@ -182,7 +240,7 @@ m.AttackManager.prototype.update = function(gameState, queues, events)
 		}
 	}
 
-	if (this.upcomingAttacks["Raid"].length === 0 && gameState.ai.HQ.defenseManager.targetList.length)
+	if (unexecutedAttacks["Raid"] === 0 && gameState.ai.HQ.defenseManager.targetList.length)
 	{
 		var target = undefined;
 		for (var targetId of gameState.ai.HQ.defenseManager.targetList)
