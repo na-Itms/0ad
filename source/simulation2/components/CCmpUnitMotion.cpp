@@ -909,7 +909,8 @@ void CCmpUnitMotion::Move(fixed dt)
 				{
 					CFixedVector2D goalPoint(m_FinalGoal.x, m_FinalGoal.z);
 					CFixedVector2D radius = pos - goalPoint;
-					radius.Normalize(SHORT_PATH_SEARCH_RANGE - fixed::Epsilon());
+					if (radius.CompareLength(SHORT_PATH_SEARCH_RANGE) > 0)
+						radius.Normalize(SHORT_PATH_SEARCH_RANGE - fixed::Epsilon());
 
 					RequestShortPath(goalPoint + radius, m_FinalGoal, true);
 					m_PathState = PATHSTATE_FOLLOWING_REQUESTING_SHORT;
