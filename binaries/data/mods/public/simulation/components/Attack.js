@@ -159,6 +159,20 @@ Attack.prototype.Schema =
 		"</element>" +
 	"</optional>" +
 	"<optional>" +
+		"<element name='Capture'>" +
+			"<interleave>" +
+				"<element name='Value' a:help='Capture points value'><ref name='nonNegativeDecimal'/></element>" +
+				"<element name='MaxRange' a:help='Maximum attack range (in meters)'><ref name='nonNegativeDecimal'/></element>" +
+				"<element name='RepeatTime' a:help='Time between attacks (in milliseconds). The attack animation will be stretched to match this time'>" + // TODO: it shouldn't be stretched
+					"<data type='positiveInteger'/>" +
+				"</element>" +
+				Attack.prototype.bonusesSchema +
+				Attack.prototype.preferredClassesSchema +
+				Attack.prototype.restrictedClassesSchema +
+			"</interleave>" +
+		"</element>" +
+	"</optional>" +
+	"<optional>" +
 		"<element name='Charge'>" +
 			"<interleave>" +
 				"<element name='Hack' a:help='Hack damage strength'><ref name='nonNegativeDecimal'/></element>" +
@@ -198,6 +212,7 @@ Attack.prototype.GetAttackTypes = function()
 	if (this.template.Charge) ret.push("Charge");
 	if (this.template.Melee) ret.push("Melee");
 	if (this.template.Ranged) ret.push("Ranged");
+	if (this.template.Capture) ret.push("Capture");
 	return ret;
 };
 
@@ -303,29 +318,46 @@ Attack.prototype.GetBestAttack = function()
 	return this.GetAttackTypes().pop();
 };
 
-Attack.prototype.GetBestAttackAgainst = function(target)
+Attack.prototype.GetBestAttackAgainst = function(target, allowCapture)
 {
 	var cmpFormation = Engine.QueryInterface(target, IID_Formation);
 	if (cmpFormation)
 		return this.GetBestAttack();
 
-	const cmpIdentity = Engine.QueryInterface(target, IID_Identity);
+	var cmpIdentity = Engine.QueryInterface(target, IID_Identity);
 	if (!cmpIdentity) 
 		return undefined;
 
-	const targetClasses = cmpIdentity.GetClassesList();
-	const isTargetClass = function (value, i, a) { return targetClasses.indexOf(value) != -1; };
-	const types = this.GetAttackTypes();
-	const attack = this;
-	const isAllowed = function (value, i, a) { return !attack.GetRestrictedClasses(value).some(isTargetClass); }
-	const isPreferred = function (value, i, a) { return attack.GetPreferredClasses(value).some(isTargetClass); }
-	const byPreference = function (a, b) { return (types.indexOf(a) + (isPreferred(a) ? types.length : 0) ) - (types.indexOf(b) + (isPreferred(b) ? types.length : 0) ); }
+
+	var targetClasses = cmpIdentity.GetClassesList();
+	var isTargetClass = function (className) { return targetClasses.indexOf(className) != -1; };
 
 	// Always slaughter domestic animals instead of using a normal attack
 	if (isTargetClass("Domestic") && this.template.Slaughter) 
 		return "Slaughter";
 
-	return types.filter(isAllowed).sort(byPreference).pop();
+	var attack = this;
+	var isAllowed = function (type) { return !attack.GetRestrictedClasses(type).some(isTargetClass); }
+
+	var types = this.GetAttackTypes().filter(isAllowed);
+
+	// check if the target is capturable
+	var captureIndex = types.indexOf("Capture")
+	if (captureIndex != -1)
+	{
+		var cmpCapturable = Engine.QueryInterface(target, IID_Capturable);
+		var cmpPlayer = QueryOwnerInterface(this.entity);
+		if (allowCapture && cmpPlayer && cmpCapturable && cmpCapturable.CanCapture(cmpPlayer.GetPlayerID()))
+			return "Capture";
+		// not captureable, so remove this attack
+		types.splice(captureIndex, 1);
+	}
+
+	var isPreferred = function (className) { return attack.GetPreferredClasses(className).some(isTargetClass); }
+	var byPreference = function (a, b) { return (types.indexOf(a) + (isPreferred(a) ? types.length : 0) ) - (types.indexOf(b) + (isPreferred(b) ? types.length : 0) ); }
+
+
+	return types.sort(byPreference).pop();
 };
 
 Attack.prototype.CompareEntitiesByPreference = function(a, b)
@@ -367,7 +399,10 @@ Attack.prototype.GetAttackStrengths = function(type)
 	{
 		return ApplyValueModificationsToEntity("Attack/" + type + splash + "/" + damageType, +(template[damageType] || 0), self.entity);
 	};
-	
+
+	if (type == "Capture")
+		return {value: applyMods("Value")};
+
 	return {
 		hack: applyMods("Hack"),
 		pierce: applyMods("Pierce"),
@@ -517,6 +552,26 @@ Attack.prototype.PerformAttack = function(type, target)
 		var cmpTimer = Engine.QueryInterface(SYSTEM_ENTITY, IID_Timer);
  		cmpTimer.SetTimeout(this.entity, IID_Attack, "MissileHit", timeToTarget*1000, {"type": type, "target": target, "position": realTargetPosition, "direction": missileDirection, "projectileId": id, "playerId":playerId});
 	}
+	else if (type == "Capture")
+	{
+		var multiplier = this.GetAttackBonus(type, target);
+		var cmpHealth = Engine.QueryInterface(target, IID_Health);
+		if (!cmpHealth || cmpHealth.GetHitpoints() == 0)
+			return;
+		multiplier *= cmpHealth.GetMaxHitpoints() / cmpHealth.GetHitpoints();
+
+		var cmpOwnership = Engine.QueryInterface(this.entity, IID_Ownership);
+		if (!cmpOwnership || cmpOwnership.GetOwner() == -1)
+			return;
+		var owner = cmpOwnership.GetOwner();
+		var cmpCapturable = Engine.QueryInterface(target, IID_Capturable);
+		if (!cmpCapturable || !cmpCapturable.CanCapture(owner))
+			return;
+		
+		var strength = this.GetAttackStrengths("Capture").value * multiplier;
+		if(cmpCapturable.Reduce(strength, owner))
+			Engine.PostMessage(target, MT_Attacked, {"attacker":this.entity, "target":target, "type":type, "damage":strength});
+	}
 	else
 	{
 		// Melee attack - hurt the target immediately
@@ -585,7 +640,7 @@ Attack.prototype.MissileHit = function(data, lateness)
 		// If friendlyFire isn't enabled, get all player enemies to pass to "Damage.CauseSplashDamage".
 		if (friendlyFire == "false")
 		{
-			var cmpPlayer = Engine.QueryInterface(Engine.QueryInterface(SYSTEM_ENTITY, IID_PlayerManager).GetPlayerByID(data.playerId), IID_Player)
+			var cmpPlayer = QueryPlayerIDInterface(data.playerId);
 			playersToDamage = cmpPlayer.GetEnemies();
 		}
 		// Damage the units.
@@ -607,7 +662,7 @@ Attack.prototype.MissileHit = function(data, lateness)
 	else
 	{
 		// If we didn't hit the main target look for nearby units
-		var cmpPlayer = Engine.QueryInterface(Engine.QueryInterface(SYSTEM_ENTITY, IID_PlayerManager).GetPlayerByID(data.playerId), IID_Player)
+		var cmpPlayer = QueryPlayerIDInterface(data.playerId);
 		var ents = Damage.EntitiesNearPoint(Vector2D.from3D(data.position), targetPosition.horizDistanceTo(data.position) * 2, cmpPlayer.GetEnemies());
 
 		for (var i = 0; i < ents.length; i++)

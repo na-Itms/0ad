@@ -87,11 +87,11 @@ var unitActions =
 		"specificness": 30,
 	},
 
-	"attack": 
+	"capture": 
 	{
 		"execute": function(target, action, selection, queued)
 		{
-			Engine.PostNetworkCommand({"type": "attack", "entities": selection, "target": action.target, "queued": queued});
+			Engine.PostNetworkCommand({"type": "attack", "entities": selection, "target": action.target, "allowCapture": true, "queued": queued});
 			Engine.GuiInterfaceCall("PlaySound", { "name": "order_attack", "entity": selection[0] });
 			return true;
 		},
@@ -99,9 +99,30 @@ var unitActions =
 		{
 			if (!entState.attack || !targetState.hitpoints)
 				return false;
-			if (playerCheck(entState, targetState, ["Neutral", "Enemy"]))
-				return {"possible": Engine.GuiInterfaceCall("CanAttack", {"entity": entState.id, "target": targetState.id})};
+			return {"possible": Engine.GuiInterfaceCall("CanCapture", {"entity": entState.id, "target": targetState.id})};
+		},
+		"actionCheck": function(target)
+		{
+			if (getActionInfo("capture", target).possible)
+				return {"type": "capture", "cursor": "action-capture", "target": target};
 			return false;
+		},
+		"specificness": 9,
+	},
+
+	"attack":
+	{
+		"execute": function(target, action, selection, queued)
+		{
+			Engine.PostNetworkCommand({"type": "attack", "entities": selection, "target": action.target, "queued": queued, "allowCapture": false});
+			Engine.GuiInterfaceCall("PlaySound", { "name": "order_attack", "entity": selection[0] });
+			return true;
+		},
+		"getActionInfo": function(entState, targetState)
+		{
+			if (!entState.attack || !targetState.hitpoints)
+				return false;
+			return {"possible": Engine.GuiInterfaceCall("CanAttack", {"entity": entState.id, "target": targetState.id})};
 		},
 		"hotkeyActionCheck": function(target)
 		{
@@ -201,7 +222,7 @@ var unitActions =
 				return false;
 			if (getActionInfo("repair", target).possible)
 				return {"type": "repair", "cursor": "action-repair", "target": target};
-			return {"type": "none", "cursor": "action-repair-disabled", "target": undefined};
+			return {"type": "none", "cursor": "action-repair-disabled", "target": null};
 		},
 		"actionCheck": function(target)
 		{
@@ -274,7 +295,7 @@ var unitActions =
 	{
 		"execute": function(target, action, selection, queued)
 		{
-			Engine.PostNetworkCommand({"type": "setup-trade-route", "entities": selection, "target": action.target, "source": undefined, "route": undefined, "queued": queued});
+			Engine.PostNetworkCommand({"type": "setup-trade-route", "entities": selection, "target": action.target, "source": null, "route": null, "queued": queued});
 			Engine.GuiInterfaceCall("PlaySound", { "name": "order_trade", "entity": selection[0] });
 			return true;
 		},
@@ -369,7 +390,7 @@ var unitActions =
 			var actionInfo =  getActionInfo("garrison", target);
 			if (actionInfo.possible)
 				return {"type": "garrison", "cursor": "action-garrison", "tooltip": actionInfo.tooltip, "target": target};
-			return {"type": "none", "cursor": "action-garrison-disabled", "target": undefined};
+			return {"type": "none", "cursor": "action-garrison-disabled", "target": null};
 		},
 		"hotkeyActionCheck": function(target)
 		{
@@ -407,7 +428,7 @@ var unitActions =
 				return false;
 			if (getActionInfo("guard", target).possible)
 				return {"type": "guard", "cursor": "action-guard", "target": target};
-			return {"type": "none", "cursor": "action-guard-disabled", "target": undefined};
+			return {"type": "none", "cursor": "action-guard-disabled", "target": null};
 		},
 		"hotkeyActionCheck": function(target)
 		{
@@ -672,6 +693,13 @@ var g_EntityCommands =
 					"icon": "kill_small.png"
 				};
 
+			if (entState.capturePoints && entState.capturePoints[entState.player] < entState.maxCapturePoints / 2)
+				return {
+					"tooltip": translate("You cannot destroy this entity as you own less than half the capture points"),
+					"icon": "kill_small.png"
+				};
+					
+
 			return {
 				"tooltip": translate("Delete"),
 				"icon": "kill_small.png"
@@ -853,10 +881,10 @@ var g_EntityCommands =
 	"increase-alert-level": {
 		"getInfo": function(entState)
 		{
-			if(!entState.alertRaiser || !entState.alertRaiser.canIncreaseLevel)
+			if (!entState.alertRaiser || !entState.alertRaiser.canIncreaseLevel)
 				return false;
 
-			if(entState.alertRaiser.hasRaisedAlert)
+			if (entState.alertRaiser.hasRaisedAlert)
 				var tooltip = translate("Increase the alert level to protect more units");
 			else
 				var tooltip = translate("Raise an alert!");
@@ -874,7 +902,7 @@ var g_EntityCommands =
 	"alert-end": {
 		"getInfo": function(entState)
 		{
-			if(!entState.alertRaiser || !entState.alertRaiser.hasRaisedAlert)
+			if (!entState.alertRaiser || !entState.alertRaiser.hasRaisedAlert)
 				return false
 			return {
 				"tooltip": translate("End of alert."),
@@ -884,6 +912,43 @@ var g_EntityCommands =
 		"execute": function(entState)
 		{
 			endOfAlert();
+		},
+	},
+};
+
+var g_AllyEntityCommands =
+{
+	// Unload
+	"unload-all": {
+		"getInfo": function(entState)
+		{
+			if (!entState.garrisonHolder)
+				return false;
+			var selection = g_Selection.toList();
+			var count = 0;
+			for (var ent of selection)
+			{
+				var selectedEntState = GetEntityState(ent);
+				if (selectedEntState.garrisonHolder)
+				{	
+					var player = Engine.GetPlayerID();
+					for (var entity of selectedEntState.garrisonHolder.entities)
+					{
+						var state = GetEntityState(entity);
+						if (state.player == player)
+							count++;
+					}
+				}
+			}
+			return {
+				"tooltip": translate("Unload All"),
+				"icon": "garrison-out.png",
+				"count": count,
+			};
+		},
+		"execute": function(entState)
+		{
+			unloadAllByOwner();
 		},
 	},
 };

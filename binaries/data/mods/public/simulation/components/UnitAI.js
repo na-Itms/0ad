@@ -416,7 +416,7 @@ UnitAI.prototype.UnitFsmSpec = {
 		}
 
 		// Work out how to attack the given target
-		var type = this.GetBestAttackAgainst(this.order.data.target);
+		var type = this.GetBestAttackAgainst(this.order.data.target, this.order.data.allowCapture);
 		if (!type)
 		{
 			// Oops, we can't attack at all
@@ -559,7 +559,7 @@ UnitAI.prototype.UnitFsmSpec = {
 		if (this.MustKillGatherTarget(this.order.data.target))
 		{
 			// Make sure we can attack the target, else we'll get very stuck
-			if (!this.GetBestAttackAgainst(this.order.data.target))
+			if (!this.GetBestAttackAgainst(this.order.data.target, false))
 			{
 				// Oops, we can't attack at all - give up
 				// TODO: should do something so the player knows why this failed
@@ -583,7 +583,7 @@ UnitAI.prototype.UnitFsmSpec = {
 				return;
 			}
 
-			this.PushOrderFront("Attack", { "target": this.order.data.target, "force": false, "hunting": true });
+			this.PushOrderFront("Attack", { "target": this.order.data.target, "force": false, "hunting": true, "allowCapture": false });
 			return;
 		}
 
@@ -822,6 +822,7 @@ UnitAI.prototype.UnitFsmSpec = {
 
 		"Order.Attack": function(msg) {
 			var target = msg.data.target;
+			var allowCapture = msg.data.allowCapture;
 			var cmpTargetUnitAI = Engine.QueryInterface(target, IID_UnitAI);
 			if (cmpTargetUnitAI && cmpTargetUnitAI.IsFormationMember())
 				target = cmpTargetUnitAI.GetFormationController();
@@ -841,7 +842,7 @@ UnitAI.prototype.UnitFsmSpec = {
 				this.FinishOrder();
 				return;
 			}
-			this.CallMemberFunction("Attack", [target, false]);
+			this.CallMemberFunction("Attack", [target, false, allowCapture]);
 			if (cmpAttack.CanAttackAsFormation())
 				this.SetNextState("COMBAT.ATTACKING");
 			else
@@ -896,7 +897,7 @@ UnitAI.prototype.UnitFsmSpec = {
 					return;
 				}
 
-				this.PushOrderFront("Attack", { "target": msg.data.target, "hunting": true });
+				this.PushOrderFront("Attack", { "target": msg.data.target, "hunting": true, "allowCapture": false });
 				return;
 			}
 
@@ -1127,7 +1128,7 @@ UnitAI.prototype.UnitFsmSpec = {
 
 				"MoveCompleted": function(msg) {
 					var cmpAttack = Engine.QueryInterface(this.entity, IID_Attack);
-					this.CallMemberFunction("Attack", [this.order.data.target, false]);
+					this.CallMemberFunction("Attack", [this.order.data.target, false, this.order.data.allowCapture]);
 					if (cmpAttack.CanAttackAsFormation())
 						this.SetNextState("COMBAT.ATTACKING");
 					else
@@ -1162,6 +1163,7 @@ UnitAI.prototype.UnitFsmSpec = {
 
 				"Timer": function(msg) {
 					var target = this.order.data.target;
+					var allowCapture = this.order.data.allowCapture;
 					// Check if we are already in range, otherwise walk there
 					if (!this.CheckTargetAttackRange(target, target))
 					{
@@ -1170,7 +1172,7 @@ UnitAI.prototype.UnitFsmSpec = {
 							var cmpAttack = Engine.QueryInterface(this.entity, IID_Attack);
 							var range = cmpAttack.GetRange(target);
 							this.FinishOrder();
-							this.PushOrderFront("Attack", { "target": target, "force": false });
+							this.PushOrderFront("Attack", { "target": target, "force": false, "allowCapture": allowCapture });
 							return;
 						}
 						this.FinishOrder();
@@ -1379,7 +1381,7 @@ UnitAI.prototype.UnitFsmSpec = {
 
 			// target the unit
 			if (this.CheckTargetVisible(msg.data.attacker))
-				this.PushOrderFront("Attack", { "target": msg.data.attacker, "force": false });
+				this.PushOrderFront("Attack", { "target": msg.data.attacker, "force": false, "allowCapture": true });
 			else
 			{
 				var cmpPosition = Engine.QueryInterface(msg.data.attacker, IID_Position);
@@ -1794,9 +1796,16 @@ UnitAI.prototype.UnitFsmSpec = {
 					this.resyncAnimation = (prepare != this.attackTimers.prepare) ? true : false;
 
 					this.FaceTowardsTarget(this.order.data.target);
+
+					var cmpBuildingAI = Engine.QueryInterface(this.entity, IID_BuildingAI);
+					if (cmpBuildingAI)
+						cmpBuildingAI.SetUnitAITarget(this.order.data.target);
 				},
 
 				"leave": function() {
+					var cmpBuildingAI = Engine.QueryInterface(this.entity, IID_BuildingAI);
+					if (cmpBuildingAI)
+						cmpBuildingAI.SetUnitAITarget(0);
 					this.StopTimer();
 				},
 
@@ -1978,7 +1987,7 @@ UnitAI.prototype.UnitFsmSpec = {
 					var cmpOwnership = Engine.QueryInterface(this.entity, IID_Ownership);
 					var cmpSupply = Engine.QueryInterface(this.gatheringTarget, IID_ResourceSupply);
 					var cmpMirage = Engine.QueryInterface(this.gatheringTarget, IID_Mirage);
-					if ((!cmpMirage || !cmpMirage.ResourceSupply()) &&
+					if ((!cmpMirage || !cmpMirage.Mirages(IID_ResourceSupply)) &&
 					    (!cmpSupply || !cmpSupply.AddGatherer(cmpOwnership.GetOwner(), this.entity)))
 					{
 						// Save the current order's data in case we need it later
@@ -2661,7 +2670,14 @@ UnitAI.prototype.UnitFsmSpec = {
 				// We finished building it.
 				// Switch to the next order (if any)
 				if (this.FinishOrder())
+				{
+					if (this.CanReturnResource(msg.data.newentity, true)) 
+					{ 
+						this.SetGathererAnimationOverride(true); 
+						this.PushOrderFront("ReturnResource", { "target": msg.data.newentity, "force": false }); 
+					}
 					return;
+				}
 
 				// No remaining orders - pick a useful default behaviour
 
@@ -2674,6 +2690,11 @@ UnitAI.prototype.UnitFsmSpec = {
 				// the build command should start gathering from it
 				if ((oldData.force || oldData.autoharvest) && this.CanGather(msg.data.newentity))
 				{
+					if (this.CanReturnResource(msg.data.newentity, true)) 
+					{ 
+						this.SetGathererAnimationOverride(true); 
+						this.PushOrder("ReturnResource", { "target": msg.data.newentity, "force": false }); 
+					}
 					this.PerformGather(msg.data.newentity, true, false);
 					return;
 				}
@@ -3882,15 +3903,8 @@ UnitAI.prototype.TargetIsAlive = function(ent)
 	if (cmpFormation)
 		return true;
 
-	var cmpMirage = Engine.QueryInterface(ent, IID_Mirage);
-	if (cmpMirage)
-		return true;
-
-	var cmpHealth = Engine.QueryInterface(ent, IID_Health);
-	if (!cmpHealth)
-		return false;
-
-	return (cmpHealth.GetHitpoints() != 0);
+	var cmpHealth = QueryMiragedInterface(ent, IID_Health);
+	return cmpHealth && cmpHealth.GetHitpoints() != 0;
 };
 
 /**
@@ -4451,12 +4465,12 @@ UnitAI.prototype.GetBestAttack = function()
 	return cmpAttack.GetBestAttack();
 };
 
-UnitAI.prototype.GetBestAttackAgainst = function(target)
+UnitAI.prototype.GetBestAttackAgainst = function(target, allowCapture)
 {
 	var cmpAttack = Engine.QueryInterface(this.entity, IID_Attack);
 	if (!cmpAttack)
 		return undefined;
-	return cmpAttack.GetBestAttackAgainst(target);
+	return cmpAttack.GetBestAttackAgainst(target, allowCapture);
 };
 
 UnitAI.prototype.GetAttackBonus = function(type, target)
@@ -4478,7 +4492,7 @@ UnitAI.prototype.AttackVisibleEntity = function(ents, forceResponse)
 	{
 		if (this.CanAttack(target, forceResponse))
 		{
-			this.PushOrderFront("Attack", { "target": target, "force": false, "forceResponse": forceResponse });
+			this.PushOrderFront("Attack", { "target": target, "force": false, "forceResponse": forceResponse, "allowCapture": true });
 			return true;
 		}
 	}
@@ -4494,11 +4508,11 @@ UnitAI.prototype.AttackEntityInZone = function(ents, forceResponse)
 {
 	for each (var target in ents)
 	{
-		var type = this.GetBestAttackAgainst(target);
+		var type = this.GetBestAttackAgainst(target, true);
 		if (this.CanAttack(target, forceResponse) && this.CheckTargetDistanceFromHeldPosition(target, IID_Attack, type)
 		    && (this.GetStance().respondChaseBeyondVision || this.CheckTargetIsInVisionRange(target)))
 		{
-			this.PushOrderFront("Attack", { "target": target, "force": false, "forceResponse": forceResponse });
+			this.PushOrderFront("Attack", { "target": target, "force": false, "forceResponse": forceResponse, "allowCapture": true });
 			return true;
 		}
 	}
@@ -4926,7 +4940,7 @@ UnitAI.prototype.LeaveFoundation = function(target)
 /**
  * Adds attack order to the queue, forced by the player.
  */
-UnitAI.prototype.Attack = function(target, queued)
+UnitAI.prototype.Attack = function(target, queued, allowCapture)
 {
 	if (!this.CanAttack(target))
 	{
@@ -4938,8 +4952,7 @@ UnitAI.prototype.Attack = function(target, queued)
 			this.WalkToTarget(target, queued);
 		return;
 	}
-
-	this.AddOrder("Attack", { "target": target, "force": true }, queued);
+	this.AddOrder("Attack", { "target": target, "force": true, "allowCapture": allowCapture}, queued);
 };
 
 /**
@@ -4999,12 +5012,9 @@ UnitAI.prototype.PerformGather = function(target, queued, force)
 	// before we process the order then we still know what resource
 	// type to look for more of
 	var type;
-	var cmpResourceSupply = Engine.QueryInterface(target, IID_ResourceSupply);
-	var cmpMirage = Engine.QueryInterface(target, IID_Mirage);
+	var cmpResourceSupply = QueryMiragedInterface(target, IID_ResourceSupply);
 	if (cmpResourceSupply)
 		type = cmpResourceSupply.GetType();
-	else if (cmpMirage && cmpMirage.ResourceSupply())
-		type = cmpMirage.GetType();
 	else
 		error("CanGather allowed gathering from invalid entity");
 
@@ -5355,7 +5365,7 @@ UnitAI.prototype.FindWalkAndFightTargets = function()
 					if (targetClasses.vetoEntities && targetClasses.vetoEntities[targ])
 						continue;
 				}
-				this.PushOrderFront("Attack", { "target": targ, "force": true });
+				this.PushOrderFront("Attack", { "target": targ, "force": true, "allowCapture": true });
 				return true;
 			}
 		}
@@ -5381,7 +5391,7 @@ UnitAI.prototype.FindWalkAndFightTargets = function()
 			if (targetClasses.vetoEntities && targetClasses.vetoEntities[targ])
 				continue;
 		}
-		this.PushOrderFront("Attack", { "target": targ, "force": true });
+		this.PushOrderFront("Attack", { "target": targ, "force": true, "allowCapture": true });
 		return true;
 	}
 	return false;
@@ -5559,20 +5569,25 @@ UnitAI.prototype.CanAttack = function(target, forceResponse)
 		return false;
 
 	var cmpOwnership = Engine.QueryInterface(this.entity, IID_Ownership);
-	if (!cmpOwnership)
+	if (!cmpOwnership || cmpOwnership.GetOwner() < 0)
 		return false;
+	var owner = cmpOwnership.GetOwner();
 
 	// Verify that the target is an attackable resource supply like a domestic animal
 	// or that it isn't owned by an ally of this entity's player or is responding to
 	// an attack.
-	var owner = cmpOwnership.GetOwner();
-	if (!this.MustKillGatherTarget(target)
-	    && !(IsOwnedByEnemyOfPlayer(owner, target)
-	         || IsOwnedByNeutralOfPlayer(owner, target)
-	         || (forceResponse && !IsOwnedByPlayer(owner, target))))
-		return false;
+	if (this.MustKillGatherTarget(target))
+		return true;
 
-	return true;
+	var cmpCapturable = Engine.QueryInterface(target, IID_Capturable);
+	if (cmpCapturable && cmpCapturable.CanCapture(owner) && cmpAttack.GetAttackTypes().indexOf("Capture") != -1)
+		return true;
+
+	if (IsOwnedByEnemyOfPlayer(owner, target) || IsOwnedByNeutralOfPlayer(owner, target))
+		return true;
+	if (forceResponse && !IsOwnedByPlayer(owner, target))
+		return true;
+	return false;
 };
 
 UnitAI.prototype.CanGarrison = function(target)
@@ -5605,9 +5620,8 @@ UnitAI.prototype.CanGather = function(target)
 	if (this.IsTurret())
 		return false;
 	// The target must be a valid resource supply, or the mirage of one.
-	var cmpResourceSupply = Engine.QueryInterface(target, IID_ResourceSupply);
-	var cmpMirage = Engine.QueryInterface(target, IID_Mirage);
-	if (!cmpResourceSupply && !(cmpMirage && cmpMirage.ResourceSupply()))
+	var cmpResourceSupply = QueryMiragedInterface(target, IID_ResourceSupply);
+	if (!cmpResourceSupply)
 		return false;
 
 	// Formation controllers should always respond to commands

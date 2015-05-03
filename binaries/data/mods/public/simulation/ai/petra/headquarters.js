@@ -19,14 +19,15 @@ m.HQ = function(Config)
 	this.Config = Config;
 	
 	this.econState = "growth";	// existing values: growth, townPhasing.
-	this.phaseStarted = undefined;
+	this.currentPhase = undefined;
 
 	// cache the rates.
 	this.wantedRates = { "food": 0, "wood": 0, "stone":0, "metal": 0 };
 	this.currentRates = { "food": 0, "wood": 0, "stone":0, "metal": 0 };
 	this.lastFailedGather = { "wood": undefined, "stone": undefined, "metal": undefined }; 
 
-	// this means we'll have about a big third of women, and thus we can maximize resource gathering rates.
+	// workers configuration
+	this.targetNumWorkers = this.Config.Economy.targetNumWorkers;
 	this.femaleRatio = this.Config.Economy.femaleRatio;
 
 	this.lastTerritoryUpdate = -1;
@@ -63,13 +64,6 @@ m.HQ.prototype.init = function(gameState, queues)
 	this.navalMap = false;
 	this.navalRegions = {};
 
-	if (this.Config.difficulty < 2)
-		this.targetNumWorkers = Math.max(1, Math.min(40, Math.floor(gameState.getPopulationMax())));
-	else if (this.Config.difficulty < 3)
-		this.targetNumWorkers = Math.max(1, Math.min(60, Math.floor(gameState.getPopulationMax()/2)));
-	else
-		this.targetNumWorkers = Math.max(1, Math.min(120, Math.floor(gameState.getPopulationMax()/3)));
-
 	this.treasures = gameState.getEntities().filter(function (ent) {
 		var type = ent.resourceSupplyType();
 		if (type && type.generic === "treasure")
@@ -77,6 +71,7 @@ m.HQ.prototype.init = function(gameState, queues)
 		return false;
 	});
 	this.treasures.registerUpdates();
+	this.currentPhase = gameState.currentPhase();
 };
 
 /**
@@ -133,7 +128,7 @@ m.HQ.prototype.checkEvents = function (gameState, events, queues)
 		{
 			// Okay so let's try to create a new base around this.
 			let newbase = new m.BaseManager(gameState, this.Config);
-			newbase.init(gameState, true);
+			newbase.init(gameState, "unconstructed");
 			newbase.setAnchor(gameState, ent);
 			this.baseManagers.push(newbase);
 			// Let's get a few units from other bases there to build this.
@@ -202,6 +197,62 @@ m.HQ.prototype.checkEvents = function (gameState, events, queues)
 		}
 	}
 
+	let captureEvents = events["OwnershipChanged"];
+	for (let evt of captureEvents)
+	{
+		if (evt.to !== PlayerID)
+			continue;
+		let ent = gameState.getEntityById(evt.entity);
+		if (!ent)
+			continue;
+		if (ent.position())
+		    ent.setMetadata(PlayerID, "access", gameState.ai.accessibility.getAccessValue(ent.position()));
+		if (ent.hasClass("Unit"))
+		{
+			m.getBestBase(ent, gameState).assignEntity(gameState, ent);
+			ent.setMetadata(PlayerID, "role", undefined);
+			ent.setMetadata(PlayerID, "subrole", undefined);
+			ent.setMetadata(PlayerID, "plan", undefined);
+			ent.setMetadata(PlayerID, "PartOfArmy", undefined);		    
+			if (ent.hasClass("Trader"))
+			{
+				ent.setMetadata(PlayerID, "role", "trader");
+				ent.setMetadata(PlayerID, "route", undefined);
+			}
+			if (ent.hasClass("Female") || ent.hasClass("CitizenSoldier"))
+			{
+				ent.setMetadata(PlayerID, "role", "worker");
+				ent.setMetadata(PlayerID, "subrole", "idle");
+			}
+			if (ent.hasClass("Ship"))
+				ent.setMetadata(PlayerID, "sea", gameState.ai.accessibility.getAccessValue(ent.position(), true));
+			if (!ent.hasClass("Support") && !ent.hasClass("Ship") &&  ent.attackTypes() !== undefined)
+				ent.setMetadata(PlayerID, "plan", -1);
+			continue;
+		}
+		if (ent.hasClass("CivCentre"))   // build a new base around it
+		{
+			let newbase = new m.BaseManager(gameState, this.Config);
+			if (ent.foundationProgress() !== undefined)
+				newbase.init(gameState, "unconstructed");
+			else
+				newbase.init(gameState, "captured");
+			newbase.setAnchor(gameState, ent);
+			this.baseManagers.push(newbase);
+			this.updateTerritories(gameState);
+			newbase.assignEntity(gameState, ent);
+		}
+		else
+		{
+			// TODO should be reassigned later if a better base is captured
+			m.getBestBase(ent, gameState).assignEntity(gameState, ent);
+			if (ent.hasTerritoryInfluence())
+				this.updateTerritories(gameState);
+			if (ent.decaying && ent.isGarrisonHolder())
+				this.garrisonManager.addDecayingStructure(gameState, evt.entity);
+		}
+	}
+
 	// deal with the different rally points of training units: the rally point is set when the training starts
 	// for the time being, only autogarrison is used
 
@@ -247,13 +298,25 @@ m.HQ.prototype.checkEvents = function (gameState, events, queues)
 			// Check if this unit is no more needed in its attack plan
 			// (happen when the training ends after the attack is started or aborted)
 			let plan = ent.getMetadata(PlayerID, "plan");
-			if (plan != undefined && plan >= 0)
+			if (plan !== undefined && plan >= 0)
 			{
 				let attack = this.attackManager.getPlan(plan);
-				if (!attack || attack.isStarted())
+				if (!attack || attack.state !== "unexecuted")
 					ent.setMetadata(PlayerID, "plan", -1);
 			}
 		}
+	}
+
+	let TerritoryEvents = events["TerritoryDecayChanged"];
+	for (let evt of TerritoryEvents)
+	{
+		let ent = gameState.getEntityById(evt.entity);
+		if (!ent || !ent.isOwn(PlayerID) || ent.foundationProgress() !== undefined || !ent.isGarrisonHolder())
+			continue;
+		if (evt.to)
+			this.garrisonManager.addDecayingStructure(gameState, evt.entity);
+		else
+			this.garrisonManager.removeDecayingStructure(evt.entity);
 	}
 };
 
@@ -262,8 +325,9 @@ m.HQ.prototype.OnTownPhase = function(gameState)
 {
 	if (this.Config.difficulty > 2 && this.femaleRatio > 0.4)
 		this.femaleRatio = 0.4;
-
-	this.phaseStarted = 2;
+		
+	var phaseName = gameState.getTemplate(gameState.townPhase()).name(); 
+	m.chatNewPhase(gameState, phaseName, true); 
 };
 
 // Called by the "city phase" research plan once it's started
@@ -272,7 +336,11 @@ m.HQ.prototype.OnCityPhase = function(gameState)
 	if (this.Config.difficulty > 2 && this.femaleRatio > 0.3)
 		this.femaleRatio = 0.3;
 
-	this.phaseStarted = 3;
+	// increase the priority of defense buildings to free this queue for our first fortress
+	gameState.ai.queueManager.changePriority("defenseBuilding", 2*this.Config.priorities.defenseBuilding);
+	
+	var phaseName = gameState.getTemplate(gameState.cityPhase()).name();   
+	m.chatNewPhase(gameState, phaseName, true); 
 };
 
 // This code trains females and citizen workers, trying to keep close to a ratio of females/CS
@@ -287,7 +355,7 @@ m.HQ.prototype.trainMoreWorkers = function(gameState, queues)
 	var numWorkers = 0;
 	gameState.getOwnUnits().forEach (function (ent) {
 		if (ent.getMetadata(PlayerID, "role") == "worker" && ent.getMetadata(PlayerID, "plan") == undefined)
-			numWorkers++;
+			++numWorkers;
 	});
 	var numInTraining = 0;
 	gameState.getOwnTrainingFacilities().forEach(function(ent) {
@@ -1186,7 +1254,8 @@ m.HQ.prototype.checkBaseExpansion = function(gameState, queues)
 	if (queues.civilCentre.length() > 0)
 		return;
 	// first build one cc if all have been destroyed
-	if (this.numActiveBase() < 1)
+	let activeBases = this.numActiveBase();
+	if (activeBases == 0)
 	{
 		this.buildFirstBase(gameState);
 		return;
@@ -1200,14 +1269,11 @@ m.HQ.prototype.checkBaseExpansion = function(gameState, queues)
 		return;
 	}
 	// then expand if we have lots of units
-	var numUnits = 	gameState.getOwnUnits().length;
-	var popForBase = this.Config.Economy.popForTown + 20;
-	if (this.saveResources)
-		popForBase = this.Config.Economy.popForTown + 5;
-	if (Math.floor(numUnits/popForBase) >= gameState.getOwnStructures().filter(API3.Filters.byClass("CivCentre")).length)
+	let numUnits = gameState.getOwnUnits().length;
+	if (numUnits > activeBases * (70 + 15*(activeBases-1)) || (this.saveResources && numUnits > 50))
 	{
 		if (this.Config.debug > 2)
-			API3.warn("try to build a new base because of population " + numUnits + " for " + this.numActiveBase() + " CCs");
+			API3.warn("try to build a new base because of population " + numUnits + " for " + activeBases + " CCs");
 		this.buildNewBase(gameState, queues);
 	}
 };
@@ -1232,50 +1298,34 @@ m.HQ.prototype.buildNewBase = function(gameState, queues, resource)
 // Deals with building fortresses and towers along our border with enemies.
 m.HQ.prototype.buildDefenses = function(gameState, queues)
 {
-	if (this.saveResources)
+	if (this.saveResources || queues.defenseBuilding.length() !== 0)
 		return;
 
 	if (gameState.currentPhase() > 2 || gameState.isResearching(gameState.cityPhase()))
 	{
 		// try to build fortresses
-		var fortressType = "structures/{civ}_fortress";
-		if (queues.defenseBuilding.length() == 0 && this.canBuild(gameState, fortressType))
+		if (this.canBuild(gameState, "structures/{civ}_fortress"))
 		{
-			var numFortresses = gameState.getOwnEntitiesByClass("Fortress", true).length;
-			if (gameState.ai.elapsedTime > (1 + 0.10*numFortresses)*this.fortressLapseTime + this.fortressStartTime)
+			let numFortresses = gameState.getOwnEntitiesByClass("Fortress", true).length;
+			if ((numFortresses == 0 || gameState.ai.elapsedTime > (1 + 0.10*numFortresses)*this.fortressLapseTime + this.fortressStartTime)
+				&& gameState.getOwnFoundationsByClass("Fortress").length < 2)
 			{
 				this.fortressStartTime = gameState.ai.elapsedTime;
-				queues.defenseBuilding.addItem(new m.ConstructionPlan(gameState, fortressType));
+				if (numFortresses == 0)
+					gameState.ai.queueManager.changePriority("defenseBuilding", 2*this.Config.priorities.defenseBuilding);
+				let plan = new m.ConstructionPlan(gameState, "structures/{civ}_fortress");
+				plan.onStart = function(gameState) { gameState.ai.queueManager.changePriority("defenseBuilding", gameState.ai.Config.priorities.defenseBuilding); };
+				queues.defenseBuilding.addItem(plan);
 			}
-		}
-
-		// let's add a siege building plan to the current attack plan if there is none currently.
-		var numSiegeBuilder = 0;
-		if (gameState.civ() !== "mace" && gameState.civ() !== "maur")
-			numSiegeBuilder += gameState.getOwnEntitiesByClass("Fortress", true).filter(API3.Filters.isBuilt()).length;
-		if (gameState.civ() === "mace" || gameState.civ() === "maur" || gameState.civ() === "rome")
-			numSiegeBuilder += gameState.countEntitiesByType(this.bAdvanced[0], true);
-		if (numSiegeBuilder > 0)
-		{
-			var attack = undefined;
-			// There can only be one upcoming attack
-			if (this.attackManager.upcomingAttacks["Attack"].length != 0)
-				attack = this.attackManager.upcomingAttacks["Attack"][0];
-			else if (this.attackManager.upcomingAttacks["HugeAttack"].length != 0)
-				attack = this.attackManager.upcomingAttacks["HugeAttack"][0];
-
-			if (attack && !attack.unitStat["Siege"])
-				attack.addSiegeUnits(gameState);
 		}
 	}
 
-	if (gameState.currentPhase() < 2 
-		|| queues.defenseBuilding.length() != 0
-		|| !this.canBuild(gameState, "structures/{civ}_defense_tower"))
+	if (gameState.currentPhase() < 2 || !this.canBuild(gameState, "structures/{civ}_defense_tower"))
 		return;	
 
-	var numTowers = gameState.getOwnEntitiesByClass("DefenseTower", true).length;
-	if (gameState.ai.elapsedTime > (1 + 0.10*numTowers)*this.towerLapseTime + this.towerStartTime)
+	let numTowers = gameState.getOwnEntitiesByClass("DefenseTower", true).length;
+	if ((numTowers == 0 || gameState.ai.elapsedTime > (1 + 0.10*numTowers)*this.towerLapseTime + this.towerStartTime)
+		&& gameState.getOwnFoundationsByClass("DefenseTower").length < 3)
 	{
 		this.towerStartTime = gameState.ai.elapsedTime;
 		queues.defenseBuilding.addItem(new m.ConstructionPlan(gameState, "structures/{civ}_defense_tower"));
@@ -1498,7 +1548,7 @@ m.HQ.prototype.trainEmergencyUnits = function(gameState, positions)
 				break;
 		}
 	}
-	var metadata = { "role": "worker", "base": nearestAnchor.getMetadata(PlayerID, "base"), "trainer": nearestAnchor.id() };
+	var metadata = { "role": "worker", "base": nearestAnchor.getMetadata(PlayerID, "base"), "plan": -1, "trainer": nearestAnchor.id() };
 	if (autogarrison)
 		metadata.garrisonType = "protection";
 	gameState.ai.queues.emergency.addItem(new m.TrainingPlan(gameState, templateFound[0], metadata, 1, 1));
@@ -1735,9 +1785,16 @@ m.HQ.prototype.update = function(gameState, queues, events)
 	this.researchManager.checkPhase(gameState, queues);
 
 	// TODO find a better way to update
-	if (this.phaseStarted && gameState.currentPhase() == this.phaseStarted)
+	if (this.currentPhase != gameState.currentPhase())
 	{
-		this.phaseStarted = undefined;
+		this.currentPhase = gameState.currentPhase();
+		let phaseName = "Unknown Phase";
+		if (this.currentPhase == 2)
+			phaseName = gameState.getTemplate(gameState.townPhase()).name(); 
+		else if (this.currentPhase == 3)
+			phaseName = gameState.getTemplate(gameState.cityPhase()).name();
+			
+		m.chatNewPhase(gameState, phaseName, false); 
 		this.updateTerritories(gameState);
 	}
 	else if (gameState.ai.playedTurn - this.lastTerritoryUpdate > 100)
@@ -1808,18 +1865,18 @@ m.HQ.prototype.Serialize = function()
 {
 	let properties = {
 		"econState": this.econState,
-		"phaseStarted": this.phaseStarted,
+		"currentPhase": this.currentPhase,
 		"wantedRates": this.wantedRates,
 		"currentRates": this.currentRates,
 		"lastFailedGather": this.lastFailedGather,
 		"femaleRatio": this.femaleRatio,
+		"targetNumWorkers": this.targetNumWorkers,
 		"lastTerritoryUpdate": this.lastTerritoryUpdate,
 		"stopBuilding": this.stopBuilding,
 		"towerStartTime": this.towerStartTime,
 		"towerLapseTime": this.towerLapseTime,
 		"fortressStartTime": this.fortressStartTime,
 		"fortressLapseTime": this.fortressLapseTime,
-		"targetNumWorkers": this.targetNumWorkers,
 		"bBase": this.bBase,
 		"bAdvanced": this.bAdvanced,
 		"saveResources": this.saveResources,

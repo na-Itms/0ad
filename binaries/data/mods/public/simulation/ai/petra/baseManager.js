@@ -34,11 +34,11 @@ m.BaseManager = function(gameState, Config)
 	this.territoryIndices = [];
 };
 
-m.BaseManager.prototype.init = function(gameState, unconstructed)
+m.BaseManager.prototype.init = function(gameState, state)
 {
-	if (unconstructed !== undefined)
-		this.constructing = unconstructed;
-	else
+	if (state == "unconstructed")
+		this.constructing = true;
+	else if (state != "captured")
 		this.neededDefenders = 0;
 	this.workerObject = new m.Worker(this);
 	// entitycollections
@@ -110,19 +110,22 @@ m.BaseManager.prototype.checkEvents = function (gameState, events, queues)
 			if (ent.resourceDropsiteTypes() && !ent.hasClass("Elephant"))
 				this.removeDropsite(gameState, ent);
 			if (evt.metadata[PlayerID]["baseAnchor"] && evt.metadata[PlayerID]["baseAnchor"] === true)
-			{
-				// sounds like we lost our anchor. Let's reaffect our units and buildings
-				this.anchor = undefined;
-				this.anchorId = undefined;
-				this.neededDefenders = 0;
-				let bestbase = m.getBestBase(ent, gameState);
-				this.newbaseID = bestbase.ID;
-				for (let entity of this.units.values())
-					bestbase.assignEntity(gameState, entity);
-				for (let entity of this.buildings.values())
-					bestbase.assignEntity(gameState, entity);
-			}
+				this.anchorLost(gameState, ent);
 		}
+	}
+
+	let captureEvents = events["OwnershipChanged"];
+	for (let evt of captureEvents)
+	{
+		if (evt.from !== PlayerID)
+			continue;
+		let ent = gameState.getEntityById(evt.entity);
+		if (!ent || ent.getMetadata(PlayerID, "base") !== this.ID)
+			continue;
+		if (ent.resourceDropsiteTypes() && !ent.hasClass("Elephant"))
+			this.removeDropsite(gameState, ent);
+		if (ent.getMetadata(PlayerID, "baseAnchor") === true)
+			this.anchorLost(gameState, ent);
 	}
 
 	for (var evt of cFinishedEvents)
@@ -161,6 +164,21 @@ m.BaseManager.prototype.checkEvents = function (gameState, events, queues)
 		this.anchorId = evt.newentity;
 		this.anchor = gameState.getEntityById(evt.newentity);
 	}
+};
+
+/* we lost our anchor. Let's reaffect our units and buildings */
+m.BaseManager.prototype.anchorLost = function (gameState, ent)
+{
+	this.anchor = undefined;
+	this.anchorId = undefined;
+	this.neededDefenders = 0;
+	let bestbase = m.getBestBase(ent, gameState);
+	this.newbaseID = bestbase.ID;
+	for (let entity of this.units.values())
+		bestbase.assignEntity(gameState, entity);
+	for (let entity of this.buildings.values())
+		bestbase.assignEntity(gameState, entity);
+	gameState.ai.HQ.updateTerritories(gameState);
 };
 
 /**
@@ -295,11 +313,11 @@ m.BaseManager.prototype.findBestDropsiteLocation = function(gameState, resource)
 
 	var obstructions = m.createObstructionMap(gameState, this.accessIndex, template);
 
-	var DPFoundations = gameState.getOwnFoundations().filter(API3.Filters.byClass("Storehouse")).toEntityArray();
-	var ccEnts = gameState.getOwnStructures().filter(API3.Filters.byClass("CivCentre")).toEntityArray();
+	var dpEnts = gameState.getOwnEntitiesByClass("Storehouse", true).toEntityArray();
+	var ccEnts = gameState.getOwnEntitiesByClass("CivCentre", true).toEntityArray();
 
 	var bestIdx = undefined;
-	var bestVal = undefined;
+	var bestVal = 0;
 	var radius = Math.ceil(template.obstructionRadius() / obstructions.cellSize);
 
 	var territoryMap = gameState.ai.HQ.territoryMap;
@@ -325,28 +343,12 @@ m.BaseManager.prototype.findBestDropsiteLocation = function(gameState, resource)
 		}
 
 		total = 0.7*total;   // Just a normalisation factor as the locateMap is limited to 255
-
-		var pos = [cellSize * (j%width+0.5), cellSize * (Math.floor(j/width)+0.5)];
-		for (var id in this.dropsites)
-		{
-			if (!gameState.getEntityById(id))
-				continue;
-			var dpPos = gameState.getEntityById(id).position();
-			if (!dpPos)
-				continue;
-			var dist = API3.SquareVectorDistance(dpPos, pos);
-			if (dist < 3600)
-			{
-				total = 0;
-				break;
-			}
-			else if (dist < 6400)
-				total /= 2;
-		}
-		if (total == 0)
+		if (total <= bestVal)
 			continue;
 
-		for (let dp of DPFoundations)
+		var pos = [cellSize * (j%width+0.5), cellSize * (Math.floor(j/width)+0.5)];
+
+		for (let dp of dpEnts)
 		{
 			let dpPos = dp.position();
 			if (!dpPos)
@@ -360,15 +362,15 @@ m.BaseManager.prototype.findBestDropsiteLocation = function(gameState, resource)
 			else if (dist < 6400)
 				total /= 2;
 		}
-		if (total == 0)
+		if (total <= bestVal)
 			continue;
 
-		for (var cc of ccEnts)
+		for (let cc of ccEnts)
 		{
-			var ccPos = cc.position();
+			let ccPos = cc.position();
 			if (!ccPos)
 				continue;
-			var dist = API3.SquareVectorDistance(ccPos, pos);
+			let dist = API3.SquareVectorDistance(ccPos, pos);
 			if (dist < 3600)
 			{
 				total = 0;
@@ -377,11 +379,9 @@ m.BaseManager.prototype.findBestDropsiteLocation = function(gameState, resource)
 			else if (dist < 6400)
 				total /= 2;
 		}
-		if (total == 0)
+		if (total <= bestVal)
 			continue;
 
-		if (bestVal !== undefined && total < bestVal)
-			continue;
 		bestVal = total;
 		bestIdx = i;
 	}

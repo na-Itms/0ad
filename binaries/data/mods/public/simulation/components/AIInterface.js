@@ -7,7 +7,6 @@ AIInterface.prototype.EventNames = [
 	"Create",
 	"Destroy",
 	"Attacked",
-	"RangeUpdate",
 	"ConstructionFinished",
 	"TrainingStarted",
 	"TrainingFinished",
@@ -17,6 +16,7 @@ AIInterface.prototype.EventNames = [
 	"OwnershipChanged",
 	"Garrison",
 	"UnGarrison",
+	"TerritoryDecayChanged",
 	"TributeExchanged",
 	"AttackRequest"
 ];

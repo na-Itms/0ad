@@ -186,9 +186,10 @@ function init(initData, hotloadData)
 	}
 	else
 	{
+		var civName =  g_CivData[g_Players[Engine.GetPlayerID()].civ].Name;
 		// TODO: Get a civ icon for gaia/observers.
 		Engine.GetGUIObjectByName("civIcon").sprite = "stretched:" + g_CivData[g_Players[Engine.GetPlayerID()].civ].Emblem;
-		Engine.GetGUIObjectByName("civIcon").tooltip = g_CivData[g_Players[Engine.GetPlayerID()].civ].Name;
+		Engine.GetGUIObjectByName("civIconOverlay").tooltip = sprintf(translate("%(civ)s - Structure Tree"), {"civ": civName});
 	}
 
 	g_GameSpeeds = initGameSpeeds();
@@ -220,12 +221,12 @@ function init(initData, hotloadData)
 		Engine.GetGUIObjectByName("menuExitButton").enabled = false;
 
 	if (hotloadData)
-	{
 		g_Selection.selected = hotloadData.selection;
-	}
+
 	// Starting for the first time:
 	initMusic();
-	if (!g_IsObserver){
+	if (!g_IsObserver)
+	{
 		var civMusic = g_CivData[g_Players[Engine.GetPlayerID()].civ].Music;
 		global.music.storeTracks(civMusic);
 	}
@@ -247,9 +248,11 @@ function init(initData, hotloadData)
 function selectViewPlayer(playerID)
 {
 	Engine.SetPlayerID(playerID);
-	if (playerID > 0) {
+	if (playerID > 0)
+	{
+		var civName = g_CivData[g_Players[playerID].civ].Name
 		Engine.GetGUIObjectByName("civIcon").sprite = "stretched:" + g_CivData[g_Players[playerID].civ].Emblem;
-		Engine.GetGUIObjectByName("civIcon").tooltip = g_CivData[g_Players[playerID].civ].Name;
+		Engine.GetGUIObjectByName("civIconOverlay").tooltip =  sprintf(translate("%(civ)s - Structure Tree"), {"civ": civName});
 	}
 }
 
@@ -284,7 +287,9 @@ function resignGame(leaveGameAfterResign)
 		"type": "defeat-player",
 		"playerId": Engine.GetPlayerID()
 	});
-
+	
+	Engine.GetGUIObjectByName("menuResignButton").enabled = false;
+	
 	global.music.setState(global.music.states.DEFEAT);
 	
 	// Resume the game if not resigning.
@@ -623,7 +628,8 @@ function updateHero()
 		tooltip += "\n" + getAttackTooltip(heroState);
 
 	tooltip += "\n" + getArmorTooltip(heroState.armour);
-	tooltip += "\n" + template.tooltip;
+	if (template.tooltip)
+		tooltip += "\n" + template.tooltip;
 
 	heroButton.tooltip = tooltip;
 	
@@ -707,6 +713,8 @@ function updatePlayerDisplay()
 	Engine.GetGUIObjectByName("resourceStone").caption = Math.floor(playerState.resourceCounts.stone);
 	Engine.GetGUIObjectByName("resourceMetal").caption = Math.floor(playerState.resourceCounts.metal);
 	Engine.GetGUIObjectByName("resourcePop").caption = playerState.popCount + "/" + playerState.popLimit;
+	Engine.GetGUIObjectByName("population").tooltip = translate("Population (current / limit)") + "\n" +
+					sprintf(translate("Maximum population: %(popCap)s"), { "popCap": playerState.popMax });
 
 	g_IsTrainingBlocked = playerState.trainingBlocked;
 }

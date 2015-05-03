@@ -532,6 +532,18 @@ m.Template = m.Class({
 			return -1;
 	},
 
+	territoryDecayRate: function() {
+		return (this.get("TerritoryDecay") ? this.get("TerritoryDecay/DecayRate") : 0);
+	},
+
+	defaultRegenRate: function() {
+		return (this.get("Capturable") ? this.get("Capturable/RegenRate") : 0);
+	},
+
+	garrisonRegenRate: function() {
+		return (this.get("Capturable") ? this.get("Capturable/GarrisonRegenRate") : 0);
+	},
+
 	visionRange: function() {
 		return this.get("Vision/Range");
 	}
@@ -675,17 +687,17 @@ m.Entity = m.Class({
 		return this._entity.resourceSupplyAmount;
 	},
 
-	resourceSupplyGatherers: function()
+	resourceSupplyNumGatherers: function()
 	{
-		if (this._entity.resourceSupplyGatherers !== undefined)
-			return this._entity.resourceSupplyGatherers;
-		return [];
+		if (this._entity.resourceSupplyNumGatherers !== undefined)
+			return this._entity.resourceSupplyNumGatherers;
+		return undefined;
 	},
 
 	isFull: function()
 	{
-		if (this._entity.resourceSupplyGatherers !== undefined)
-			return (this.maxGatherers() === this._entity.resourceSupplyGatherers.length);
+		if (this._entity.resourceSupplyNumGatherers !== undefined)
+			return (this.maxGatherers() === this._entity.resourceSupplyNumGatherers);
 
 		return undefined;
 	},

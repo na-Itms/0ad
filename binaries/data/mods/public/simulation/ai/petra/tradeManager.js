@@ -11,7 +11,7 @@ m.TradeManager = function(Config)
 	this.tradeRoute = undefined;
 	this.potentialTradeRoute = undefined;
 	this.routeProspection = false;
-	this.targetNumTraders = Math.round(this.Config.popScaling * this.Config.Economy.targetNumTraders);
+	this.targetNumTraders = this.Config.Economy.targetNumTraders;
 	this.warnedAllies = {};
 };
 
@@ -322,22 +322,44 @@ m.TradeManager.prototype.checkEvents = function(gameState, events)
 		}
 	}
 
-	// if one market is destroyed or built, we may have to look for a better route
+	// if one market is destroyed, we should look for a better route
 	let destroyEvents = events["Destroy"];
 	for (let evt of destroyEvents)
 	{
 		if (!evt.entityObj)
 			continue;
 		let ent = evt.entityObj;
-		if (!ent || !ent.hasClass("Market") || !gameState.isPlayerAlly(ent.owner()))
+		if (!ent || ent.foundationProgress() !== undefined || !ent.hasClass("Market") || !gameState.isPlayerAlly(ent.owner()))
 			continue;
-		if (this.Config.debug > 1)
-		{
-			if (evt.SuccessfulFoundation)
-				API3.warn("new market build ... checking routes");
-			else
-				API3.warn("one market (or foundation) has been destroyed ... checking routes");
-		}
+		this.routeProspection = true;
+		gameState.ai.HQ.restartBuild(gameState, "structures/{civ}_market");
+		gameState.ai.HQ.restartBuild(gameState, "structures/{civ}_dock");
+		return true;
+	}
+
+	// same thing if one market is built
+	let createEvents = events["Create"];
+	for (let evt of createEvents)
+	{
+		let ent = gameState.getEntityById(evt.entity);
+		if (!ent || ent.foundationProgress() !== undefined || !ent.hasClass("Market") || !gameState.isPlayerAlly(ent.owner()))
+			continue;
+		this.routeProspection = true;
+		gameState.ai.HQ.restartBuild(gameState, "structures/{civ}_market");
+		gameState.ai.HQ.restartBuild(gameState, "structures/{civ}_dock");
+		return true;
+	}
+
+
+	// and same thing for captured markets
+	let captureEvents = events["OwnershipChanged"];
+	for (let evt of captureEvents)
+	{
+		if (!gameState.isPlayerAlly(evt.from) && !gameState.isPlayerAlly(evt.to))
+			continue;
+		let ent = gameState.getEntityById(evt.entity);
+		if (!ent || ent.foundationProgress() !== undefined || !ent.hasClass("Market"))
+			continue;
 		this.routeProspection = true;
 		gameState.ai.HQ.restartBuild(gameState, "structures/{civ}_market");
 		gameState.ai.HQ.restartBuild(gameState, "structures/{civ}_dock");

@@ -144,9 +144,11 @@ var commands = {
 			warn("Invalid command: attack target is not owned by enemy of player "+player+": "+uneval(cmd));
 		}
 
+		if (cmd.allowCapture == null)
+			cmd.allowCapture = true;
 		// See UnitAI.CanAttack for target checks
 		GetFormationUnitAIs(data.entities, player).forEach(function(cmpUnitAI) {
-			cmpUnitAI.Attack(cmd.target, cmd.queued);
+			cmpUnitAI.Attack(cmd.target, cmd.queued, cmd.allowCapture);
 		});
 	},
 
@@ -349,8 +351,18 @@ var commands = {
 
 	"delete-entities": function(player, cmd, data)
 	{
-		for each (var ent in data.entities)
+		for (let ent of data.entities)
 		{
+			// don't allow to delete entities who are half-captured
+			var cmpCapturable = Engine.QueryInterface(ent, IID_Capturable);
+			if (cmpCapturable)
+			{
+				var capturePoints = cmpCapturable.GetCapturePoints();
+				var maxCapturePoints = cmpCapturable.GetMaxCapturePoints();
+				if (capturePoints[player] < maxCapturePoints / 2)
+					return;
+			}
+			// either kill or delete the entity
 			var cmpHealth = Engine.QueryInterface(ent, IID_Health);
 			if (cmpHealth)
 			{
@@ -487,10 +499,21 @@ var commands = {
 		{
 			var cmpGarrisonHolder = Engine.QueryInterface(garrisonHolder, IID_GarrisonHolder);
 			if (!cmpGarrisonHolder || !cmpGarrisonHolder.UnloadAllOwn())
-				notifyUnloadFailure(player, garrisonHolder)
+				notifyUnloadFailure(player, garrisonHolder);
 		}
 	},
-
+	
+	"unload-all-by-owner": function(player, cmd, data)
+	{
+		var entities = cmd.garrisonHolders;
+		for (var garrisonHolder of entities)
+		{
+			var cmpGarrisonHolder = Engine.QueryInterface(garrisonHolder, IID_GarrisonHolder);
+			if (!cmpGarrisonHolder || !cmpGarrisonHolder.UnloadAllByOwner(player))
+				notifyUnloadFailure(player, garrisonHolder);
+		}
+	},
+	
 	"unload-all": function(player, cmd, data)
 	{
 		var entities = FilterEntityList(cmd.garrisonHolders, player, data.controlAllUnits);
@@ -498,7 +521,7 @@ var commands = {
 		{
 			var cmpGarrisonHolder = Engine.QueryInterface(garrisonHolder, IID_GarrisonHolder);
 			if (!cmpGarrisonHolder || !cmpGarrisonHolder.UnloadAll())
-				notifyUnloadFailure(player, garrisonHolder)
+				notifyUnloadFailure(player, garrisonHolder);
 		}
 	},
 

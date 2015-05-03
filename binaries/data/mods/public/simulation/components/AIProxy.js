@@ -111,6 +111,13 @@ AIProxy.prototype.OnHealthChanged = function(msg)
 	this.changes.hitpoints = msg.to;
 };
 
+AIProxy.prototype.OnCapturePointsChanged = function(msg)
+{
+	if (!this.NotifyChange())
+		return;
+	this.changes.capturePoints = msg.capturePoints;
+};
+
 AIProxy.prototype.OnUnitIdleChanged = function(msg)
 {
 	if (!this.NotifyChange())
@@ -165,11 +172,11 @@ AIProxy.prototype.OnResourceSupplyChanged = function(msg)
 	this.changes.resourceSupplyAmount = msg.to;
 };
 
-AIProxy.prototype.OnResourceSupplyGatherersChanged = function(msg)
+AIProxy.prototype.OnResourceSupplyNumGatherersChanged = function(msg)
 {
 	if (!this.NotifyChange())
 		return;
-	this.changes.resourceSupplyGatherers = msg.to;
+	this.changes.resourceSupplyNumGatherers = msg.to;
 };
 
 AIProxy.prototype.OnResourceCarryingChanged = function(msg)
@@ -274,7 +281,7 @@ AIProxy.prototype.GetFullRepresentation = function()
 	{
 		// Updated by OnResourceSupplyChanged
 		ret.resourceSupplyAmount = cmpResourceSupply.GetCurrentAmount();
-		ret.resourceSupplyGatherers = cmpResourceSupply.GetGatherers();
+		ret.resourceSupplyNumGatherers = cmpResourceSupply.GetNumGatherers();
 	}
 
 	var cmpResourceGatherer = Engine.QueryInterface(this.entity, IID_ResourceGatherer);
@@ -294,6 +301,10 @@ AIProxy.prototype.GetFullRepresentation = function()
 	var cmpTerritoryDecay = Engine.QueryInterface(this.entity, IID_TerritoryDecay);
 	if (cmpTerritoryDecay)
 		ret.decaying = cmpTerritoryDecay.IsDecaying();
+
+	var cmpCapturable = Engine.QueryInterface(this.entity, IID_Capturable);
+	if (cmpCapturable)
+		ret.capturePoints = cmpCapturable.GetCapturePoints();
 
 	return ret;
 };
@@ -332,15 +343,6 @@ AIProxy.prototype.OnAttacked = function(msg)
 	this.cmpAIInterface.PushEvent("Attacked", msg);
 };
 
-/*
- Deactivated for actually not really being practical for most uses.
- AIProxy.prototype.OnRangeUpdate = function(msg)
-{
-	msg.owner = this.owner;
-	this.cmpAIInterface.PushEvent("RangeUpdate", msg);
-	warn(uneval(msg));
-};*/
-
 AIProxy.prototype.OnConstructionFinished = function(msg)
 {
 	this.cmpAIInterface.PushEvent("ConstructionFinished", msg);
@@ -359,6 +361,11 @@ AIProxy.prototype.OnTrainingFinished = function(msg)
 AIProxy.prototype.OnAIMetadata = function(msg)
 {
 	this.cmpAIInterface.PushEvent("AIMetadata", msg);
+};
+
+AIProxy.prototype.OnTerritoryDecayChanged = function(msg)
+{
+	this.cmpAIInterface.PushEvent("TerritoryDecayChanged", msg);
 };
 
 Engine.RegisterComponentType(IID_AIProxy, "AIProxy", AIProxy);
