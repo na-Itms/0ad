@@ -76,6 +76,12 @@ struct PathCost
 		return c;
 	}
 
+	PathCost& operator+=(const PathCost& a)
+	{
+		data += a.data;
+		return *this;
+	}
+
 	bool operator<=(const PathCost& b) const { return data <= b.data; }
 	bool operator< (const PathCost& b) const { return data <  b.data; }
 	bool operator>=(const PathCost& b) const { return data >= b.data; }

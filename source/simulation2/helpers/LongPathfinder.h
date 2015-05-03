@@ -131,7 +131,7 @@ struct CircularRegion
 	entity_pos_t x, z, r;
 };
 
-typedef PriorityQueueHeap<TileID, PathCost> PriorityQueue;
+typedef PriorityQueueHeap<TileID, PathCost, PathCost> PriorityQueue;
 typedef SparseGrid<PathfindTile> PathfindTileGrid;
 
 class JumpPointCache;
@@ -295,9 +295,9 @@ private:
 	 * @param detectGoal is not used if m_UseJPSCache is true
 	 */
 	void AddJumpedHoriz(int i, int j, int di, PathCost g, PathfinderState& state, bool detectGoal);
-	bool HasJumpedHoriz(int i, int j, int di, PathfinderState& state, bool detectGoal);
+	int HasJumpedHoriz(int i, int j, int di, PathfinderState& state, bool detectGoal);
 	void AddJumpedVert(int i, int j, int dj, PathCost g, PathfinderState& state, bool detectGoal);
-	bool HasJumpedVert(int i, int j, int dj, PathfinderState& state, bool detectGoal);
+	int HasJumpedVert(int i, int j, int dj, PathfinderState& state, bool detectGoal);
 	void AddJumpedDiag(int i, int j, int di, int dj, PathCost g, PathfinderState& state);
 
 	/**
