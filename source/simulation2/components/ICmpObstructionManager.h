@@ -279,6 +279,8 @@ public:
 	 */
 	virtual void SetPassabilityCircular(bool enabled) = 0;
 
+	virtual bool GetPassabilityCircular() const = 0;
+
 	/**
 	 * Toggle the rendering of debug info.
 	 */

@@ -517,19 +517,20 @@ void CCmpPathfinder::UpdateGrid()
 
 			ComputeTerrainPassabilityGrid(shoreGrid);
 
-			if (1) // XXX: if circular
+			// Compute off-world passability
+			// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
+
+			const int edgeSize = 3 * Pathfinding::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
+
+			NavcellData edgeMask = 0;
+			for (size_t n = 0; n < m_PassClasses.size(); ++n)
+				edgeMask |= m_PassClasses[n].m_Mask;
+
+			int w = m_Grid->m_W;
+			int h = m_Grid->m_H;
+
+			if (cmpObstructionManager->GetPassabilityCircular())
 			{
-				PROFILE3("off-world passability");
-
-				// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
-				const int edgeSize = 3 * Pathfinding::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
-
-				NavcellData edgeMask = 0;
-				for (size_t n = 0; n < m_PassClasses.size(); ++n)
-					edgeMask |= m_PassClasses[n].m_Mask;
-
-				int w = m_Grid->m_W;
-				int h = m_Grid->m_H;
 				for (int j = 0; j < h; ++j)
 				{
 					for (int i = 0; i < w; ++i)
@@ -547,6 +548,21 @@ void CCmpPathfinder::UpdateGrid()
 							m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
 					}
 				}
+			}
+			else
+			{
+				for (u16 j = 0; j < h; ++j)
+					for (u16 i = 0; i < edgeSize; ++i)
+						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+				for (u16 j = 0; j < h; ++j)
+					for (u16 i = w-edgeSize+1; i < w; ++i)
+						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+				for (u16 j = 0; j < edgeSize; ++j)
+					for (u16 i = edgeSize; i < w-edgeSize+1; ++i)
+						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+				for (u16 j = h-edgeSize+1; j < h; ++j)
+					for (u16 i = edgeSize; i < w-edgeSize+1; ++i)
+						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
 			}
 
 			// Expand the impassability grid, for any class with non-zero clearance,

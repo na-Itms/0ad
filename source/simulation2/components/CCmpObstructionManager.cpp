@@ -448,6 +448,11 @@ public:
 		GetSimContext().GetComponentManager().BroadcastMessage(msg);
 	}
 
+	virtual bool GetPassabilityCircular() const
+	{
+		return m_PassabilityCircular;
+	}
+
 	virtual void SetDebugOverlay(bool enabled)
 	{
 		m_DebugOverlayEnabled = enabled;
@@ -466,7 +471,7 @@ private:
 	size_t m_DirtyID;
 
 	/**
-	 * Mark all previous Rasterise()d grids as dirty, and the debug display.
+	 * Mark all previous Rasterize()d grids as dirty, and the debug display.
 	 * Call this when the world bounds have changed.
 	 */
 	void MakeDirtyAll()
@@ -485,7 +490,7 @@ private:
 	}
 
 	/**
-	 * Mark all previous Rasterise()d grids as dirty, if they depend on this shape.
+	 * Mark all previous Rasterize()d grids as dirty, if they depend on this shape.
 	 * Call this when a static shape has changed.
 	 */
 	void MakeDirtyStatic(flags_t flags)
@@ -497,7 +502,7 @@ private:
 	}
 
 	/**
-	 * Mark all previous Rasterise()d grids as dirty, if they depend on this shape.
+	 * Mark all previous Rasterize()d grids as dirty, if they depend on this shape.
 	 * Call this when a unit shape has changed.
 	 */
 	void MakeDirtyUnit(flags_t flags)
@@ -714,7 +719,7 @@ void CCmpObstructionManager::Rasterize(Grid<u16>& grid, entity_pos_t expand, ICm
 	PROFILE3("Rasterize");
 
 	// Since m_DirtyID is only updated for pathfinding/foundation blocking shapes,
-	// NeedUpdate+Rasterise will only be accurate for that subset of shapes.
+	// NeedUpdate+Rasterize will only be accurate for that subset of shapes.
 	// (If we ever want to support rasterizing more shapes, we need to improve
 	// the dirty-detection system too.)
 	ENSURE(!(requireMask & ~(FLAG_BLOCK_PATHFINDING|FLAG_BLOCK_FOUNDATION)));
