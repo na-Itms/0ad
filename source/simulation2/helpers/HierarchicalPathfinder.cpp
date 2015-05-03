@@ -311,6 +311,57 @@ void HierarchicalPathfinder::Recompute(const std::map<std::string, pass_class_t>
 	}
 }
 
+void HierarchicalPathfinder::Update(Grid<NavcellData>* grid, const Grid<u8>* dirtinessGrid)
+{
+	PROFILE3("Hierarchical Update");
+
+	std::vector<std::pair<int, int> > processedChunks;
+	for (int j = 0; j < dirtinessGrid->m_H; ++j)
+	{
+		for (int i = 0; i < dirtinessGrid->m_W; ++i)
+		{
+			if (!dirtinessGrid->get(i, j))
+				continue;
+
+			std::pair<int, int> chunkID(i / CHUNK_SIZE, j / CHUNK_SIZE);
+
+			for (auto& passClassMask : m_PassClassMasks)
+			{
+				pass_class_t passClass = passClassMask.second;
+				Chunk& a = m_Chunks[passClass].at(chunkID.second*m_ChunksW + chunkID.first);
+				if (std::find(processedChunks.begin(), processedChunks.end(), chunkID) == processedChunks.end())
+				{
+					processedChunks.push_back(chunkID);
+					a.InitRegions(chunkID.first, chunkID.second, grid, passClass);
+				}
+			}
+		}
+	}
+
+	// TODO: Also be clever with edges
+	m_Edges.clear();
+	for (auto& passClassMask : m_PassClassMasks)
+	{
+		pass_class_t passClass = passClassMask.second;
+		EdgesMap& edges = m_Edges[passClass];
+
+		for (int cj = 0; cj < m_ChunksH; ++cj)
+		{
+			for (int ci = 0; ci < m_ChunksW; ++ci)
+			{
+				FindEdges(ci, cj, passClass, edges);
+			}
+		}
+	}
+
+	if (m_DebugOverlay)
+	{
+		PROFILE("debug overlay");
+		m_DebugOverlayLines.clear();
+		AddDebugEdges(GetPassabilityClass("default"));
+	}
+}
+
 /**
  * Find edges between regions in this chunk and the adjacent below/left chunks.
  */

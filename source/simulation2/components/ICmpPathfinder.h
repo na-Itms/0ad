@@ -64,6 +64,12 @@ public:
 	virtual const Grid<u16>& GetPassabilityGrid() = 0;
 
 	/**
+	 * Passes the lazily-stored dirtiness data collected from
+	 * the obstruction manager during the previous grid update.
+	 */
+	virtual bool GetDirtinessData(Grid<u8>& dirtinessGrid, bool& globalUpdateNeeded) = 0;
+
+	/**
 	 * Get a grid representing the distance to the shore of the terrain tile.
 	 */
 	virtual Grid<u16> ComputeShoreGrid(bool expandOnWater = false) = 0;

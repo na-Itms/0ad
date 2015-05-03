@@ -513,17 +513,23 @@ public:
 		
 		return true;
 	}
-	void StartComputation(const shared_ptr<ScriptInterface::StructuredClone>& gameState, const Grid<u16>& passabilityMap, const Grid<u8>& territoryMap, bool territoryMapDirty, std::map<std::string, pass_class_t> passClassMasks)
+	void StartComputation(const shared_ptr<ScriptInterface::StructuredClone>& gameState, 
+		const Grid<u16>& passabilityMap, bool passabilityMapDirty, const Grid<u8>* dirtinessGrid, bool passabilityMapEntirelyDirty,
+		const Grid<u8>& territoryMap, bool territoryMapDirty, 
+		std::map<std::string, pass_class_t> passClassMasks)
 	{
 		ENSURE(m_CommandsComputed);
 
 		m_GameState = gameState;
 		JSContext* cx = m_ScriptInterface->GetContext();
 
-		if (passabilityMap.m_DirtyID != m_PassabilityMap.m_DirtyID)
+		if (passabilityMapDirty)
 		{
 			m_PassabilityMap = passabilityMap;
-			m_LongPathfinder.Reload(passClassMasks, &m_PassabilityMap);
+			if (passabilityMapEntirelyDirty)
+				m_LongPathfinder.Reload(passClassMasks, &m_PassabilityMap);
+			else
+				m_LongPathfinder.Update(&m_PassabilityMap, dirtinessGrid);
 			ScriptInterface::ToJSVal(cx, &m_PassabilityMapVal, m_PassabilityMap);
 		}
 
@@ -1035,6 +1041,11 @@ public:
 		if (cmpPathfinder)
 			passabilityMap = &cmpPathfinder->GetPassabilityGrid();
 
+		Grid<u8> dummyDirtinessGrid;
+		const Grid<u8>* dirtinessGrid = &dummyDirtinessGrid;
+		bool passabilityMapEntirelyDirty = false;
+		bool passabilityMapDirty = cmpPathfinder->GetDirtinessData(dummyDirtinessGrid, passabilityMapEntirelyDirty);
+
 		// Get the territory data
 		//	Since getting the territory grid can trigger a recalculation, we check NeedUpdate first
 		bool territoryMapDirty = false;
@@ -1052,7 +1063,10 @@ public:
 		if (cmpPathfinder)
 			passClassMasks = cmpPathfinder->GetPassabilityClasses();
 
-		m_Worker.StartComputation(scriptInterface.WriteStructuredClone(state), *passabilityMap, *territoryMap, territoryMapDirty, passClassMasks);
+		m_Worker.StartComputation(scriptInterface.WriteStructuredClone(state), 
+			*passabilityMap, passabilityMapDirty, dirtinessGrid, passabilityMapEntirelyDirty,
+			*territoryMap, territoryMapDirty,
+			passClassMasks);
 		
 		m_JustDeserialized = false;
 	}

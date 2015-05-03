@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Wildfire Games.
+/* Copyright (C) 2015 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -224,16 +224,11 @@ public:
 	virtual void Rasterize(Grid<u16>& grid, entity_pos_t expand, ICmpObstructionManager::flags_t requireMask, u16 setMask) = 0;
 
 	/**
-	 * Returns whether obstructions have changed such that Rasterize will
-	 * return different data, since the last call to NeedUpdate with the same
-	 * @p dirtyID handle.
-	 * This should be first called with @p dirtyID pointing to 0; the function
-	 * will return true and update the pointed-at value to indicate the current
-	 * state. Pass the same pointer to subsequent calls, and the function either
-	 * will return false (if nothing relevant has changed), or will update the
-	 * value and return true (in which case you should call Rasterize again).
+	 * Gets dirtiness information and resets it afterwards. Then it's the role of CCmpPathfinder
+	 * to pass the information to other components if needed. (AIs, etc.)
+	 * The return value is false if an update is unnecessary.
 	 */
-	virtual bool NeedUpdate(size_t* dirtyID) = 0;
+	virtual bool GetDirtinessData(Grid<u8>& dirtinessGrid, bool& globalUpdateNeeded) = 0;
 
 	/**
 	 * Standard representation for all types of shapes, for use with geometry processing code.

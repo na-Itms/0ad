@@ -63,8 +63,10 @@ void CCmpPathfinder::Init(const CParamNode& UNUSED(paramNode))
 	m_MapSize = 0;
 	m_Grid = NULL;
 	m_BaseGrid = NULL;
-	m_ObstructionGridDirtyID = 0;
+
+	m_ObstructionsDirty = true;
 	m_TerrainDirty = true;
+
 	m_NextAsyncTicket = 1;
 
 	m_DebugOverlay = false;
@@ -477,6 +479,8 @@ void CCmpPathfinder::UpdateGrid()
 	if (!cmpTerrain)
 		return; // error
 
+	bool forceGlobalUpdate = false;
+
 	// If the terrain was resized then delete the old grid data
 	if (m_Grid && m_MapSize != cmpTerrain->GetTilesPerSide())
 	{
@@ -491,118 +495,126 @@ void CCmpPathfinder::UpdateGrid()
 		m_MapSize = cmpTerrain->GetTilesPerSide();
 		m_Grid = new Grid<NavcellData>(m_MapSize * Pathfinding::NAVCELLS_PER_TILE, m_MapSize * Pathfinding::NAVCELLS_PER_TILE);
 		m_BaseGrid = new Grid<NavcellData>(m_MapSize * Pathfinding::NAVCELLS_PER_TILE, m_MapSize * Pathfinding::NAVCELLS_PER_TILE);
-		m_ObstructionGridDirtyID = 0;
+		forceGlobalUpdate = true;
+		m_TerrainDirty = true;
 	}
 
 	CmpPtr<ICmpObstructionManager> cmpObstructionManager(GetSimContext(), SYSTEM_ENTITY);
-
-	bool obstructionsDirty = cmpObstructionManager->NeedUpdate(&m_ObstructionGridDirtyID);
-
-	// TODO: for performance, it'd be nice if we could get away with not
-	// recomputing all the terrain passability when only an obstruction has
-	// changed. But that's not supported yet, so recompute everything after
-	// every change:
-	if (obstructionsDirty || m_TerrainDirty)
+	if (forceGlobalUpdate)
 	{
-		PROFILE3("UpdateGrid full");
+		m_ObstructionsDirty = true;
+		m_ObstructionsGlobalUpdate = true;
+	}
+	else
+		m_ObstructionsDirty = cmpObstructionManager->GetDirtinessData(m_DirtinessGrid, m_ObstructionsGlobalUpdate);
 
-		// Obstructions or terrain changed - we need to recompute passability
-		// TODO: only bother recomputing the region that has actually changed
+	if (!m_ObstructionsDirty && !m_TerrainDirty)
+		return;
 
-		// If the terrain has changed, recompute entirely m_Grid
-		// Else, use data from m_BaseGrid and add obstructions
-		if (m_TerrainDirty)
+	// If the terrain has changed, recompute entirely m_Grid
+	// Else, use data from m_BaseGrid and add obstructions
+	if (m_TerrainDirty)
+	{
+		Grid<u16> shoreGrid = ComputeShoreGrid();
+
+		ComputeTerrainPassabilityGrid(shoreGrid);
+
+		// Compute off-world passability
+		// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
+
+		const int edgeSize = 3 * Pathfinding::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
+
+		NavcellData edgeMask = 0;
+		for (size_t n = 0; n < m_PassClasses.size(); ++n)
+			edgeMask |= m_PassClasses[n].m_Mask;
+
+		int w = m_Grid->m_W;
+		int h = m_Grid->m_H;
+
+		if (cmpObstructionManager->GetPassabilityCircular())
 		{
-			Grid<u16> shoreGrid = ComputeShoreGrid();
-
-			ComputeTerrainPassabilityGrid(shoreGrid);
-
-			// Compute off-world passability
-			// WARNING: CCmpRangeManager::LosIsOffWorld needs to be kept in sync with this
-
-			const int edgeSize = 3 * Pathfinding::NAVCELLS_PER_TILE; // number of tiles around the edge that will be off-world
-
-			NavcellData edgeMask = 0;
-			for (size_t n = 0; n < m_PassClasses.size(); ++n)
-				edgeMask |= m_PassClasses[n].m_Mask;
-
-			int w = m_Grid->m_W;
-			int h = m_Grid->m_H;
-
-			if (cmpObstructionManager->GetPassabilityCircular())
+			for (int j = 0; j < h; ++j)
 			{
-				for (int j = 0; j < h; ++j)
+				for (int i = 0; i < w; ++i)
 				{
-					for (int i = 0; i < w; ++i)
-					{
-						// Based on CCmpRangeManager::LosIsOffWorld
-						// but tweaked since it's tile-based instead.
-						// (We double all the values so we can handle half-tile coordinates.)
-						// This needs to be slightly tighter than the LOS circle,
-						// else units might get themselves lost in the SoD around the edge.
+					// Based on CCmpRangeManager::LosIsOffWorld
+					// but tweaked since it's tile-based instead.
+					// (We double all the values so we can handle half-tile coordinates.)
+					// This needs to be slightly tighter than the LOS circle,
+					// else units might get themselves lost in the SoD around the edge.
 
-						int dist2 = (i*2 + 1 - w)*(i*2 + 1 - w)
-							+ (j*2 + 1 - h)*(j*2 + 1 - h);
+					int dist2 = (i*2 + 1 - w)*(i*2 + 1 - w)
+						+ (j*2 + 1 - h)*(j*2 + 1 - h);
 
-						if (dist2 >= (w - 2*edgeSize) * (h - 2*edgeSize))
-							m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
-					}
+					if (dist2 >= (w - 2*edgeSize) * (h - 2*edgeSize))
+						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
 				}
 			}
-			else
-			{
-				for (u16 j = 0; j < h; ++j)
-					for (u16 i = 0; i < edgeSize; ++i)
-						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
-				for (u16 j = 0; j < h; ++j)
-					for (u16 i = w-edgeSize+1; i < w; ++i)
-						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
-				for (u16 j = 0; j < edgeSize; ++j)
-					for (u16 i = edgeSize; i < w-edgeSize+1; ++i)
-						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
-				for (u16 j = h-edgeSize+1; j < h; ++j)
-					for (u16 i = edgeSize; i < w-edgeSize+1; ++i)
-						m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
-			}
-
-			// Expand the impassability grid, for any class with non-zero clearance,
-			// so that we can stop units getting too close to impassable navcells
-			for (size_t n = 0; n < m_PassClasses.size(); ++n)
-			{
-				if (m_PassClasses[n].m_HasClearance)
-				{
-					// TODO: if multiple classes have the same clearance, we should
-					// only bother doing this once for them all
-					int clearance = (m_PassClasses[n].m_Clearance / Pathfinding::NAVCELL_SIZE).ToInt_RoundToInfinity();
-					if (clearance > 0)
-						ExpandImpassableCells(*m_Grid, clearance, m_PassClasses[n].m_Mask);
-				}
-			}
-
-			// Store the updated terrain-only grid
-			*m_BaseGrid = *m_Grid;
 		}
 		else
 		{
-			ENSURE(m_Grid->m_W == m_BaseGrid->m_W && m_Grid->m_H == m_BaseGrid->m_H);
-			memcpy(m_Grid->m_Data, m_BaseGrid->m_Data, (m_Grid->m_W)*(m_Grid->m_H)*sizeof(NavcellData));
+			for (u16 j = 0; j < h; ++j)
+				for (u16 i = 0; i < edgeSize; ++i)
+					m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+			for (u16 j = 0; j < h; ++j)
+				for (u16 i = w-edgeSize+1; i < w; ++i)
+					m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+			for (u16 j = 0; j < edgeSize; ++j)
+				for (u16 i = edgeSize; i < w-edgeSize+1; ++i)
+					m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
+			for (u16 j = h-edgeSize+1; j < h; ++j)
+				for (u16 i = edgeSize; i < w-edgeSize+1; ++i)
+					m_Grid->set(i, j, m_Grid->get(i, j) | edgeMask);
 		}
 
-		// Add obstructions onto the grid, for any class with (possibly zero) clearance
+		// Expand the impassability grid, for any class with non-zero clearance,
+		// so that we can stop units getting too close to impassable navcells
 		for (size_t n = 0; n < m_PassClasses.size(); ++n)
 		{
-			// TODO: if multiple classes have the same clearance, we should
-			// only bother running Rasterize once for them all
 			if (m_PassClasses[n].m_HasClearance)
-				cmpObstructionManager->Rasterize(*m_Grid, m_PassClasses[n].m_Clearance, ICmpObstructionManager::FLAG_BLOCK_PATHFINDING, m_PassClasses[n].m_Mask);
+			{
+				// TODO: if multiple classes have the same clearance, we should
+				// only bother doing this once for them all
+				int clearance = (m_PassClasses[n].m_Clearance / Pathfinding::NAVCELL_SIZE).ToInt_RoundToInfinity();
+				if (clearance > 0)
+					ExpandImpassableCells(*m_Grid, clearance, m_PassClasses[n].m_Mask);
+			}
 		}
 
+		// Store the updated terrain-only grid
+		*m_BaseGrid = *m_Grid;
 		m_TerrainDirty = false;
-
-		++m_Grid->m_DirtyID;
-
-		m_LongPathfinder.Reload(m_PassClassMasks, m_Grid);
 	}
+	else
+	{
+		ENSURE(m_Grid->m_W == m_BaseGrid->m_W && m_Grid->m_H == m_BaseGrid->m_H);
+		memcpy(m_Grid->m_Data, m_BaseGrid->m_Data, (m_Grid->m_W)*(m_Grid->m_H)*sizeof(NavcellData));
+	}
+
+	// TODO: tweak rasterizing conditions
+	// Add obstructions onto the grid, for any class with (possibly zero) clearance
+	for (size_t n = 0; n < m_PassClasses.size(); ++n)
+	{
+		// TODO: if multiple classes have the same clearance, we should
+		// only bother running Rasterize once for them all
+		if (m_PassClasses[n].m_HasClearance)
+			cmpObstructionManager->Rasterize(*m_Grid, m_PassClasses[n].m_Clearance, ICmpObstructionManager::FLAG_BLOCK_PATHFINDING, m_PassClasses[n].m_Mask);
+	}
+
+	if (m_ObstructionsGlobalUpdate)
+		m_LongPathfinder.Reload(m_PassClassMasks, m_Grid);
+	else
+		m_LongPathfinder.Update(m_Grid, &m_DirtinessGrid);
+}
+
+bool CCmpPathfinder::GetDirtinessData(Grid<u8>& dirtinessGrid, bool& globalUpdateNeeded)
+{
+	if (!m_ObstructionsDirty)
+		return false;
+
+	dirtinessGrid = m_DirtinessGrid;
+	globalUpdateNeeded = m_ObstructionsGlobalUpdate;
+	return true;
 }
 
 //////////////////////////////////////////////////////////

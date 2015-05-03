@@ -107,8 +107,12 @@ public:
 	u16 m_MapSize; // tiles per side
 	Grid<NavcellData>* m_Grid; // terrain/passability information
 	Grid<NavcellData>* m_BaseGrid; // same as m_Grid, but only with terrain, to avoid some recomputations
-	size_t m_ObstructionGridDirtyID; // dirty ID for ICmpObstructionManager::NeedUpdate
 	bool m_TerrainDirty; // indicates if m_Grid has been updated since terrain changed
+
+	// Update data, stored for the AI manager
+	bool m_ObstructionsDirty;
+	bool m_ObstructionsGlobalUpdate;
+	Grid<u8> m_DirtinessGrid;
 
 	// Interface to the long-range pathfinder.
 	LongPathfinder m_LongPathfinder;
@@ -142,6 +146,8 @@ public:
 	const PathfinderPassability* GetPassabilityFromMask(pass_class_t passClass);
 
 	virtual const Grid<u16>& GetPassabilityGrid();
+
+	virtual bool GetDirtinessData(Grid<u8>& dirtinessGrid, bool& globalUpdateNeeded);
 
 	virtual Grid<u16> ComputeShoreGrid(bool expandOnWater = false);
 

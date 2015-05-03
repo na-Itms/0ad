@@ -221,6 +221,17 @@ public:
 		m_PathfinderHier.Recompute(passClassMasks, passabilityGrid);
 	}
 
+	void Update(Grid<NavcellData>* passabilityGrid, const Grid<u8>* dirtinessGrid)
+	{
+		m_Grid = passabilityGrid;
+		ASSERT(passabilityGrid->m_H == passabilityGrid->m_W);
+		ASSERT(m_GridSize == passabilityGrid->m_H);
+
+		m_JumpPointCache.clear();
+
+		m_PathfinderHier.Update(passabilityGrid, dirtinessGrid);
+	}
+
 	void HierarchicalRenderSubmit(SceneCollector& collector)
 	{
 		for (size_t i = 0; i < m_PathfinderHier.m_DebugOverlayLines.size(); ++i)

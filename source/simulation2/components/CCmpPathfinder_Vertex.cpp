@@ -859,7 +859,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 	// we can't reach. Since the algorithm can only reach a vertex once (and then it'll be marked
 	// as closed), we won't be doing any redundant visibility computations.
 
-	PROFILE_START("A*");
+	PROFILE_START("Short pathfinding - A*");
 
 	VertexPriorityQueue open;
 	VertexPriorityQueue::Item qiStart = { START_VERTEX_ID, start.h, start.h };
@@ -1019,7 +1019,7 @@ void CCmpPathfinder::ComputeShortPath(const IObstructionTestFilter& filter,
 		path.m_Waypoints.push_back(w);
 	}
 
-	PROFILE_END("A*");
+	PROFILE_END("Short pathfinding - A*");
 }
 
 bool CCmpPathfinder::CheckMovement(const IObstructionTestFilter& filter,
