@@ -64,6 +64,11 @@ public:
 	virtual const Grid<u16>& GetPassabilityGrid() = 0;
 
 	/**
+	 * Get a grid representing the distance to the shore of the terrain tile.
+	 */
+	virtual Grid<u16> ComputeShoreGrid(bool expandOnWater = false) = 0;
+
+	/**
 	 * Compute a tile-based path from the given point to the goal, and return the set of waypoints.
 	 * The waypoints correspond to the centers of horizontally/vertically adjacent tiles
 	 * along the path.
