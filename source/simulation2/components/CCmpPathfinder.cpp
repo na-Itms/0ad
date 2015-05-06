@@ -303,13 +303,13 @@ static void ExpandImpassableCells(Grid<u16>& grid, u16 clearance, pass_class_t m
 	}
 }
 
-Grid<u16> CCmpPathfinder::ComputeShoreGrid()
+Grid<u16> CCmpPathfinder::ComputeShoreGrid(bool expandOnWater)
 {
 	PROFILE3("ComputeShoreGrid");
 
 	CmpPtr<ICmpWaterManager> cmpWaterManager(GetSystemEntity());
 
-	// TOOD: these bits should come from ICmpTerrain
+	// TODO: these bits should come from ICmpTerrain
 	CTerrain& terrain = GetSimContext().GetTerrain();
 
 	// avoid integer overflow in intermediate calculation
@@ -338,18 +338,18 @@ Grid<u16> CCmpPathfinder::ComputeShoreGrid()
 			// Find a land tile
 			if (!waterGrid.get(i, j))
 			{
+				// If it's bordered by water, it's a shore tile
 				if ((i > 0 && waterGrid.get(i-1, j)) || (i > 0 && j < m_MapSize-1 && waterGrid.get(i-1, j+1)) || (i > 0 && j > 0 && waterGrid.get(i-1, j-1))
 					|| (i < m_MapSize-1 && waterGrid.get(i+1, j)) || (i < m_MapSize-1 && j < m_MapSize-1 && waterGrid.get(i+1, j+1)) || (i < m_MapSize-1 && j > 0 && waterGrid.get(i+1, j-1))
 					|| (j > 0 && waterGrid.get(i, j-1)) || (j < m_MapSize-1 && waterGrid.get(i, j+1))
 					)
-				{	// If it's bordered by water, it's a shore tile
 					shoreGrid.set(i, j, 0);
-				}
 				else
-				{
 					shoreGrid.set(i, j, shoreMax);
-				}
 			}
+			// If we want to expand on water, we want water tiles not to be shore tiles
+			else if (expandOnWater)
+				shoreGrid.set(i, j, shoreMax);
 		}
 	}
 
@@ -359,7 +359,7 @@ Grid<u16> CCmpPathfinder::ComputeShoreGrid()
 		u16 min = shoreMax;
 		for (u16 x = 0; x < m_MapSize; ++x)
 		{
-			if (!waterGrid.get(x, y))
+			if (!waterGrid.get(x, y) || expandOnWater)
 			{
 				u16 g = shoreGrid.get(x, y);
 				if (g > min)
@@ -372,7 +372,7 @@ Grid<u16> CCmpPathfinder::ComputeShoreGrid()
 		}
 		for (u16 x = m_MapSize; x > 0; --x)
 		{
-			if (!waterGrid.get(x-1, y))
+			if (!waterGrid.get(x-1, y) || expandOnWater)
 			{
 				u16 g = shoreGrid.get(x-1, y);
 				if (g > min)
@@ -389,7 +389,7 @@ Grid<u16> CCmpPathfinder::ComputeShoreGrid()
 		u16 min = shoreMax;
 		for (u16 y = 0; y < m_MapSize; ++y)
 		{
-			if (!waterGrid.get(x, y))
+			if (!waterGrid.get(x, y) || expandOnWater)
 			{
 				u16 g = shoreGrid.get(x, y);
 				if (g > min)
@@ -402,7 +402,7 @@ Grid<u16> CCmpPathfinder::ComputeShoreGrid()
 		}
 		for (u16 y = m_MapSize; y > 0; --y)
 		{
-			if (!waterGrid.get(x, y-1))
+			if (!waterGrid.get(x, y-1) || expandOnWater)
 			{
 				u16 g = shoreGrid.get(x, y-1);
 				if (g > min)
