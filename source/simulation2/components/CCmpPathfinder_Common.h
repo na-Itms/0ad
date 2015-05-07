@@ -200,8 +200,6 @@ public:
 	 */
 	virtual void UpdateGrid();
 
-	Grid<u16> ComputeShoreGrid();
-
 	void ComputeTerrainPassabilityGrid(const Grid<u16>& shoreGrid);
 
 	void RenderSubmit(SceneCollector& collector);
