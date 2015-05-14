@@ -903,13 +903,15 @@ void CCmpUnitMotion::Move(fixed dt)
 			// towards the final goal starting from the point where we'll be close enough
 			if (m_LongPath.m_Waypoints.size() == 1)
 			{
-				if (!m_ShortPath.m_Waypoints.empty())
-					m_LongPath.m_Waypoints.clear();
-				else
+				//if (!m_ShortPath.m_Waypoints.empty())
+				//	m_LongPath.m_Waypoints.clear();
+				if (m_ShortPath.m_Waypoints.empty())
+				//else
 				{
 					CFixedVector2D goalPoint(m_FinalGoal.x, m_FinalGoal.z);
 					CFixedVector2D radius = pos - goalPoint;
-					radius.Normalize(SHORT_PATH_SEARCH_RANGE - fixed::Epsilon());
+					if (radius.CompareLength(SHORT_PATH_SEARCH_RANGE) > 0)
+						radius.Normalize(SHORT_PATH_SEARCH_RANGE - fixed::Epsilon());
 
 					RequestShortPath(goalPoint + radius, m_FinalGoal, true);
 					m_PathState = PATHSTATE_FOLLOWING_REQUESTING_SHORT;
@@ -1006,6 +1008,14 @@ void CCmpUnitMotion::Move(fixed dt)
 			if (!m_ShortPath.m_Waypoints.empty())
 			{
 				PathGoal goal = { PathGoal::POINT, m_ShortPath.m_Waypoints.front().x, m_ShortPath.m_Waypoints.front().z };
+				if ((goal.x - pos.X).Absolute() > SHORT_PATH_SEARCH_RANGE ||
+					(goal.z - pos.Y).Absolute() > SHORT_PATH_SEARCH_RANGE)
+				{
+					Waypoint wp;
+					wp.x = goal.x;
+					wp.z = goal.z;
+					m_LongPath.m_Waypoints.push_back(wp);
+				}
 				RequestShortPath(pos, goal, true);
 				m_PathState = PATHSTATE_WAITING_REQUESTING_SHORT;
 				return;
