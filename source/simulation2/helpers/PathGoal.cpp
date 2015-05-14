@@ -22,14 +22,6 @@
 #include "graphics/Terrain.h"
 #include "Pathfinding.h"
 
-#define PATHGOAL_PROFILE 1
-#if PATHGOAL_PROFILE
-	#include "lib/timer.h"
-	TIMER_ADD_CLIENT(tc_NavcellContainsGoal);
-#else
-	#define	TIMER_ACCRUE(a) ;
-#endif
-
 static bool NavcellContainsCircle(int i, int j, fixed x, fixed z, fixed r, bool inside)
 {
 	// Accept any navcell (i,j) that contains a point which is inside[/outside]
@@ -100,7 +92,6 @@ static bool NavcellContainsSquare(int i, int j,
 
 bool PathGoal::NavcellContainsGoal(int i, int j) const
 {
-	TIMER_ACCRUE(tc_NavcellContainsGoal);
 	switch (type)
 	{
 	case POINT:

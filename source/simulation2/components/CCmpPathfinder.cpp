@@ -36,20 +36,6 @@
 #include "simulation2/helpers/Rasterize.h"
 #include "simulation2/serialization/SerializeTemplates.h"
 
-#define PATHFIND_PROFILE 1
-#if PATHFIND_PROFILE
-	#include "lib/timer.h"
-	TIMER_ADD_CLIENT(tc_ProcessSameTurnMoves);
-	TIMER_ADD_CLIENT(tc_FinishAsyncRequests);
-	TIMER_ADD_CLIENT(tc_ProcessLongRequests);
-	TIMER_ADD_CLIENT(tc_ProcessShortRequests);
-	TIMER_ADD_CLIENT(tc_ProcessLongRequests_Loop);
-	TIMER_ADD_CLIENT(tc_UpdateGrid);
-#else
-	#undef TIMER_ACCRUE
-	#define	TIMER_ACCRUE(a) ;
-#endif
-
 
 // Default cost to move a single tile is a fairly arbitrary number, which should be big
 // enough to be precise when multiplied/divided and small enough to never overflow when
@@ -474,7 +460,7 @@ void CCmpPathfinder::ComputeTerrainPassabilityGrid(const Grid<u16>& shoreGrid)
 
 void CCmpPathfinder::UpdateGrid()
 {
-	TIMER_ACCRUE(tc_UpdateGrid);
+	PROFILE3("UpdateGrid");
 	CmpPtr<ICmpTerrain> cmpTerrain(GetSimContext(), SYSTEM_ENTITY);
 	if (!cmpTerrain)
 		return; // error
@@ -637,8 +623,6 @@ u32 CCmpPathfinder::ComputeShortPathAsync(entity_pos_t x0, entity_pos_t z0, enti
 
 void CCmpPathfinder::FinishAsyncRequests()
 {
-	TIMER_ACCRUE(tc_FinishAsyncRequests);
-
 	// Save the request queue in case it gets modified while iterating
 	std::vector<AsyncLongPathRequest> longRequests;
 	m_AsyncLongPathRequests.swap(longRequests);
@@ -657,11 +641,8 @@ void CCmpPathfinder::FinishAsyncRequests()
 
 void CCmpPathfinder::ProcessLongRequests(const std::vector<AsyncLongPathRequest>& longRequests)
 {
-	TIMER_ACCRUE(tc_ProcessLongRequests);
-
 	for (size_t i = 0; i < longRequests.size(); ++i)
 	{
-		TIMER_ACCRUE(tc_ProcessLongRequests_Loop);
 		const AsyncLongPathRequest& req = longRequests[i];
 		WaypointPath path;
 		ComputePath(req.x0, req.z0, req.goal, req.passClass, path);
@@ -672,8 +653,6 @@ void CCmpPathfinder::ProcessLongRequests(const std::vector<AsyncLongPathRequest>
 
 void CCmpPathfinder::ProcessShortRequests(const std::vector<AsyncShortPathRequest>& shortRequests)
 {
-	TIMER_ACCRUE(tc_ProcessShortRequests);
-
 	for (size_t i = 0; i < shortRequests.size(); ++i)
 	{
 		const AsyncShortPathRequest& req = shortRequests[i];
@@ -687,8 +666,6 @@ void CCmpPathfinder::ProcessShortRequests(const std::vector<AsyncShortPathReques
 
 void CCmpPathfinder::ProcessSameTurnMoves()
 {
-	TIMER_ACCRUE(tc_ProcessSameTurnMoves);
-
 	if (!m_AsyncLongPathRequests.empty())
 	{
 		// Figure out how many moves we can do this time

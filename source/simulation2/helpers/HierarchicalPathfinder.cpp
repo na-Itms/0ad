@@ -22,15 +22,6 @@
 #include "graphics/Overlay.h"
 #include "ps/Profile.h"
 
-#define PATHFINDER_HIER_PROFILE 1
-#if PATHFINDER_HIER_PROFILE
-	#include "lib/timer.h"
-	TIMER_ADD_CLIENT(tc_MakeGoalReachable);
-	TIMER_ADD_CLIENT(tc_InitRegions);
-#else
-	#define	TIMER_ACCRUE(a) ;
-#endif
-
 // Find the root ID of a region, used by InitRegions
 inline u16 RootID(u16 x, std::vector<u16> v)
 {
@@ -48,7 +39,6 @@ inline u16 RootID(u16 x, std::vector<u16> v)
 
 void HierarchicalPathfinder::Chunk::InitRegions(int ci, int cj, Grid<NavcellData>* grid, pass_class_t passClass)
 {
-	TIMER_ACCRUE(tc_InitRegions);
 	ENSURE(ci < 256 && cj < 256); // avoid overflows
 	m_ChunkI = ci;
 	m_ChunkJ = cj;
@@ -460,7 +450,6 @@ HierarchicalPathfinder::RegionID HierarchicalPathfinder::Get(u16 i, u16 j, pass_
 
 bool HierarchicalPathfinder::MakeGoalReachable(u16 i0, u16 j0, PathGoal& goal, pass_class_t passClass)
 {
-	TIMER_ACCRUE(tc_MakeGoalReachable);
 	RegionID source = Get(i0, j0, passClass);
 
 	// Find everywhere that's reachable

@@ -388,10 +388,6 @@ PathCost LongPathfinder::CalculateHeuristic(int i, int j, int iGoal, int jGoal)
 // Do the A* processing for a neighbour tile i,j.
 void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg, PathfinderState& state)
 {
-#if PATHFIND_STATS
-	state.numProcessed++;
-#endif
-
 	// Reject impassable tiles
 	if (!PASSABLE(i, j))
 		return;
@@ -444,9 +440,6 @@ void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg,
 			n.SetCost(g);
 			n.SetPred(pi, pj, i, j);
 			state.open.promote(TileID(i, j), gprev + h, g + h, h);
-#if PATHFIND_STATS
-			state.numImproveOpen++;
-#endif
 			return;
 		}
 	}
@@ -457,9 +450,6 @@ void LongPathfinder::ProcessNeighbour(int pi, int pj, int i, int j, PathCost pg,
 	n.SetPred(pi, pj, i, j);
 	PriorityQueue::Item t = { TileID(i, j), g + h, h };
 	state.open.push(t);
-#if PATHFIND_STATS
-	state.numAddToOpen++;
-#endif
 }
 
 /*
@@ -777,8 +767,6 @@ void LongPathfinder::AddJumpedDiag(int i, int j, int di, int dj, PathCost g, Pat
 
 void LongPathfinder::ComputeTilePath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
 {
-	double time = timer_Time();
-
 	PathfinderState state = { 0 };
 
 	// Convert the start/end coordinates to tile indexes
@@ -835,10 +823,6 @@ void LongPathfinder::ComputeTilePath(entity_pos_t x0, entity_pos_t z0, const Pat
 		if (state.open.empty())
 			break;
 
-#if PATHFIND_STATS
-		state.sumOpenSize += state.open.size();
-#endif
-
 		// Move best tile from open to closed
 		PriorityQueue::Item curr = state.open.pop();
 		u16 i = curr.id.i();
@@ -885,26 +869,15 @@ void LongPathfinder::ComputeTilePath(entity_pos_t x0, entity_pos_t z0, const Pat
 	NormalizePathWaypoints(path);
 
 	// Save this grid for debug display
-	m_DebugTime = timer_Time() - time;
 	delete m_DebugGrid;
 	m_DebugGrid = state.tiles;
 	m_DebugSteps = state.steps;
 	m_DebugGoal = goal;
-
-	PROFILE2_ATTR("from: (%d, %d)", i0, j0);
-	PROFILE2_ATTR("to: (%d, %d)", state.iGoal, state.jGoal);
-	PROFILE2_ATTR("reached: (%d, %d)", state.iBest, state.jBest);
-	PROFILE2_ATTR("steps: %u", state.steps);
-
-#if PATHFIND_STATS
-	debug_printf("PATHFINDER: steps=%d avgo=%d proc=%d impc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveClosed, state.numImproveOpen, state.numAddToOpen);
-#endif
 }
 
 void LongPathfinder::ComputeJPSPath(entity_pos_t x0, entity_pos_t z0, const PathGoal& origGoal, pass_class_t passClass, WaypointPath& path)
 {
 	PROFILE3("ComputePathJPS");
-	//TIMER(L"ComputePathJPS");
 
 	PathfinderState state = { 0 };
 
@@ -969,10 +942,6 @@ void LongPathfinder::ComputeJPSPath(entity_pos_t x0, entity_pos_t z0, const Path
 		// If we ran out of tiles to examine, give up
 		if (state.open.empty())
 			break;
-
-#if PATHFIND_STATS
-		state.sumOpenSize += state.open.size();
-#endif
 
 		// Move best tile from open to closed
 		PriorityQueue::Item curr = state.open.pop();
@@ -1108,15 +1077,6 @@ void LongPathfinder::ComputeJPSPath(entity_pos_t x0, entity_pos_t z0, const Path
 	m_DebugGrid = state.tiles;
 	m_DebugSteps = state.steps;
 	m_DebugGoal = state.goal;
-
-	PROFILE2_ATTR("from: (%d, %d)", i0, j0);
-	PROFILE2_ATTR("to: (%d, %d)", state.iGoal, state.jGoal);
-	PROFILE2_ATTR("reached: (%d, %d)", state.iBest, state.jBest);
-	PROFILE2_ATTR("steps: %d", state.steps);
-
-#if PATHFIND_STATS
-	debug_printf("PATHFINDER: steps=%d avgo=%d proc=%d impo=%d addo=%d\n", state.steps, state.sumOpenSize/state.steps, state.numProcessed, state.numImproveOpen, state.numAddToOpen);
-#endif
 }
 
 void LongPathfinder::ComputePathOffImpassable(entity_pos_t x0, entity_pos_t z0, const PathGoal& UNUSED(origGoal), pass_class_t passClass, WaypointPath& path)

@@ -25,8 +25,6 @@
 #include "graphics/Overlay.h"
 #include "renderer/Scene.h"
 
-#define PATHFIND_STATS 0
-
 #define ACCEPT_DIAGONAL_GAPS 0
 
 /**
@@ -156,14 +154,6 @@ struct PathfinderState
 	u16 iBest, jBest; // closest tile
 
 	JumpPointCache* jpc;
-
-#if PATHFIND_STATS
-	// Performance debug counters
-	size_t numProcessed;
-	size_t numImproveOpen;
-	size_t numAddToOpen;
-	size_t sumOpenSize;
-#endif
 };
 
 class LongOverlay;
