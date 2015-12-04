@@ -227,6 +227,16 @@ function GetTemplateDataHelper(template, player, auraTemplates)
 			warn("GetTemplateDataHelper(): Unrecognized Footprint type");
 	}
 
+	if (template.Formation)
+	{
+		ret.name = {
+			"specific": template.Formation.FormationName,
+			"generic": template.Formation.FormationName
+		};
+
+		ret.icon = "units/formation.png";
+	}
+
 	if (template.GarrisonHolder)
 	{
 		ret.garrisonHolder = {};

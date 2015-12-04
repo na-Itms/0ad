@@ -286,7 +286,6 @@ function TestMoveIntoFormationWhileAttacking()
 
 	AddMock(controller, IID_Attack, {
 		GetRange: function() { return {"max":10, "min": 0}; },
-		CanAttackAsFormation: function() { return false },
 	});
 
 	controllerAI.OnCreate();

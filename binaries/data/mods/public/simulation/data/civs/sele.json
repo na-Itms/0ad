@@ -133,7 +133,6 @@
 	],
 	"Formations":
 	[
-		"formations/null",
 		"formations/box",
 		"formations/column_closed",
 		"formations/line_closed",

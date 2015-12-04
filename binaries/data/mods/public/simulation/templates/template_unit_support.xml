@@ -12,6 +12,7 @@
     <GenericName>Support</GenericName>
     <Classes datatype="tokens">Human Organic</Classes>
     <VisibleClasses datatype="tokens">Support</VisibleClasses>
+    <Formations disable=""/>
   </Identity>
   <Loot>
     <xp>10</xp>

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Entity>
-  <!--
-  <VisualActor>
-    <Actor>props/special/common/waypoint_flag.xml</Actor>
-  </VisualActor>
-  -->
+  <AIProxy/>
+  <Footprint>
+    <Circle radius="1.5"/>
+    <Height>2.5</Height>
+  </Footprint>
   <Formation>
     <RequiredMemberCount>1</RequiredMemberCount>
     <DisabledTooltip></DisabledTooltip>
@@ -19,8 +19,8 @@
     <Animations/>
   </Formation>
   <FormationAttack>
-    <CanAttackAsFormation>false</CanAttackAsFormation>
   </FormationAttack>
+  <OverlayRenderer/>
   <Ownership/>
   <Position>
     <Altitude>0</Altitude>
@@ -28,6 +28,11 @@
     <Floating>false</Floating>
     <TurnRate>3.0</TurnRate>
   </Position>
+  <StatusBars>
+    <BarWidth>2.0</BarWidth>
+    <BarHeight>0.333</BarHeight>
+    <HeightOffset>10.0</HeightOffset>
+  </StatusBars>
   <UnitAI>
     <AlertReactiveLevel>2</AlertReactiveLevel>
     <DefaultStance>aggressive</DefaultStance>
@@ -40,7 +45,10 @@
     <WalkSpeed>1.0</WalkSpeed>
     <PassabilityClass>large</PassabilityClass>
   </UnitMotion>
-  <Trader>
-    <GainMultiplier>0.75</GainMultiplier>
-  </Trader>
+  <VisualActor>
+    <Actor>props/special/common/waypoint_flag.xml</Actor>
+    <SilhouetteDisplay>false</SilhouetteDisplay>
+    <SilhouetteOccluder>false</SilhouetteOccluder>
+    <VisibleInAtlasOnly>false</VisibleInAtlasOnly>
+  </VisualActor>
 </Entity>

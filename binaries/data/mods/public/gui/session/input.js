@@ -268,7 +268,7 @@ function determineAction(x, y, fromMinimap)
 	{
 		var ent = Engine.PickEntityAtPoint(x, y);
 		if (ent != INVALID_ENTITY)
-			target = ent;
+			target = useFormationController(ent);
 	}
 
 	// decide between the following ordered actions
@@ -536,7 +536,7 @@ function handleInputBeforeGui(ev, hoveredObject)
 
 			var ents = Engine.PickPlayerEntitiesInRect(rect[0], rect[1], rect[2], rect[3], g_ViewedPlayer);
 			var preferredEntities = getPreferredEntities(ents);
-			g_Selection.setHighlightList(preferredEntities);
+			g_Selection.setHighlightList(useFormationControllers(preferredEntities));
 
 			return false;
 
@@ -546,7 +546,7 @@ function handleInputBeforeGui(ev, hoveredObject)
 				var rect = updateBandbox(bandbox, ev, true);
 
 				// Get list of entities limited to preferred entities
-				var ents = getPreferredEntities(Engine.PickPlayerEntitiesInRect(rect[0], rect[1], rect[2], rect[3], g_ViewedPlayer));
+				var ents = useFormationControllers(getPreferredEntities(Engine.PickPlayerEntitiesInRect(rect[0], rect[1], rect[2], rect[3], g_ViewedPlayer)));
 
 				// Remove the bandbox hover highlighting
 				g_Selection.setHighlightList([]);
@@ -861,7 +861,7 @@ function handleInputAfterGui(ev)
 			// Highlight the first hovered entity (if any)
 			var ent = Engine.PickEntityAtPoint(ev.x, ev.y);
 			if (ent != INVALID_ENTITY)
-				g_Selection.setHighlightList([ent]);
+				g_Selection.setHighlightList(useFormationControllers([ent]));
 			else
 				g_Selection.setHighlightList([]);
 
@@ -915,7 +915,7 @@ function handleInputAfterGui(ev)
 			// Highlight the first hovered entity (if any)
 			var ent = Engine.PickEntityAtPoint(ev.x, ev.y);
 			if (ent != INVALID_ENTITY)
-				g_Selection.setHighlightList([ent]);
+				g_Selection.setHighlightList(useFormationControllers([ent]));
 			else
 				g_Selection.setHighlightList([]);
 
@@ -965,7 +965,7 @@ function handleInputAfterGui(ev)
 
 			var ent = Engine.PickEntityAtPoint(ev.x, ev.y);
 			if (ent != INVALID_ENTITY)
-				g_Selection.setHighlightList([ent]);
+				g_Selection.setHighlightList(useFormationControllers([ent]));
 			else
 				g_Selection.setHighlightList([]);
 			return false;
@@ -974,7 +974,7 @@ function handleInputAfterGui(ev)
 			if (ev.button == SDL_BUTTON_LEFT)
 			{
 				var ents = [];
-				var selectedEntity = Engine.PickEntityAtPoint(ev.x, ev.y);
+				var selectedEntity = useFormationController(Engine.PickEntityAtPoint(ev.x, ev.y));
 				if (selectedEntity == INVALID_ENTITY)
 				{
 					if (!Engine.HotkeyIsPressed("selection.add") && !Engine.HotkeyIsPressed("selection.remove"))
@@ -1543,6 +1543,10 @@ function performFormation(entity, formationTemplate)
 			"entities": g_Selection.toList(),
 			"name": formationTemplate
 		});
+
+	// Reset the selection if the formation is being disbanded
+	if (formationTemplate == "formations/null")
+		g_Selection.reset();
 }
 
 function performGroup(action, groupId)

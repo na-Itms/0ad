@@ -1,23 +1,20 @@
 function FormationAttack() {}
 
 FormationAttack.prototype.Schema =
-	"<element name='CanAttackAsFormation'>" +
-		"<text/>" +
-	"</element>";
+	"<empty/>";
 
 FormationAttack.prototype.Init = function()
 {
-	this.canAttackAsFormation = this.template.CanAttackAsFormation == "true";
 };
 
-FormationAttack.prototype.CanAttackAsFormation = function()
+FormationAttack.prototype.GetAttackTypes = function()
 {
-	return this.canAttackAsFormation;
+	return [];
 };
 
 FormationAttack.prototype.GetRange = function(target)
 {
-	var result = {"min": 0, "max": this.canAttackAsFormation ? -1 : 0};
+	var result = {"min": 0, "max": -1};
 	var cmpFormation = Engine.QueryInterface(this.entity, IID_Formation);
 	if (!cmpFormation)
 	{
@@ -35,21 +32,11 @@ FormationAttack.prototype.GetRange = function(target)
 		if (!type)
 			continue;
 
-		// if the formation can attack, take the minimum max range (so units are certainly in range), 
-		// If the formation can't attack, take the maximum max range as the point where the formation will be disbanded
-		// Always take the minimum min range (to not get impossible situations)
+		// Take the minimum max range and the minimum min range (to not get impossible situations)
 		var range = cmpAttack.GetRange(type);
 
-		if (this.canAttackAsFormation)
-		{
-			if (range.max < result.max || result.max < 0)
-				result.max = range.max;
-		}
-		else
-		{
-			if (range.max > result.max || range.max < 0)
-				result.max = range.max;
-		}
+		if (range.max > result.max || range.max < 0)
+			result.max = range.max;
 		if (range.min < result.min)
 			result.min = range.min;
 	}

@@ -12,7 +12,4 @@
     <MaxColumns>20</MaxColumns>
     <MaxRows>6</MaxRows>
   </Formation>
-  <FormationAttack>
-    <CanAttackAsFormation>true</CanAttackAsFormation>
-  </FormationAttack>
 </Entity>

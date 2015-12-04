@@ -230,6 +230,7 @@ GuiInterface.prototype.GetEntityState = function(player, ent)
 		"builder": null,
 		"identity": null,
 		"fogging": null,
+		"formation": null,
 		"foundation": null,
 		"garrisonHolder": null,
 		"gate": null,
@@ -259,7 +260,8 @@ GuiInterface.prototype.GetEntityState = function(player, ent)
 			"rank": cmpIdentity.GetRank(),
 			"classes": cmpIdentity.GetClassesList(),
 			"visibleClasses": cmpIdentity.GetVisibleClassesList(),
-			"selectionGroupName": cmpIdentity.GetSelectionGroupName()
+			"selectionGroupName": cmpIdentity.GetSelectionGroupName(),
+			"canUseFormations": cmpIdentity.CanUseFormations()
 		};
 
 	let cmpPosition = Engine.QueryInterface(ent, IID_Position);
@@ -340,6 +342,10 @@ GuiInterface.prototype.GetEntityState = function(player, ent)
 			"numBuilders": cmpFoundation.GetNumBuilders()
 		};
 
+	let cmpFormation = Engine.QueryInterface(ent, IID_Formation);
+	if (cmpFormation)
+		ret.formation = true;
+
 	let cmpRepairable = QueryMiragedInterface(ent, IID_Repairable);
 	if (cmpRepairable)
 		ret.repairable = { "numBuilders": cmpRepairable.GetNumBuilders() };
@@ -371,7 +377,8 @@ GuiInterface.prototype.GetEntityState = function(player, ent)
 			"canGuard": cmpUnitAI.CanGuard(),
 			"isGuarding": cmpUnitAI.IsGuardOf(),
 			"possibleStances": cmpUnitAI.GetPossibleStances(),
-			"isIdle":cmpUnitAI.IsIdle(),
+			"isIdle": cmpUnitAI.IsIdle(),
+			"controller": cmpUnitAI.GetFormationController()
 		};
 		// Add some information needed for ungarrisoning
 		if (cmpUnitAI.IsGarrisoned() && ret.player !== undefined)
@@ -775,14 +782,66 @@ GuiInterface.prototype.GetAvailableFormations = function(player, wantedPlayer)
 	return QueryPlayerIDInterface(wantedPlayer).GetFormations();
 };
 
-GuiInterface.prototype.GetFormationRequirements = function(player, data)
+GuiInterface.prototype.GetFormationRequirements = function(formationTemplate)
 {
-	return GetFormationRequirements(data.formationTemplate);
+	let cmpTempManager = Engine.QueryInterface(SYSTEM_ENTITY, IID_TemplateManager);
+	let template = cmpTempManager.GetTemplate(formationTemplate);
+	if (!template.Formation)
+		return false;
+
+	// Currently there is only a minimum count so this is not needed when
+	// adding new members to the formation.
+	// TODO: this "requirements" system should be more general.
+	return {"minCount": +template.Formation.RequiredMemberCount};
+};
+
+GuiInterface.prototype.CanUseFormations = function(player, data)
+{
+	// We need at least two entities that can use formations in data.ents
+	let found = false;
+	for (let ent of data.ents)
+	{
+		let cmpIdentity = Engine.QueryInterface(ent, IID_Identity);
+		if (!cmpIdentity || !cmpIdentity.CanUseFormations())
+			continue;
+
+		if (found)
+			return true;
+		else
+			found = true;
+	}
+	return false;
 };
 
 GuiInterface.prototype.CanMoveEntsIntoFormation = function(player, data)
 {
-	return CanMoveEntsIntoFormation(data.ents, data.formationTemplate);
+	// TODO: should check the player's civ is allowed to use this formation
+	// See simulation/components/Player.js GetFormations() for a list of all allowed formations
+
+	if (data.formationTemplate == "formations/null")
+		return true;
+
+	let requirements = this.GetFormationRequirements(data.formationTemplate);
+	if (!requirements)
+		return false;
+
+	let count = 0;
+	for (let ent of data.ents)
+	{
+		let cmpIdentity = Engine.QueryInterface(ent, IID_Identity);
+		if (!cmpIdentity || !cmpIdentity.CanUseFormation(data.formationTemplate))
+			continue;
+
+		count++;
+	}
+
+	return count >= requirements.minCount;
+};
+
+GuiInterface.prototype.CanAddEntToFormation = function(player, data)
+{
+	let cmpIdentity = Engine.QueryInterface(data.ent, IID_Identity);
+	return cmpIdentity && cmpIdentity.CanUseFormation(data.formationTemplate);
 };
 
 GuiInterface.prototype.GetFormationInfoFromTemplate = function(player, data)
@@ -798,19 +857,6 @@ GuiInterface.prototype.GetFormationInfoFromTemplate = function(player, data)
 		"tooltip": template.Formation.DisabledTooltip || "",
 		"icon": template.Formation.Icon
 	};
-};
-
-GuiInterface.prototype.IsFormationSelected = function(player, data)
-{
-	for each (let ent in data.ents)
-	{
-		let cmpUnitAI = Engine.QueryInterface(ent, IID_UnitAI);
-		// GetLastFormationName is named in a strange way as it (also) is
-		// the value of the current formation (see Formation.js LoadFormation)
-		if (cmpUnitAI && cmpUnitAI.GetLastFormationTemplate() == data.formationTemplate)
-			return true;
-	}
-	return false;
 };
 
 GuiInterface.prototype.IsStanceSelected = function(player, data)
@@ -844,7 +890,17 @@ GuiInterface.prototype.SetSelectionHighlight = function(player, cmd)
 {
 	let playerColors = {}; // cache of owner -> color map
 
-	for each (let ent in cmd.entities)
+	let entities = [];
+	for (let ent of cmd.entities)
+	{
+		entities.push(ent);
+
+		let cmpFormation = Engine.QueryInterface(ent, IID_Formation);
+		if (cmpFormation)
+			entities = entities.concat(cmpFormation.GetMembers());
+	}
+
+	for (let ent of entities)
 	{
 		let cmpSelectable = Engine.QueryInterface(ent, IID_Selectable);
 		if (!cmpSelectable)
@@ -877,8 +933,18 @@ GuiInterface.prototype.GetEntitiesWithStatusBars = function()
 
 GuiInterface.prototype.SetStatusBars = function(player, cmd)
 {
-	let affectedEnts = new Set();
+	let entities = [];
 	for (let ent of cmd.entities)
+	{
+		entities.push(ent);
+
+		let cmpFormation = Engine.QueryInterface(ent, IID_Formation);
+		if (cmpFormation)
+			entities = entities.concat(cmpFormation.GetMembers());
+	}
+
+	let affectedEnts = new Set();
+	for (let ent of entities)
 	{
 		let cmpStatusBars = Engine.QueryInterface(ent, IID_StatusBars);
 		if (!cmpStatusBars)
@@ -1961,9 +2027,9 @@ let exposedFunctions = {
 	"GetTimeNotifications": 1,
 
 	"GetAvailableFormations": 1,
-	"GetFormationRequirements": 1,
+	"CanUseFormations": 1,
 	"CanMoveEntsIntoFormation": 1,
-	"IsFormationSelected": 1,
+	"CanAddEntToFormation": 1,
 	"GetFormationInfoFromTemplate": 1,
 	"IsStanceSelected": 1,
 

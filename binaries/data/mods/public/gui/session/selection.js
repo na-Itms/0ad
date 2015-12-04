@@ -447,6 +447,7 @@ EntitySelection.prototype.onChange = function()
 var g_Selection = new EntitySelection();
 g_Selection.isSelection = true;
 
+var g_canUseFormations = undefined;
 var g_canMoveIntoFormation = {};
 var g_allBuildableEntities = undefined;
 var g_allTrainableEntities = undefined;
@@ -454,6 +455,7 @@ var g_allTrainableEntities = undefined;
 // Reset cached quantities
 function onSelectionChange()
 {
+	g_canUseFormations = undefined;
 	g_canMoveIntoFormation = {};
 	g_allBuildableEntities = undefined;
 	g_allTrainableEntities = undefined;

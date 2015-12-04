@@ -26,7 +26,4 @@
       </run>      
     </Animations>    
   </Formation>
-  <FormationAttack>
-    <CanAttackAsFormation>true</CanAttackAsFormation>
-  </FormationAttack>
 </Entity>

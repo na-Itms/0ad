@@ -964,6 +964,43 @@ function selectAndMoveTo(ent)
 	Engine.CameraMoveTo(position.x, position.z);
 }
 
+/**
+ * Replace ent by its formation controller if it belongs to one.
+ */
+function useFormationController(ent)
+{
+	let entState = GetEntityState(ent);
+
+	if (entState && entState.unitAI && entState.unitAI.controller != INVALID_ENTITY)
+		return entState.unitAI.controller;
+	else
+		return ent;
+}
+
+/**
+ * Filter a list of entities and replace them by their controller if
+ * they are units belonging to a formation.
+ */
+function useFormationControllers(ents)
+{
+	let selectableEnts = [];
+
+	for (let ent of ents)
+	{
+		let entState = GetEntityState(ent);
+		if (entState && entState.unitAI && entState.unitAI.controller != INVALID_ENTITY)
+		{
+			// Only select each controller once
+			if (selectableEnts.indexOf(entState.unitAI.controller) == -1)
+				selectableEnts.push(entState.unitAI.controller);
+		}
+		else
+			selectableEnts.push(ent);
+	}
+
+	return selectableEnts;
+}
+
 function updateResearchDisplay()
 {
 	let researchStarted = Engine.GuiInterfaceCall("GetStartedResearch", g_ViewedPlayer);

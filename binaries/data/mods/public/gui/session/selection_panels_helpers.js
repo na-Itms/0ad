@@ -13,6 +13,19 @@ const UPGRADING_CHOSEN_OTHER = -1;
 // Resources to sell on barter panel
 var g_BarterSell = "food";
 
+// Check if the selection contains units that can use formations, and cache the result
+function canSelectionUseFormations()
+{
+	if (g_canUseFormations === undefined)
+	{
+		g_canUseFormations = Engine.GuiInterfaceCall("CanUseFormations", {
+			"ents": g_Selection.toList()
+		});
+	}
+	return g_canUseFormations;
+}
+
+// Check if the selection can move into the specified formation, and cache the result
 function canMoveSelectionIntoFormation(formationTemplate)
 {
 	if (!(formationTemplate in g_canMoveIntoFormation))

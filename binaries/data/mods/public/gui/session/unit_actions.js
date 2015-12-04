@@ -640,6 +640,48 @@ var unitActions =
 		"specificness": 20,
 	},
 
+	"join-formation":
+	{
+		"execute": function(target, action, selection, queued)
+		{
+			Engine.PostNetworkCommand({"type": "join-formation", "entities": selection, "target": action.target, "queued": queued});
+			Engine.GuiInterfaceCall("PlaySound", { "name": "order_walk", "entity": selection[0] });
+			return true;
+		},
+		"getActionInfo": function(entState, targetState)
+		{
+			if (!hasClass(entState, "Unit") || !targetState.formation)
+				return false;
+			if (!playerCheck(entState, targetState, ["Player", "Ally"]))
+				return false;
+			if (!entState.identity.canUseFormations)
+				return false;
+
+			if (!Engine.GuiInterfaceCall("CanAddEntToFormation", { "ent": entState.id, "formationTemplate": targetState.template }))
+			{
+				let formationInfo = Engine.GuiInterfaceCall("GetFormationInfoFromTemplate", { "templateName": targetState.template });
+				let tooltip = formationInfo.tooltip;
+				if (tooltip == "")
+					tooltip = markForTranslation("This unit cannot be part of this formation.");
+				return {"possible": false, "tooltip": "[color=\"red\"]" + translate(tooltip) + "[/color]"};
+			}
+
+			return {"possible": true};
+		},
+		"actionCheck": function(target)
+		{
+			var actionInfo = getActionInfo("join-formation", target);
+			if (actionInfo.possible)
+				return {"type": "join-formation", "cursor": "action-formation", "target": target};
+
+			if (actionInfo.tooltip)
+				return {"type": "none", "cursor": "action-formation-disabled", "target": null, "tooltip": actionInfo.tooltip};
+
+			return false;
+		},
+		"specificness": 4,
+	},
+
 	"guard":
 	{
 		"execute": function(target, action, selection, queued)

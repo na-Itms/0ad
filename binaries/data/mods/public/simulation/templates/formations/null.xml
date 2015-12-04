@@ -2,6 +2,6 @@
 <Entity parent="template_formation">
   <Formation>
     <Icon>formations/null.png</Icon>
-    <FormationName>None</FormationName>
+    <FormationName>Disband</FormationName>
   </Formation>
 </Entity>

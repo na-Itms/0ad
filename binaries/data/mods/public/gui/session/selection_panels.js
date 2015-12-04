@@ -362,8 +362,12 @@ g_SelectionPanels.Formation = {
 	"conflictsWith": ["Garrison"],
 	"getItems": function(unitEntState)
 	{
-		if (!hasClass(unitEntState, "Unit") || hasClass(unitEntState, "Animal"))
+		if (unitEntState.formation)
+			return ["formations/null"];
+
+		if (!canSelectionUseFormations())
 			return [];
+
 		if (!g_AvailableFormations.has(unitEntState.player))
 			g_AvailableFormations.set(unitEntState.player, Engine.GuiInterfaceCall("GetAvailableFormations", unitEntState.player));
 		return g_AvailableFormations.get(unitEntState.player);
@@ -375,10 +379,6 @@ g_SelectionPanels.Formation = {
 
 		let formationInfo = g_FormationsInfo.get(data.item);
 		let formationOk = canMoveSelectionIntoFormation(data.item);
-		let formationSelected = Engine.GuiInterfaceCall("IsFormationSelected", {
-			"ents": data.selection,
-			"formationTemplate": data.item
-		});
 
 		data.button.onPress = function() { performFormation(data.unitEntState.id, data.item); };
 
@@ -389,7 +389,6 @@ g_SelectionPanels.Formation = {
 
 		data.button.enabled = formationOk && controlsPlayer(data.unitEntState.player);
 		let grayscale = formationOk ? "" : "grayscale:";
-		data.guiSelection.hidden = !formationSelected;
 		data.icon.sprite = "stretched:" + grayscale + "session/icons/" + formationInfo.icon;
 
 		setPanelObjectPosition(data.button, data.i, data.rowLength);

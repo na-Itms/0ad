@@ -153,6 +153,11 @@ Identity.prototype.GetFormationsList = function()
 	return [];
 };
 
+Identity.prototype.CanUseFormations = function()
+{
+	return this.GetFormationsList().length > 0;
+};
+
 Identity.prototype.CanUseFormation = function(template)
 {
 	return this.GetFormationsList().indexOf(template) != -1;
