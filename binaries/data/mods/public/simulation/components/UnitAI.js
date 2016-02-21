@@ -1112,6 +1112,13 @@ UnitAI.prototype.UnitFsmSpec = {
 				var cmpFormation = Engine.QueryInterface(this.formationController, IID_Formation);
 				if (cmpFormation)
 					cmpFormation.SetInPosition(this.entity);
+
+				let cmpPosition = Engine.QueryInterface(this.entity, IID_Position);
+				if (cmpPosition && cmpPosition.IsInWorld())
+				{
+					let pos = cmpPosition.GetPosition();
+					this.SetHeldPosition(pos.x, pos.z);
+				}
 			},
 		},
 
@@ -2999,10 +3006,12 @@ UnitAI.prototype.Init = function()
 {
 	this.orderQueue = []; // current order is at the front of the list
 	this.order = undefined; // always == this.orderQueue[0]
-	this.formationController = INVALID_ENTITY; // entity with IID_Formation that we belong to
 	this.isGarrisoned = false;
 	this.isIdle = false;
 	this.finishedOrder = false; // used to find if all formation members finished the order
+
+	this.formationController = INVALID_ENTITY; // entity with IID_Formation that we belong to
+	this.moraleMemory = -1; // morale points remembered from a previous formation
 
 	this.heldPosition = undefined;
 
@@ -3233,7 +3242,12 @@ UnitAI.prototype.OnPickupCanceled = function(msg)
 // Wrapper function that sets up the normal and healer range queries.
 UnitAI.prototype.SetupRangeQueries = function()
 {
-	this.SetupRangeQuery();
+	// Formation members should have attack queries disabled, only the
+	// controller should detect nearby enemies
+	if (this.IsFormationMember())
+		this.SetupRangeQuery(false);
+	else
+		this.SetupRangeQuery();
 
 	if (this.IsHealer())
 		this.SetupHealRangeQuery();
@@ -3262,6 +3276,9 @@ UnitAI.prototype.SetupRangeQuery = function(enable = true)
 		this.losRangeQuery = undefined;
 	}
 
+	if (!enable)
+		return;
+
 	var cmpPlayer = QueryOwnerInterface(this.entity);
 	// If we are being destructed (owner -1), creating a range query is pointless
 	if (!cmpPlayer)
@@ -3282,8 +3299,7 @@ UnitAI.prototype.SetupRangeQuery = function(enable = true)
 
 	this.losRangeQuery = cmpRangeManager.CreateActiveQuery(this.entity, range.min, range.max, players, IID_DamageReceiver, cmpRangeManager.GetEntityFlagMask("normal"));
 
-	if (enable)
-		cmpRangeManager.EnableActiveQuery(this.losRangeQuery);
+	cmpRangeManager.EnableActiveQuery(this.losRangeQuery);
 };
 
 // Set up a range query for all own or ally units within LOS range
@@ -3298,6 +3314,9 @@ UnitAI.prototype.SetupHealRangeQuery = function(enable = true)
 		cmpRangeManager.DestroyActiveQuery(this.losHealRangeQuery);
 		this.losHealRangeQuery = undefined;
 	}
+
+	if (!enable)
+		return;
 
 	var cmpPlayer = QueryOwnerInterface(this.entity);
 	// If we are being destructed (owner -1), creating a range query is pointless
@@ -4527,6 +4546,9 @@ UnitAI.prototype.SetFormationController = function(ent)
 	// If we were added to a formation, rename this entity to its controller for the GUI
 	else
 		Engine.BroadcastMessage(MT_EntityRenamed, { "entity": this.entity, "newentity": ent });
+
+	// Only the controller should deal with attack range queries
+	this.SetupRangeQueries();
 };
 
 UnitAI.prototype.GetFormationController = function()
@@ -4541,6 +4563,16 @@ UnitAI.prototype.JoinFormation = function(controller)
 		return;
 
 	this.PushOrderFront("JoinFormation", { "target": controller, "force": true });
+};
+
+UnitAI.prototype.SetMoraleMemory = function(points)
+{
+	this.moraleMemory = points;
+};
+
+UnitAI.prototype.GetMoraleMemory = function()
+{
+	return this.moraleMemory;
 };
 
 UnitAI.prototype.GetTargetPositions = function()

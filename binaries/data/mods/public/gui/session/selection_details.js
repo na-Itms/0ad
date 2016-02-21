@@ -150,6 +150,21 @@ function displaySingle(entState)
 		});
 	}
 
+	// Morale
+	Engine.GetGUIObjectByName("moraleSection").hidden = !entState.moralePoints;
+	if (entState.moralePoints)
+	{
+		let formationMoraleBar = Engine.GetGUIObjectByName("moraleBar");
+		let moraleSize = formationMoraleBar.size;
+		moraleSize.rright = 100*Math.max(0, Math.min(1, entState.moralePoints / entState.maxMoralePoints));
+		formationMoraleBar.size = moraleSize;
+
+		Engine.GetGUIObjectByName("moraleStats").caption = sprintf(translate("%(moralePoints)s / %(maxMoralePoints)s"), {
+			"moralePoints": Math.ceil(entState.moralePoints),
+			"maxMoralePoints": entState.maxMoralePoints
+		});
+	}
+
 	// Experience
 	Engine.GetGUIObjectByName("experience").hidden = !entState.promotion;
 	if (entState.promotion)

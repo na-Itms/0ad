@@ -172,7 +172,7 @@ var unitActions =
 		},
 		"getActionInfo": function(entState, targetState)
 		{
-			if (!entState.attack || !targetState.hitpoints)
+			if ((!entState.attack && !entState.formationAttack) || (!targetState.hitpoints && !targetState.formation))
 				return false;
 
 			return {

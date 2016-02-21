@@ -25,6 +25,7 @@ StatusBars.prototype.Sprites =
 		"PackBar",
 		"ResourceSupplyBar",
 		"CaptureBar",
+		"MoraleBar",
 		"HealthBar",
 		"AuraIcons",
 	];
@@ -77,25 +78,31 @@ StatusBars.prototype.RemoveAuraSource = function(source, auraName)
 	this.RegenerateSprites();
 };
 
-StatusBars.prototype.OnHealthChanged = function(msg)
-{
-	if (this.enabled)
-		this.RegenerateSprites();
-};
-
 StatusBars.prototype.OnCapturePointsChanged = function(msg)
 {
 	if (this.enabled)
 		this.RegenerateSprites();
 };
 
-StatusBars.prototype.OnResourceSupplyChanged = function(msg)
+StatusBars.prototype.OnHealthChanged = function(msg)
+{
+	if (this.enabled)
+		this.RegenerateSprites();
+};
+
+StatusBars.prototype.OnMoraleChanged = function(msg)
 {
 	if (this.enabled)
 		this.RegenerateSprites();
 };
 
 StatusBars.prototype.OnPackProgressUpdate = function(msg)
+{
+	if (this.enabled)
+		this.RegenerateSprites();
+};
+
+StatusBars.prototype.OnResourceSupplyChanged = function(msg)
 {
 	if (this.enabled)
 		this.RegenerateSprites();
@@ -145,40 +152,42 @@ StatusBars.prototype.AddBar = function(cmpOverlayRenderer, yoffset, type, amount
 	return height * 1.2;
 };
 
-StatusBars.prototype.AddPackBar = function(cmpOverlayRenderer, yoffset)
+StatusBars.prototype.AddAuraIcons = function(cmpOverlayRenderer, yoffset)
 {
-	if (!this.enabled)
+	let cmpGuiInterface = Engine.QueryInterface(SYSTEM_ENTITY, IID_GuiInterface);
+	let sources = cmpGuiInterface.GetEntitiesWithStatusBars().filter(e => this.auraSources[e] && this.auraSources[e].length);
+
+	if (!sources.length)
 		return 0;
 
-	let cmpPack = Engine.QueryInterface(this.entity, IID_Pack);
-	if (!cmpPack || !cmpPack.IsPacking())
-		return 0;
+	let iconSet = new Set();
+	for (let ent of sources)
+	{
+		let cmpAuras = Engine.QueryInterface(ent, IID_Auras); 
+		if (!cmpAuras) // probably the ent just died 
+			continue; 
+		for (let name of this.auraSources[ent]) 
+			iconSet.add(cmpAuras.GetOverlayIcon(name)); 
+	}
 
-	return this.AddBar(cmpOverlayRenderer, yoffset, "pack", cmpPack.GetProgress());
-};
+	// World-space offset from the unit's position
+	let offset = { "x": 0, "y": +this.template.HeightOffset + yoffset, "z": 0 };
 
-StatusBars.prototype.AddHealthBar = function(cmpOverlayRenderer, yoffset)
-{
-	if (!this.enabled)
-		return 0;
+	let iconSize = +this.template.BarWidth / 2; 
+	let xoffset = -iconSize * (iconSet.size - 1) * 0.6;
+	for (let icon of iconSet) 
+	{ 
+		cmpOverlayRenderer.AddSprite( 
+			icon, 
+			{ "x": xoffset - iconSize/2, "y": yoffset }, 
+			{ "x": xoffset + iconSize/2, "y": iconSize + yoffset }, 
+			offset,
+			NATURAL_COLOR
+		); 
+		xoffset += iconSize * 1.2;
+	} 
 
-	let cmpHealth = QueryMiragedInterface(this.entity, IID_Health);
-	if (!cmpHealth || !cmpHealth.GetHitpoints() > 0)
-		return 0;
-
-	return this.AddBar(cmpOverlayRenderer, yoffset, "health", cmpHealth.GetHitpoints() / cmpHealth.GetMaxHitpoints());
-};
-
-StatusBars.prototype.AddResourceSupplyBar = function(cmpOverlayRenderer, yoffset)
-{
-	if (!this.enabled)
-		return 0;
-
-	let cmpResourceSupply = QueryMiragedInterface(this.entity, IID_ResourceSupply);
-	if (!cmpResourceSupply)
-		return 0;
-	let value = cmpResourceSupply.IsInfinite() ? 1 : cmpResourceSupply.GetCurrentAmount() / cmpResourceSupply.GetMaxAmount();
-	return this.AddBar(cmpOverlayRenderer, yoffset, "supply", value);
+	return iconSize + this.template.BarHeight / 2;
 };
 
 StatusBars.prototype.AddCaptureBar = function(cmpOverlayRenderer, yoffset)
@@ -230,44 +239,52 @@ StatusBars.prototype.AddCaptureBar = function(cmpOverlayRenderer, yoffset)
 	return height * 1.2;
 };
 
-StatusBars.prototype.AddAuraIcons = function(cmpOverlayRenderer, yoffset)
+StatusBars.prototype.AddHealthBar = function(cmpOverlayRenderer, yoffset)
 {
-	let cmpGuiInterface = Engine.QueryInterface(SYSTEM_ENTITY, IID_GuiInterface);
-	let sources = cmpGuiInterface.GetEntitiesWithStatusBars().filter(e => this.auraSources.has(e) && this.auraSources.get(e).length);
-
-	if (!sources.length)
+	if (!this.enabled)
 		return 0;
 
-	let iconSet = new Set();
-	for (let ent of sources)
-	{
-		let cmpAuras = Engine.QueryInterface(ent, IID_Auras); 
-		if (!cmpAuras) // probably the ent just died 
-			continue; 
-		for (let name of this.auraSources.get(ent)) 
-			iconSet.add(cmpAuras.GetOverlayIcon(name)); 
-	}
+	let cmpHealth = QueryMiragedInterface(this.entity, IID_Health);
+	if (!cmpHealth || !cmpHealth.GetHitpoints() > 0)
+		return 0;
 
-	// World-space offset from the unit's position
-	let offset = { "x": 0, "y": +this.template.HeightOffset + yoffset, "z": 0 };
-
-	let iconSize = +this.template.BarWidth / 2; 
-	let xoffset = -iconSize * (iconSet.size - 1) * 0.6;
-	for (let icon of iconSet) 
-	{ 
-		cmpOverlayRenderer.AddSprite( 
-			icon, 
-			{ "x": xoffset - iconSize/2, "y": yoffset }, 
-			{ "x": xoffset + iconSize/2, "y": iconSize + yoffset }, 
-			offset,
-			NATURAL_COLOR
-		); 
-		xoffset += iconSize * 1.2;
-	} 
-
-	return iconSize + this.template.BarHeight / 2;
+	return this.AddBar(cmpOverlayRenderer, yoffset, "health", cmpHealth.GetHitpoints() / cmpHealth.GetMaxHitpoints());
 };
 
+StatusBars.prototype.AddMoraleBar = function(cmpOverlayRenderer, yoffset)
+{
+	if (!this.enabled)
+		return 0;
 
+	let cmpMorale = Engine.QueryInterface(this.entity, IID_Morale);
+	if (!cmpMorale || !cmpMorale.GetMoralePoints() > 0)
+		return 0;
+
+	return this.AddBar(cmpOverlayRenderer, yoffset, "morale", cmpMorale.GetMoralePoints() / cmpMorale.GetMaxMoralePoints());
+};
+
+StatusBars.prototype.AddPackBar = function(cmpOverlayRenderer, yoffset)
+{
+	if (!this.enabled)
+		return 0;
+
+	let cmpPack = Engine.QueryInterface(this.entity, IID_Pack);
+	if (!cmpPack || !cmpPack.IsPacking())
+		return 0;
+
+	return this.AddBar(cmpOverlayRenderer, yoffset, "pack", cmpPack.GetProgress());
+};
+
+StatusBars.prototype.AddResourceSupplyBar = function(cmpOverlayRenderer, yoffset)
+{
+	if (!this.enabled)
+		return 0;
+
+	let cmpResourceSupply = QueryMiragedInterface(this.entity, IID_ResourceSupply);
+	if (!cmpResourceSupply)
+		return 0;
+	let value = cmpResourceSupply.IsInfinite() ? 1 : cmpResourceSupply.GetCurrentAmount() / cmpResourceSupply.GetMaxAmount();
+	return this.AddBar(cmpOverlayRenderer, yoffset, "supply", value);
+};
 
 Engine.RegisterComponentType(IID_StatusBars, "StatusBars", StatusBars);

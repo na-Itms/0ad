@@ -682,6 +682,14 @@
 		<image backcolor="orange"/>
 	</sprite>
 
+	<sprite name="moraleBackground">
+		<image backcolor="115 0 115 255"/>
+	</sprite>
+
+	<sprite name="moraleForeground">
+		<image backcolor="95 215 215 255"/>
+	</sprite>
+
 	<sprite name="experienceBackground">
 		<image backcolor="darkgray"/>
 	</sprite>

@@ -231,10 +231,6 @@ Attack.prototype.GetRestrictedClasses = function(type)
 
 Attack.prototype.CanAttack = function(target)
 {
-	let cmpFormation = Engine.QueryInterface(target, IID_Formation);
-	if (cmpFormation)
-		return true;
-
 	let cmpThisPosition = Engine.QueryInterface(this.entity, IID_Position);
 	let cmpTargetPosition = Engine.QueryInterface(target, IID_Position);
 	if (!cmpThisPosition || !cmpTargetPosition || !cmpThisPosition.IsInWorld() || !cmpTargetPosition.IsInWorld())
@@ -245,11 +241,15 @@ Attack.prototype.CanAttack = function(target)
 	// reach each other, no matter how close they come.
 	let heightDiff = Math.abs(cmpThisPosition.GetHeightOffset() - cmpTargetPosition.GetHeightOffset());
 
-	const cmpIdentity = Engine.QueryInterface(target, IID_Identity);
+	let cmpFormation = Engine.QueryInterface(target, IID_Formation);
+	if (cmpFormation)
+		return true;
+
+	let cmpIdentity = Engine.QueryInterface(target, IID_Identity);
 	if (!cmpIdentity)
 		return undefined;
 
-	const targetClasses = cmpIdentity.GetClassesList();
+	let targetClasses = cmpIdentity.GetClassesList();
 
 	for (let type of this.GetAttackTypes())
 	{
@@ -317,9 +317,8 @@ Attack.prototype.GetBestAttackAgainst = function(target, allowCapture)
 	let cmpFormation = Engine.QueryInterface(target, IID_Formation);
 	if (cmpFormation)
 	{
-		// TODO: Formation against formation needs review
-		let types = this.GetAttackTypes();
-		return ["Ranged", "Melee", "Capture"].find(attack => types.indexOf(attack) != -1);
+		let best = ["Ranged", "Melee", "Capture"];		let types = this.GetAttackTypes();
+		return ["Ranged", "Melee"].find(attack => types.indexOf(attack) != -1);
 	}
 
 	let cmpIdentity = Engine.QueryInterface(target, IID_Identity);
@@ -430,6 +429,17 @@ Attack.prototype.GetRange = function(type)
 Attack.prototype.GetAttackBonus = function(type, target)
 {
 	let attackBonus = 1;
+
+	// If the unit is part of the formation and the target is not, we get a bonus
+	let cmpUnitAI = Engine.QueryInterface(this.entity, IID_UnitAI);
+	let cmpTargetUnitAI = Engine.QueryInterface(target, IID_UnitAI);
+	if (cmpUnitAI && cmpUnitAI.IsFormationMember() && cmpTargetUnitAI && !cmpTargetUnitAI.IsFormationMember())
+	{
+		let cmpFormationAttack = Engine.QueryInterface(cmpUnitAI.GetFormationController(), IID_FormationAttack);
+		if (cmpFormationAttack)
+			attackBonus *= cmpFormationAttack.GetAttackMultiplierAgainstIndividuals();
+	}
+
 	let template = this.template[type];
 	if (!template)
 		template = this.template[type.split(".")[0]].Splash;

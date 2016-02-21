@@ -346,6 +346,13 @@ GuiInterface.prototype.GetEntityState = function(player, ent)
 	if (cmpFormation)
 		ret.formation = true;
 
+	let cmpMorale = Engine.QueryInterface(ent, IID_Morale);
+	if (cmpMorale)
+	{
+		ret.moralePoints = Math.ceil(cmpMorale.GetMoralePoints());
+		ret.maxMoralePoints = cmpMorale.GetMaxMoralePoints();
+	}
+
 	let cmpRepairable = QueryMiragedInterface(ent, IID_Repairable);
 	if (cmpRepairable)
 		ret.repairable = { "numBuilders": cmpRepairable.GetNumBuilders() };
@@ -423,6 +430,7 @@ GuiInterface.prototype.GetExtendedEntityState = function(player, ent)
 	let ret = {
 		"armour": null,
 		"attack": null,
+		"formationAttack": null,
 		"barterMarket": null,
 		"buildingAI": null,
 		"heal": null,
@@ -489,6 +497,10 @@ GuiInterface.prototype.GetExtendedEntityState = function(player, ent)
 			}
 		}
 	}
+
+	let cmpFormationAttack = Engine.QueryInterface(ent, IID_FormationAttack);
+	if (cmpFormationAttack)
+		ret.formationAttack = true;
 
 	let cmpArmour = Engine.QueryInterface(ent, IID_DamageReceiver);
 	if (cmpArmour)
@@ -1889,7 +1901,10 @@ GuiInterface.prototype.CanCapture = function(player, data)
 
 GuiInterface.prototype.CanAttack = function(player, data)
 {
-	let cmpAttack = Engine.QueryInterface(data.entity, IID_Attack);
+	let cmpAttack =
+		Engine.QueryInterface(data.entity, IID_Attack) ||
+		Engine.QueryInterface(data.entity, IID_FormationAttack);
+
 	if (!cmpAttack)
 		return false;
 

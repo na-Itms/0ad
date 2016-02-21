@@ -19,7 +19,13 @@
     <Animations/>
   </Formation>
   <FormationAttack>
+    <AttackMultiplierAgainstIndividuals>2.0</AttackMultiplierAgainstIndividuals>
   </FormationAttack>
+  <Morale>
+    <PointsPerMember>5.0</PointsPerMember>
+    <BonusPoints>25.0</BonusPoints>
+    <RegenRate>1.0</RegenRate>
+  </Morale>
   <OverlayRenderer/>
   <Ownership/>
   <Position>
@@ -29,9 +35,9 @@
     <TurnRate>3.0</TurnRate>
   </Position>
   <StatusBars>
-    <BarWidth>2.0</BarWidth>
-    <BarHeight>0.333</BarHeight>
-    <HeightOffset>10.0</HeightOffset>
+    <BarWidth>4.0</BarWidth>
+    <BarHeight>0.666</BarHeight>
+    <HeightOffset>7.5</HeightOffset>
   </StatusBars>
   <UnitAI>
     <AlertReactiveLevel>2</AlertReactiveLevel>

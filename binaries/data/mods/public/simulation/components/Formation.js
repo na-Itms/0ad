@@ -300,6 +300,10 @@ Formation.prototype.AddMember = function(newent)
 	var cmpUnitAI = Engine.QueryInterface(newent, IID_UnitAI);
 	cmpUnitAI.SetFormationController(this.entity);
 
+	let cmpMorale = Engine.QueryInterface(this.entity, IID_Morale);
+	if (cmpMorale)
+		cmpMorale.AddMember(cmpUnitAI.GetMoraleMemory());
+
 	var cmpAuras = Engine.QueryInterface(newent, IID_Auras);
 	if (cmpAuras && cmpAuras.HasFormationAura())
 		this.formationMembersWithAura.push(newent);
@@ -332,6 +336,13 @@ Formation.prototype.RemoveMember = function(oldent)
 	let cmpUnitAI = Engine.QueryInterface(oldent, IID_UnitAI);
 	cmpUnitAI.UpdateWorkOrders();
 	cmpUnitAI.SetFormationController(INVALID_ENTITY);
+
+	let cmpMorale = Engine.QueryInterface(this.entity, IID_Morale);
+	if (cmpMorale)
+	{
+		cmpUnitAI.SetMoraleMemory(cmpMorale.ComputeIndividualMorale());
+		cmpMorale.RemoveMember();
+	}
 
 	for (let ent of this.formationMembersWithAura)
 	{
@@ -366,10 +377,14 @@ Formation.prototype.RemoveMember = function(oldent)
  */
 Formation.prototype.Disband = function()
 {
+	let cmpMorale = Engine.QueryInterface(this.entity, IID_Morale);
+
 	for each (var ent in this.members)
 	{
 		var cmpUnitAI = Engine.QueryInterface(ent, IID_UnitAI);
 		cmpUnitAI.SetFormationController(INVALID_ENTITY);
+		if (cmpMorale)
+			cmpUnitAI.SetMoraleMemory(cmpMorale.ComputeIndividualMorale());
 	}
 
 	for each (var ent in this.formationMembersWithAura)
