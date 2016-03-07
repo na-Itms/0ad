@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<sprites>
+	<sprite name="IconFrame_Gold">
+		<image
+			border="true"
+			bordercolor="163 163 103"
+			backcolor="0 0 0 0"
+			size="0 0 100% 100%"
+		/>
+		<image
+			border="true"
+			bordercolor="0 0 0"
+			backcolor="0 0 0 0"
+			size="1 1 100%-1 100%-1"
+		/>
+	</sprite>
+
+	<sprite name="ModernDialogNoTitle">
+
+		<!-- background -->
+		<image texture = "global/modern/background.png"
+			texture_size = "0 0 512 512"
+			size = "4 0 100%-4 100%-4"
+		/>
+
+		<!-- shading -->
+		<!-- we just mirror the same texture on the top and bottom -->
+		<image texture = "global/modern/shadow-low.png"
+			texture_size = "0 0 1024 128"
+			size = "4 100%-132 100%-4 100%-4"
+		/>
+
+		<image texture = "global/modern/shadow-low.png"
+			texture_size = "1024 128 0 0"
+			size = "4 0 100%-4 128"
+		/>
+
+		<!-- top and bottom edge -->
+		<image texture = "global/modern/border.png"
+			real_texture_placement = "0 0 2048 8"
+			size = "4 0%-4 100%-4 4"
+		/>
+		<image texture = "global/modern/border.png"
+			real_texture_placement = "0 0 2048 8"
+			size = "4 100%-8 100%-4 100%"
+		/>
+
+		<!-- corners -->
+		<image texture = "global/modern/dialog-deco-top.png"
+			real_texture_placement = "0 0 64 32"
+			texture_size = "64 0 0 32"
+			size = "-14 -21 50 11"
+		/>
+		<image texture = "global/modern/dialog-deco-top.png"
+			real_texture_placement = "0 0 64 32"
+			texture_size = "0 0 64 32"
+			size = "100%-50 -21 100%+14 11"
+		/>
+		<image texture = "global/modern/dialog-deco-bottom.png"
+			real_texture_placement = "0 0 64 32"
+			texture_size = "64 0 0 32"
+			size = "-31 100%-23 33 100%+9"
+		/>
+		<image texture = "global/modern/dialog-deco-bottom.png"
+			real_texture_placement = "0 0 64 32"
+			texture_size = "0 0 64 32"
+			size = "100%-31 100%-23 100%+33 100%+9"
+		/>
+	</sprite>
+	
+	<sprite name="ModernTitle">
+		<image texture = "global/modern/titlebar-middle.png"
+			real_texture_placement = "0 0 128 32"
+			size = "50%-108 0 50%+108 33"
+		/>
+		<image texture = "global/modern/titlebar-left.png"
+			real_texture_placement = "0 0 32 32"
+			size = "-36 0 0 33"
+		/>
+		<image texture = "global/modern/titlebar-left.png"
+			real_texture_placement = "32 32 0 0"
+			size = "100% 0 100%+36 33"
+		/>
+	</sprite>
+
+</sprites>

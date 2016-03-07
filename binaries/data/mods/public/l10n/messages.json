@@ -245,7 +245,8 @@
                     "gui/savedgames/**.js",
                     "gui/splashscreen/**.js",
                     "gui/structree/**.js",
-                    "gui/summary/**.js"
+                    "gui/summary/**.js",
+                    "gui/viewer/**.js"
                 ],
                 "options": {
                     "format": "javascript-format",
@@ -278,7 +279,8 @@
                     "gui/savedgames/**.xml",
                     "gui/splashscreen/**.xml",
                     "gui/structree/**.xml",
-                    "gui/summary/**.xml"
+                    "gui/summary/**.xml",
+                    "gui/viewer/**.xml"
                 ],
                 "options": {
                     "keywords": {
@@ -341,6 +343,7 @@
                     "keywords": {
                         "GenericName": {},
                         "SpecificName": {},
+                        "History": {},
                         "VisibleClasses": {
                             "splitOnWhitespace": true
                         },
@@ -375,6 +378,7 @@
                     "keywords": {
                         "GenericName": {},
                         "SpecificName": {},
+                        "History": {},
                         "VisibleClasses": {
                             "splitOnWhitespace": true
                         },
@@ -416,6 +420,7 @@
                     "keywords": {
                         "GenericName": {},
                         "SpecificName": {},
+                        "History": {},
                         "VisibleClasses": {
                             "splitOnWhitespace": true
                         },

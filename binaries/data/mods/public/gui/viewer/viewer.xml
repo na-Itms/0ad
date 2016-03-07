@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<objects>
+	<script file="gui/common/functions_civinfo.js"/>
+	<script file="gui/common/functions_utility.js"/>
+	<script file="gui/common/tooltips.js"/>
+	<script file="gui/viewer/viewer.js"/>
+	<script file="gui/structree/helper.js"/>
+	<script file="gui/structree/load.js"/>
+
+	<!-- Add a translucent black background to fade out whatever's behind this -->
+	<object type="image" z="0" sprite="bkTranslucent"/>
+
+	<object type="image" sprite="ModernDialogNoTitle" size="50%-250 50%-300 50%+250 50%+300">
+
+		<object name="entityName" type="text" style="Title" size="8 12 100%-8 48"/>
+
+		<object name="entityIcon" type="image"
+			size="16 48 128+16 128+48"
+			sprite="stretched:pregame/shell/logo/wfg_logo_white.png"
+		>
+			<object type="image" style="IconFrame"/>
+		</object>
+
+		<object name="entityStats" type="text" style="BodyText" size="128+20 44 100%-8 50%"/>
+
+		<object name="entityInfo" type="text" style="BodyText" size="16 128+48 100%-16 100%"/>
+
+		<!-- Close page -->
+		<object
+			type="button"
+			style="StoneButton"
+			size="100%-164 100%-44 100%-16 100%-16"
+			hotkey="cancel"
+		>
+			<translatableAttribute id="caption">Close</translatableAttribute>
+			<action on="Press"><![CDATA[
+				closeViewer();
+			]]></action>
+		</object>
+	</object>
+
+</objects>

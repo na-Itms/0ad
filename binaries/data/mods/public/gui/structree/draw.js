@@ -39,6 +39,7 @@ function draw()
 			stru = g_ParsedData.structures[stru];
 			Engine.GetGUIObjectByName("phase["+i+"]_struct["+s+"]_icon").sprite = "stretched:session/portraits/"+stru.icon;
 			Engine.GetGUIObjectByName("phase["+i+"]_struct["+s+"]_icon").tooltip = assembleTooltip(stru);
+			setViewerOnPress("phase["+i+"]_struct["+s+"]_icon", stru);
 			Engine.GetGUIObjectByName("phase["+i+"]_struct["+s+"]_name").caption = translate(stru.name.specific);
 			thisEle.hidden = false;
 
@@ -168,7 +169,15 @@ function drawProdIcon(pha, s, r, p, prod)
 	prodEle.sprite = "stretched:session/portraits/"+prod.icon;
 	prodEle.tooltip = assembleTooltip(prod);
 	prodEle.hidden = false;
+	setViewerOnPress(prodEle, prod);
 	return true;
+}
+
+function setViewerOnPress(ele, entity)
+{
+	if (typeof ele === "string")
+		ele = Engine.GetGUIObjectByName(ele);
+	ele.onpressright = function () { Engine.PushGuiPage("page_viewer.xml", entity); };
 }
 
 /**
@@ -194,7 +203,6 @@ function hideRemaining(prefix, idx, suffix)
 		obj = Engine.GetGUIObjectByName(prefix+idx+suffix);
 	}
 }
-
 
 /**
  * Positions certain elements that only need to be positioned once
@@ -343,38 +351,7 @@ function assembleTooltip(template)
 	if (template.auras)
 		txt += getAurasTooltip(template);
 
-	if (template.health)
-		txt += '\n' + sprintf(translate("%(label)s %(details)s"), {
-			"label": g_TooltipTextFormats.header[0] + translate("Health:") + g_TooltipTextFormats.header[1],
-			"details": template.health
-		});
-
-	if (template.healer)
-		txt += '\n' + getHealerTooltip(template);
-
-	if (template.attack)
-		txt += '\n' + getAttackTooltip(template);
-
-	if (template.armour)
-		txt += '\n' + getArmorTooltip(template.armour);
-
-	if (template.speed)
-		txt += '\n' + getSpeedTooltip(template);
-
-	if (template.gather)
-	{
-		let rates = [];
-		for (let type in template.gather)
-			rates.push(sprintf(translate("%(resourceIcon)s %(rate)s"), {
-				"resourceIcon": getCostComponentDisplayName(type),
-				"rate": template.gather[type]
-			}));
-
-		txt += '\n' + sprintf(translate("%(label)s %(details)s"), {
-			"label": g_TooltipTextFormats.header[0] + translate("Gather Rates:") + g_TooltipTextFormats.header[1],
-			"details": rates.join("  ")
-		});
-	}
+	txt += getEntityStats(template);
 
 	txt += getPopulationBonusTooltip(template);
 

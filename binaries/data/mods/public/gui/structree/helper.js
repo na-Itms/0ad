@@ -7,7 +7,7 @@ function loadTemplate(templateName)
 	{
 		// We need to clone the template because we want to perform some translations.
 		var data = clone(Engine.GetTemplate(templateName));
-		translateObjectKeys(data, ["GenericName", "SpecificName", "Tooltip"]);
+		translateObjectKeys(data, ["GenericName", "SpecificName", "Tooltip", "History"]);
 		
 		g_TemplateData[templateName] = data;
 	}
@@ -86,4 +86,47 @@ function GetTemplateData(templateName)
 {
 	var template = loadTemplate(templateName);
 	return GetTemplateDataHelper(template);
+}
+
+function getEntityStats(template)
+{
+	var txt = "";
+
+	if (template.health)
+		txt += "\n" + sprintf(translate("%(label)s %(details)s"), {
+			label: g_TooltipTextFormats.header[0] + translate("Health:") + g_TooltipTextFormats.header[1],
+			details: template.health
+		});
+
+	if (template.healer)
+		txt += "\n" + getHealerTooltip(template);
+
+	if (template.attack)
+		txt += "\n" + getAttackTooltip(template);
+
+	if (template.armour)
+		txt += "\n" + getArmorTooltip(template.armour);
+
+	if (template.speed)
+		txt += "\n" + getSpeedTooltip(template);
+
+	if (template.gather)
+	{
+		var rates = [];
+		for (let type in template.gather)
+			rates.push(sprintf(translate("%(resourceIcon)s %(rate)s"), {
+				resourceIcon: getCostComponentDisplayName(type),
+				rate: template.gather[type]
+			}));
+
+		txt += "\n" + sprintf(translate("%(label)s %(details)s"), {
+			label: g_TooltipTextFormats.header[0] + translate("Gather Rates:") + g_TooltipTextFormats.header[1],
+			details: rates.join("  ")
+		});
+	}
+
+	if (template.supply)
+		txt += "\n" + getResourceSupplyTooltip(template);
+
+	return txt;
 }

@@ -392,6 +392,23 @@ function getEntityCostTooltip(template, trainNum, entity)
 }
 
 /**
+ * Returns the resources this entity supplies in the specified entity's tooltip
+ */
+function getResourceSupplyTooltip(template)
+{
+	if (!template.supply)
+		return "";
+
+	var supply = template.supply;
+	var type = (supply.type[0] === "treasure") ? supply.type[1] : supply.type[0];
+
+	var txt = g_TooltipTextFormats.header[0] + translate("Resource Supply:") + g_TooltipTextFormats.header[1] + " ";
+	txt += sprintf(translate("%(component)s %(amount)s"), { component: getCostComponentDisplayName(type), amount: supply.amount });
+
+	return txt;
+}
+
+/**
  * Returns the population bonus information to display in the specified entity's construction button tooltip.
  */
 function getPopulationBonusTooltip(template)

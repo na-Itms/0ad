@@ -254,7 +254,13 @@ function displaySingle(entState)
 
 	// Icon image
 	// TODO: we should require all entities to have icons
-	Engine.GetGUIObjectByName("icon").sprite = template.icon ? ("stretched:session/portraits/" + template.icon) : "bkFillBlack";
+	if (template.icon)
+	{
+		Engine.GetGUIObjectByName("icon").sprite = "stretched:session/portraits/" + template.icon;
+		Engine.GetGUIObjectByName("iconBorder").onpressright = function () { showEntityDetails(entState.template); };
+	}
+	else
+		Engine.GetGUIObjectByName("icon").sprite = "bkFillBlack";
 
 	let armorString = getArmorTooltip(entState.armour);
 
@@ -420,4 +426,18 @@ function updateSelectionDetails()
 
 	// Fill out commands panel for specific unit selected (or first unit of primary group)
 	updateUnitCommands(entState, supplementalDetailsPanel, commandsPanel, selection);
+}
+
+/**
+ * Pauses game and opens the entity details viewer on a given entity
+ */
+function showEntityDetails(entityName = null)
+{
+	pauseGame();
+	var data = { // TODO civ should be that of entity, not that of current player
+		"entityName" : entityName,
+		"callback": "resumeGame",
+		"civ": g_Players[Engine.GetPlayerID()].civ,
+	};
+	Engine.PushGuiPage("page_viewer.xml", data);
 }
