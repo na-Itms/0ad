@@ -2,7 +2,7 @@
 <Entity parent="template_gaia_flora_tree">
   <Identity>
     <SpecificName>Dead Tree</SpecificName>
-    <History>.</History>
+    <History>Snags can stand for a long time after a tree is dead from a lack of water.</History>
   </Identity>
   <VisualActor>
     <Actor>flora/trees/tree_dead.xml</Actor>
