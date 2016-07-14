@@ -1025,9 +1025,13 @@ var g_EntityCommands =
 			unloadAll();
 		},
 	},
+
 	"delete": {
 		"getInfo": function(entState)
 		{
+			if (entState.formation)
+				return false;
+
 			let deleteReason = isUndeletable(entState);
 			return deleteReason ?
 				{
@@ -1063,6 +1067,7 @@ var g_EntityCommands =
 				openDeleteDialog(selection);
 		},
 	},
+
 	"stop": {
 		"getInfo": function(entState)
 		{
@@ -1372,7 +1377,7 @@ function someGuarding(entities)
 }
 
 /**
- * Keep in sync with Commands.js.
+ * Keep in sync with Commands.js. wat
  */
 function isUndeletable(entState)
 {
