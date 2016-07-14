@@ -4203,15 +4203,6 @@ UnitAI.prototype.CheckTargetRange = function(target, iid, type)
  */
 UnitAI.prototype.CheckTargetAttackRange = function(target, type)
 {
-	// for formation members, the formation will take care of the range check
-	if (this.IsFormationMember())
-	{
-		var cmpFormationUnitAI = Engine.QueryInterface(this.formationController, IID_UnitAI);
-		if (cmpFormationUnitAI && cmpFormationUnitAI.IsAttackingAsFormation()
-			&& cmpFormationUnitAI.order.data.target == target)
-			return true;
-	}
-
 	var cmpFormation = Engine.QueryInterface(target, IID_Formation);
 	if (cmpFormation)
 		target = cmpFormation.GetClosestMember(this.entity);
@@ -5423,11 +5414,6 @@ UnitAI.prototype.WalkToHeldPosition = function()
 
 UnitAI.prototype.CanAttack = function(target, forceResponse)
 {
-	// Formation controllers should always respond to commands
-	// (then the individual units can make up their own minds)
-	if (this.IsFormationController())
-		return true;
-
 	// Verify that we're able to respond to Attack commands
 	var cmpAttack = Engine.QueryInterface(this.entity, IID_Attack);
 	if (!cmpAttack)
