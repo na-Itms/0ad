@@ -1,6 +1,5 @@
 newoption { trigger = "android", description = "Use non-working Android cross-compiling mode" }
 newoption { trigger = "atlas", description = "Include Atlas scenario editor projects" }
-newoption { trigger = "collada", description = "Include COLLADA projects (requires FCollada library)" }
 newoption { trigger = "coverage", description = "Enable code coverage data collection (GCC only)" }
 newoption { trigger = "gles", description = "Use non-working OpenGL ES 2.0 mode" }
 newoption { trigger = "icc", description = "Use Intel C++ Compiler (Linux only; should use either \"--cc icc\" or --without-pch too, and then set CXX=icpc before calling make)" }
@@ -937,6 +936,8 @@ function setup_main_exe ()
 	project_add_extern_libs(used_extern_libs, target_type)
 	project_add_x11_dirs()
 
+	dependson { "Collada" }
+
 	-- Platform Specifics
 	if os.is("windows") then
 
@@ -1356,6 +1357,8 @@ function setup_tests()
 	project_add_extern_libs(used_extern_libs, target_type)
 	project_add_x11_dirs()
 
+	dependson { "Collada" }
+
 	-- TODO: should fix the duplication between this OS-specific linking
 	-- code, and the similar version in setup_main_exe
 
@@ -1434,9 +1437,7 @@ if _OPTIONS["atlas"] then
 	setup_atlas_frontends()
 end
 
-if _OPTIONS["collada"] then
-	setup_collada_projects()
-end
+setup_collada_projects()
 
 if not _OPTIONS["without-tests"] then
 	setup_tests()
