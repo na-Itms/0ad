@@ -5,7 +5,6 @@
 -- 1) add a new extern_lib_defs entry
 -- 2) add library name to extern_libs tables in premake.lua for all 'projects' that want to use it
 
-
 -- directory in which OS-specific library subdirectories reside.
 if os.is("macosx") then
 	libraries_dir = rootdir.."/libraries/osx/"
@@ -38,57 +37,8 @@ local function add_third_party_include_paths(extern_lib)
 	includedirs { third_party_source_dir .. extern_lib .. "/include" }
 end
 
+pkgconfig = require "pkgconfig"
 
--- For unixes: add buildflags and linkflags using pkg-config or another similar command.
--- By default, pkg-config is used. Other commands can be passed as "alternative_cmd".
--- Running such commands at build/linktime does not work on all environments.
--- For those environments where it does not work, we already run it now.
--- Any better ideas?
-local function pkgconfig_cflags(lib, alternative_cmd)
-	local cmd_cflags = ""
-	local result_cflags
-	if not alternative_cmd then
-		cmd_cflags = "pkg-config "..lib.." --cflags"
-	else
-		cmd_cflags = alternative_cmd
-	end
-
-	if _ACTION == "xcode3" or _ACTION == "xcode4" then
-		result_cflags = string.gsub(os.capture(cmd_cflags), "\n", "")
-		buildoptions { result_cflags }
-	else
-		buildoptions { "`"..cmd_cflags.."`" }
-	end
-end
-
-local function pkgconfig_libs(lib, alternative_cmd)
-	local cmd_libs = ""
-	local result_libs
-	if not alternative_cmd then
-		cmd_libs = "pkg-config "..lib.." --libs"
-	else
-		cmd_libs = alternative_cmd
-	end
-
-	if _ACTION == "xcode3" or _ACTION == "xcode4" then
-		-- The syntax of -Wl with the comma separated list doesn't work and -Wl apparently isn't needed in xcode.
-		-- This is a hack, but it works...
-		result_libs = string.gsub(os.capture(cmd_libs), "-Wl", "")
-		result_libs = string.gsub(result_libs, ",", " ")
-		result_libs = string.gsub(result_libs, "\n", "")
-		linkoptions { result_libs }
-	elseif _ACTION == "gmake" then	
-		gnuexternals { "`"..cmd_libs.."`" }
-	else
-		linkoptions { "`"..cmd_libs.."`" }
-	end
-end
-
-function os.capture(cmd)
-	local f = io.popen(cmd, 'r')
-	local s = f:read('*a')
-	return s
-end
 
 local function add_delayload(name, suffix, def)
 
@@ -109,11 +59,11 @@ local function add_delayload(name, suffix, def)
 		local dbg_cmd = "/DELAYLOAD:" .. name .. suffix .. ".dll"
 		local cmd     = "/DELAYLOAD:" .. name .. ".dll"
 
-		configuration "Debug"
+		filter "Debug"
 			linkoptions { dbg_cmd }
-		configuration "Release"
+		filter "Release"
 			linkoptions { cmd }
-		configuration { }
+		filter { }
 	end
 
 end
@@ -150,19 +100,18 @@ local function add_default_links(def)
 		suffix = ""
 	end
 
-	-- OS X "Frameworks" need to be added in a special way to the link
-	-- i.e. by linkoptions += "-framework ..."
+	-- OS X "Frameworks" are added to the links as "name.framework"
 	if os.is("macosx") and def.osx_frameworks then
 		for i,name in pairs(def.osx_frameworks) do
-			linkoptions { "-framework " .. name }
+			links { name .. ".framework" }
 		end
 	else
 		for i,name in pairs(names) do
-			configuration "Debug"
+			filter "Debug"
 				links { name .. suffix }
-			configuration "Release"
+			filter "Release"
 				links { name }
-			configuration { }
+			filter { }
 
 			add_delayload(name, suffix, def)
 		end
@@ -237,7 +186,7 @@ extern_lib_defs = {
 			end
 			-- TODO: This actually applies to most libraries we use on BSDs, make this a global setting.
 			if os.is("bsd") then
-				includedirs { "/usr/local/include" }
+				sysincludedirs { "/usr/local/include" }
 			end
 		end,
 		link_settings = function()
@@ -290,17 +239,17 @@ extern_lib_defs = {
 		link_settings = function()
 			add_source_lib_paths("fcollada")
 			if os.is("windows") then
-				configuration "Debug"
+				filter "Debug"
 					links { "FColladaD" }
-				configuration "Release"
+				filter "Release"
 					links { "FCollada" }
-			 	configuration { }
+				filter { }
 			else
-				configuration "Debug"
+				filter "Debug"
 					links { "FColladaSD" }
-				configuration "Release"
+				filter "Release"
 					links { "FColladaSR" }
-				configuration { }
+				filter { }
 			end
 		end,
 	},
@@ -314,7 +263,7 @@ extern_lib_defs = {
 				if not gloox_config_path then
 					gloox_config_path = "gloox-config"
 				end
-				pkgconfig_cflags(nil, gloox_config_path.." --cflags")
+				pkgconfig.add_includes(nil, gloox_config_path.." --cflags")
 			end
 		end,
 		link_settings = function()
@@ -326,7 +275,7 @@ extern_lib_defs = {
 				if not gloox_config_path then
 					gloox_config_path = "gloox-config"
 				end
-				pkgconfig_libs(nil, gloox_config_path.." --libs")
+				pkgconfig.add_links(nil, gloox_config_path.." --libs")
 			else
 				-- TODO: consider using pkg-config on non-Windows (for compile_settings too)
 				add_default_links({
@@ -383,7 +332,7 @@ extern_lib_defs = {
 				if not icu_config_path then
 					icu_config_path = "icu-config"
 				end
-				pkgconfig_cflags(nil, icu_config_path.." --cppflags")
+				pkgconfig.add_includes(nil, icu_config_path.." --cppflags")
 			end
 		end,
 		link_settings = function()
@@ -395,7 +344,7 @@ extern_lib_defs = {
 				if not icu_config_path then
 					icu_config_path = "gloox-config"
 				end
-				pkgconfig_libs(nil, icu_config_path.." --ldflags-searchpath --ldflags-libsonly --ldflags-system")
+				pkgconfig.add_links(nil, icu_config_path.." --ldflags-searchpath --ldflags-libsonly --ldflags-system")
 			else
 				add_default_links({
 					win_names  = { "icuuc", "icuin" },
@@ -428,7 +377,7 @@ extern_lib_defs = {
 				add_default_include_paths("libpng")
 			end
 			if os.getversion().description == "OpenBSD" then
-				includedirs { "/usr/local/include/libpng" }
+				sysincludedirs { "/usr/local/include/libpng" }
 			end
 		end,
 		link_settings = function()
@@ -456,30 +405,30 @@ extern_lib_defs = {
 				end
 
 				-- use xml2-config instead of pkg-config on OS X
-				pkgconfig_cflags(nil, xml2_config_path.." --cflags")
+				pkgconfig.add_includes(nil, xml2_config_path.." --cflags")
 				-- libxml2 needs _REENTRANT or __MT__ for thread support;
 				-- OS X doesn't get either set by default, so do it manually
 				defines { "_REENTRANT" }
 			else
-				pkgconfig_cflags("libxml-2.0")
+				pkgconfig.add_includes("libxml-2.0")
 			end
 		end,
 		link_settings = function()
 			if os.is("windows") then
 				add_default_lib_paths("libxml2")
-				configuration "Debug"
+				filter "Debug"
 					links { "libxml2" }
-				configuration "Release"
+				filter "Release"
 					links { "libxml2" }
-				configuration { }
+				filter { }
 			elseif os.is("macosx") then
 				xml2_config_path = os.getenv("XML2_CONFIG")
 				if not xml2_config_path then
 					xml2_config_path = "xml2-config"
 				end
-				pkgconfig_libs(nil, xml2_config_path.." --libs")
+				pkgconfig.add_links(nil, xml2_config_path.." --libs")
 			else
-				pkgconfig_libs("libxml-2.0")
+				pkgconfig.add_links("libxml-2.0")
 			end
 		end,
 	},
@@ -574,7 +523,7 @@ extern_lib_defs = {
 					sdl_config_path = "sdl2-config"
 				end
 
-				pkgconfig_cflags(nil, sdl_config_path.." --cflags")
+				pkgconfig.add_includes(nil, sdl_config_path.." --cflags")
 			end
 		end,
 		link_settings = function()
@@ -585,7 +534,7 @@ extern_lib_defs = {
 				if not sdl_config_path then
 					sdl_config_path = "sdl2-config"
 				end
-				pkgconfig_libs(nil, sdl_config_path.." --libs")
+				pkgconfig.add_links(nil, sdl_config_path.." --libs")
 			end
 		end,
 	},
@@ -593,7 +542,7 @@ extern_lib_defs = {
 		compile_settings = function()
 			if _OPTIONS["with-system-mozjs38"] then
 				if not _OPTIONS["android"] then
-					pkgconfig_cflags("mozjs-38")
+					pkgconfig.add_includes("mozjs-38")
 				end
 			else
 				if os.is("windows") then
@@ -602,12 +551,12 @@ extern_lib_defs = {
 				else
 					include_dir = "include-unix"
 				end
-				configuration "Debug"
+				filter "Debug"
 					includedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-debug" }
 					defines { "DEBUG" }
-				configuration "Release"
+				filter "Release"
 					includedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-release" }
-				configuration { }
+				filter { }
 			end
 		end,
 		link_settings = function()
@@ -615,19 +564,19 @@ extern_lib_defs = {
 				if _OPTIONS["android"] then
 					links { "mozjs-38" }
 				else
-					pkgconfig_libs("nspr")
-					pkgconfig_libs("mozjs-38")
+					pkgconfig.add_links("nspr")
+					pkgconfig.add_links("mozjs-38")
 				end
 			else
 				if os.is("macosx") then
 					add_default_lib_paths("nspr")
 					links { "nspr4", "plc4", "plds4" }
 				end
-				configuration "Debug"
+				filter "Debug"
 					links { "mozjs38-ps-debug" }
-				configuration "Release"
+				filter "Release"
 					links { "mozjs38-ps-release" }
-				configuration { }
+				filter { }
 				add_source_lib_paths("spidermonkey")
 			end
 		end,
@@ -687,7 +636,7 @@ extern_lib_defs = {
 					wx_config_path = "wx-config"
 				end
 
-				pkgconfig_cflags(nil, wx_config_path.." --unicode=yes --cxxflags")
+				pkgconfig.add_includes(nil, wx_config_path.." --unicode=yes --cxxflags")
 			end
 		end,
 		link_settings = function()
@@ -698,7 +647,7 @@ extern_lib_defs = {
 				if not wx_config_path then
 					wx_config_path = "wx-config"
 				end
-				pkgconfig_libs(nil, wx_config_path.." --unicode=yes --libs std,gl")
+				pkgconfig.add_links(nil, wx_config_path.." --unicode=yes --libs std,gl")
 			end
 		end,
 	},

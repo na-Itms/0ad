@@ -23,7 +23,7 @@ function m.add_includes(lib, alternative_cmd)
 		end
 	end
 
-	includedirs(dirs)
+	sysincludedirs(dirs)
 	buildoptions(options)
 end
 
