@@ -2,7 +2,9 @@
  * Tests for consistent and correct math results
  */
 
- // +0 is different than -0, but standard equality won't test that
+Engine.LoadGlobalScript("Math.js");
+
+// +0 is different than -0, but standard equality won't test that
 function isNegativeZero(z) { return z === 0 && 1/z === -Infinity; }
 function isPositiveZero(z) { return z === 0 && 1/z === Infinity; }
 

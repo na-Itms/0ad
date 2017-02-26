@@ -850,6 +850,28 @@ bool ScriptInterface::LoadScript(const VfsPath& filename, const std::string& cod
 	return JS_CallFunction(m->m_cx, JS::NullPtr(), func, JS::HandleValueArray::empty(), &rval);
 }
 
+bool ScriptInterface::LoadScriptFile(const VfsPath& path)
+{
+	if (!VfsFileExists(path))
+	{
+		LOGERROR("File '%s' does not exist", path.string8());
+		return false;
+	}
+
+	CVFSFile file;
+	PSRETURN ret = file.Load(g_VFS, path);
+
+	if (ret != PSRETURN_OK)
+	{
+		LOGERROR("Failed to load file '%s': %s", path.string8(), GetErrorString(ret));
+		return false;
+	}
+
+	std::string code = file.DecodeUTF8(); // assume it's UTF-8
+
+	return LoadScript(path, code);
+}
+
 shared_ptr<ScriptRuntime> ScriptInterface::CreateRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtimeSize, int heapGrowthBytesGCTrigger)
 {
 	return shared_ptr<ScriptRuntime>(new ScriptRuntime(parentRuntime, runtimeSize, heapGrowthBytesGCTrigger));
@@ -874,8 +896,6 @@ bool ScriptInterface::LoadGlobalScript(const VfsPath& filename, const std::wstri
 
 bool ScriptInterface::LoadGlobalScriptFile(const VfsPath& path)
 {
-	JSAutoRequest rq(m->m_cx);
-	JS::RootedObject global(m->m_cx, m->m_glob);
 	if (!VfsFileExists(path))
 	{
 		LOGERROR("File '%s' does not exist", path.string8());
@@ -883,7 +903,6 @@ bool ScriptInterface::LoadGlobalScriptFile(const VfsPath& path)
 	}
 
 	CVFSFile file;
-
 	PSRETURN ret = file.Load(g_VFS, path);
 
 	if (ret != PSRETURN_OK)
@@ -894,17 +913,7 @@ bool ScriptInterface::LoadGlobalScriptFile(const VfsPath& path)
 
 	std::wstring code = wstring_from_utf8(file.DecodeUTF8()); // assume it's UTF-8
 
-	utf16string codeUtf16(code.begin(), code.end());
-	uint lineNo = 1;
-	// CompileOptions does not copy the contents of the filename string pointer.
-	// Passing a temporary string there will cause undefined behaviour, so we create a separate string to avoid the temporary.
-	std::string filenameStr = path.string8();
-
-	JS::RootedValue rval(m->m_cx);
-	JS::CompileOptions opts(m->m_cx);
-	opts.setFileAndLine(filenameStr.c_str(), lineNo);
-	return JS::Evaluate(m->m_cx, global, opts,
-			reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)(codeUtf16.length()), &rval);
+	return LoadGlobalScript(path, code);
 }
 
 bool ScriptInterface::Eval(const char* code)

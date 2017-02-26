@@ -247,6 +247,12 @@ public:
 	bool LoadScript(const VfsPath& filename, const std::string& code);
 
 	/**
+	 * Load and execute the given script in a new function scope.
+	 * @return true on successful compilation and execution; false otherwise
+	 */
+	bool LoadScriptFile(const VfsPath& path);
+
+	/**
 	 * Load and execute the given script in the global scope.
 	 * @param filename Name for debugging purposes (not used to load the file)
 	 * @param code JS code to execute

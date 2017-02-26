@@ -1,4 +1,8 @@
-// TODO: Move this to a folder of tests for GlobalScripts (once one is created)
+/**
+ * Tests for technology templates loading and interaction
+ */
+
+Engine.LoadGlobalScript("Technologies.js");
 
 // No requirements set in template
 let template = {};
