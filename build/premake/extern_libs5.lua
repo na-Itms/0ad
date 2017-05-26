@@ -26,15 +26,15 @@ local function add_source_lib_paths(extern_lib)
 end
 
 local function add_default_include_paths(extern_lib)
-	includedirs { libraries_dir .. extern_lib .. "/include" }
+	sysincludedirs { libraries_dir .. extern_lib .. "/include" }
 end
 
 local function add_source_include_paths(extern_lib)
-	includedirs { libraries_source_dir .. extern_lib .. "/include" }
+	sysincludedirs { libraries_source_dir .. extern_lib .. "/include" }
 end
 
 local function add_third_party_include_paths(extern_lib)
-	includedirs { third_party_source_dir .. extern_lib .. "/include" }
+	sysincludedirs { third_party_source_dir .. extern_lib .. "/include" }
 end
 
 pkgconfig = require "pkgconfig"
@@ -213,7 +213,7 @@ extern_lib_defs = {
 	},
 	cxxtest = {
 		compile_settings = function()
-			includedirs { libraries_source_dir .. "cxxtest-4.4" }
+			sysincludedirs { libraries_source_dir .. "cxxtest-4.4" }
 		end,
 	},
 	enet = {
@@ -552,10 +552,10 @@ extern_lib_defs = {
 					include_dir = "include-unix"
 				end
 				filter "Debug"
-					includedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-debug" }
+					sysincludedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-debug" }
 					defines { "DEBUG" }
 				filter "Release"
-					includedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-release" }
+					sysincludedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-release" }
 				filter { }
 			end
 		end,

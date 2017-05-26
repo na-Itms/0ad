@@ -453,7 +453,7 @@ function project_add_contents(source_root, rel_source_dirs, rel_include_dirs, ex
 		filter "action:vs*"
 			pchheader("precompiled.h")
 		filter "action:not vs*"
-			pchheader(pch_dir.."precompiled.h")
+			pchheader("../"..pch_dir.."precompiled.h")
 		filter {}
 		pchsource(pch_dir.."precompiled.cpp")
 		defines { "USING_PCH" }
