@@ -71,18 +71,19 @@ matrix:
         apt:
           sources:
           - ubuntu-toolchain-r-test
-          - sourceline: 'deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-6.0 main'
-          packages:
+          - sourceline: 'deb https://apt.llvm.org/trusty/ llvm-toolchain-trusty-6.0 main'
+          - key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'    
+      packages:
           - clang-6.0
       env:
         - MATRIX_EVAL="CC=clang-6.0 && CXX=clang++-6.0"
-
-    - os: osx
-      osx_image: xcode9.2
-      env: Tr_Xcode_Version="9.2"
-    - os: osx
-      osx_image: xcode9.3beta
-      env: Tr_Xcode_Version="9.3beta"
+#
+#    - os: osx
+#      osx_image: xcode9.2
+#      env: Tr_Xcode_Version="9.2"
+#    - os: osx
+#      osx_image: xcode9.3beta
+#      env: Tr_Xcode_Version="9.3beta"
 
 before_install:
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then ./.travis_before_osx_install.sh; fi
