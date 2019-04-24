@@ -52,8 +52,9 @@ template<typename T> static bool FromJSVal_vector(JSContext* cx, JS::HandleValue
 	if (!v.isObject())
 		FAIL("Argument must be an array");
 
+	bool isArray;
 	obj = &v.toObject();
-	if (!(JS_IsArrayObject(cx, obj) || JS_IsTypedArrayObject(obj)))
+	if (!(JS_IsArrayObject(cx, obj, &isArray) && isArray || JS_IsTypedArrayObject(obj)))
 		FAIL("Argument must be an array");
 
 	u32 length;

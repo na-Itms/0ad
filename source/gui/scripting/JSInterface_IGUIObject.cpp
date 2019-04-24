@@ -314,28 +314,28 @@ bool JSI_IGUIObject::getProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	}
 }
 
-bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool UNUSED(strict), JS::MutableHandleValue vp)
+bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp, JS::ObjectOpResult& result)
 {
 	IGUIObject* e = (IGUIObject*)JS_GetInstancePrivate(cx, obj, &JSI_IGUIObject::JSI_class, NULL);
 	if (!e)
-		return false;
+		return result.fail(JSMSG_NOT_NONNULL_OBJECT);
 
 	JSAutoRequest rq(cx);
 	JS::RootedValue idval(cx);
 	if (!JS_IdToValue(cx, id, &idval))
-		return false;
+		return result.fail(JSMSG_NOT_NONNULL_OBJECT);
 
 	std::string propName;
 	if (!ScriptInterface::FromJSVal(cx, idval, propName))
-		return false;
+		return result.fail(JSMSG_UNDEFINED_PROP);
 
 	if (propName == "name")
 	{
 		std::string value;
 		if (!ScriptInterface::FromJSVal(cx, vp, value))
-			return false;
+			return result.fail(JSMSG_UNDEFINED_PROP);
 		e->SetName(value);
-		return true;
+		return result.succeed();
 	}
 
 	JS::RootedObject vpObj(cx);
@@ -348,13 +348,13 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		if (vp.isPrimitive() || vp.isNull() || !JS_ObjectIsFunction(cx, &vp.toObject()))
 		{
 			JS_ReportError(cx, "on- event-handlers must be functions");
-			return false;
+			return result.fail(JSMSG_NOT_FUNCTION);
 		}
 
 		CStr eventName(CStr(propName.substr(2)).LowerCase());
 		e->SetScriptHandler(eventName, vpObj);
 
-		return true;
+		return result.succeed();
 	}
 
 	// Retrieve the setting's type (and make sure it actually exists)
@@ -362,7 +362,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	if (e->GetSettingType(propName, Type) != PSRETURN_OK)
 	{
 		JS_ReportError(cx, "Invalid setting '%s'", propName.c_str());
-		return true;
+		return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 	}
 
 	switch (Type)
@@ -371,7 +371,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	{
 		std::string value;
 		if (!ScriptInterface::FromJSVal(cx, vp, value))
-			return false;
+			return result.fail(JSMSG_UNDEFINED_PROP);
 
 		GUI<CStr>::SetSetting(e, propName, value);
 		break;
@@ -381,7 +381,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	{
 		std::wstring value;
 		if (!ScriptInterface::FromJSVal(cx, vp, value))
-			return false;
+			return result.fail(JSMSG_UNDEFINED_PROP);
 
 		GUI<CStrW>::SetSetting(e, propName, value);
 		break;
@@ -391,7 +391,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	{
 		std::string value;
 		if (!ScriptInterface::FromJSVal(cx, vp, value))
-			return false;
+			return result.fail(JSMSG_UNDEFINED_PROP);
 
 		GUI<CGUISpriteInstance>::SetSetting(e, propName, CGUISpriteInstance(value));
 		break;
@@ -401,7 +401,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	{
 		std::wstring value;
 		if (!ScriptInterface::FromJSVal(cx, vp, value))
-			return false;
+			return result.fail(JSMSG_UNDEFINED_PROP);
 
 		CGUIString str;
 		str.SetValue(value);
@@ -413,7 +413,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	{
 		std::string value;
 		if (!ScriptInterface::FromJSVal(cx, vp, value))
-			return false;
+			return result.fail(JSMSG_UNDEFINED_PROP);
 
 		EAlign a;
 		if (value == "left") a = EAlign_Left;
@@ -422,7 +422,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Invalid alignment (should be 'left', 'right' or 'center')");
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		GUI<EAlign>::SetSetting(e, propName, a);
 		break;
@@ -432,7 +432,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	{
 		std::string value;
 		if (!ScriptInterface::FromJSVal(cx, vp, value))
-			return false;
+			return result.fail(JSMSG_UNDEFINED_PROP);
 
 		EVAlign a;
 		if (value == "top") a = EVAlign_Top;
@@ -441,7 +441,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Invalid alignment (should be 'top', 'bottom' or 'center')");
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		GUI<EVAlign>::SetSetting(e, propName, a);
 		break;
@@ -455,7 +455,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Cannot convert value to int");
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		break;
 	}
@@ -468,7 +468,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Cannot convert value to u32");
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		break;
 	}
@@ -481,7 +481,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Cannot convert value to float");
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		break;
 	}
@@ -499,12 +499,12 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		{
 			std::wstring value;
 			if (!ScriptInterface::FromJSVal(cx, vp, value))
-				return false;
+				return result.fail(JSMSG_UNDEFINED_PROP);
 
 			if (e->SetSetting(propName, value) != PSRETURN_OK)
 			{
 				JS_ReportError(cx, "Invalid value for setting '%s'", propName.c_str());
-				return false;
+				return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 			}
 		}
 		else if (vp.isObject() && JS_InstanceOf(cx, vpObj, &JSI_GUISize::JSI_class, NULL))
@@ -529,7 +529,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Size only accepts strings or GUISize objects");
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		break;
 	}
@@ -540,12 +540,12 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		{
 			std::wstring value;
 			if (!ScriptInterface::FromJSVal(cx, vp, value))
-				return false;
+				return result.fail(JSMSG_UNDEFINED_PROP);
 
 			if (e->SetSetting(propName, value) != PSRETURN_OK)
 			{
 				JS_ReportError(cx, "Invalid value for setting '%s'", propName.c_str());
-				return false;
+				return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 			}
 		}
 		else if (vp.isObject() && JS_InstanceOf(cx, vpObj, &JSI_GUIColor::JSI_class, NULL))
@@ -568,7 +568,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Color only accepts strings or GUIColor objects");
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		break;
 	}
@@ -581,7 +581,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Failed to get list '%s'", propName.c_str());
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		break;
 	}
@@ -594,7 +594,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		else
 		{
 			JS_ReportError(cx, "Invalid value for chart series '%s'", propName.c_str());
-			return false;
+			return result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
 		}
 		break;
 	}
@@ -604,7 +604,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 		break;
 	}
 
-	return !JS_IsExceptionPending(cx);
+	return result.succeed() && !JS_IsExceptionPending(cx);
 }
 
 
