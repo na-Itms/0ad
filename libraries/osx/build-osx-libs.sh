@@ -973,6 +973,7 @@ then
   mkdir -p $INCLUDE_DIR_RELEASE
   cp -R -L dist/include/* $INCLUDE_DIR_RELEASE/
   cp dist/sdk/lib/*.a $INSTALL_DIR/lib
+  cp js/src/*.a $INSTALL_DIR/lib
   popd
   mv moz.build.bak moz.build
   
