@@ -52,6 +52,10 @@ struct BufferOutputHandler : public nvtt::OutputHandler
 		memcpy(&buffer[off], data, size);
 		return true;
 	}
+
+	virtual void endImage()
+	{
+	}
 };
 
 /**
