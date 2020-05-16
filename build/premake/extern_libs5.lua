@@ -282,6 +282,7 @@ extern_lib_defs = {
 					-- Manually add gnutls dependencies, those are not present in gloox's pkg-config
 					add_default_lib_paths("nettle")
 					add_default_lib_paths("gmp")
+					add_default_lib_paths("gnutls")
 					add_default_links({
 						osx_names = { "nettle", "hogweed", "gmp" },
 					})
