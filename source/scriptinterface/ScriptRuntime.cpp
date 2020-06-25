@@ -89,6 +89,11 @@ void GCSliceCallbackHook(JSRuntime* UNUSED(rt), JS::GCProgress progress, const J
 	#endif
 }
 
+shared_ptr<ScriptRuntime> ScriptRuntime::CreateRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtimeSize, int heapGrowthBytesGCTrigger)
+{
+	return shared_ptr<ScriptRuntime>(new ScriptRuntime(parentRuntime, runtimeSize, heapGrowthBytesGCTrigger));
+}
+
 ScriptRuntime::ScriptRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtimeSize, int heapGrowthBytesGCTrigger):
 	m_LastGCBytes(0),
 	m_LastGCCheck(0.0f),
