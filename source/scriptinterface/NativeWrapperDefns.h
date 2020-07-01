@@ -177,37 +177,34 @@ static void AssignOrToJSValHelper(JSContext* UNUSED(cx), JS::AutoValueVector& UN
 template<typename R, typename... Ts>
 bool ScriptInterface::CallFunction(JS::HandleValue val, const char* name, R& ret, const Ts&... params) const
 {
-	JSContext* cx = GetContext();
-	JSAutoRequest rq(cx);
-	JS::RootedValue jsRet(cx);
-	JS::AutoValueVector argv(cx);
+	ScriptInterface::Request rq(this);
+	JS::RootedValue jsRet(rq.cx);
+	JS::AutoValueVector argv(rq.cx);
 	argv.resize(sizeof...(Ts));
-	AssignOrToJSValHelper<0>(cx, argv, params...);
+	AssignOrToJSValHelper<0>(rq.cx, argv, params...);
 	if (!CallFunction_(val, name, argv, &jsRet))
 		return false;
-	return FromJSVal(cx, jsRet, ret);
+	return FromJSVal(rq.cx, jsRet, ret);
 }
 
 template<typename R, typename... Ts>
 bool ScriptInterface::CallFunction(JS::HandleValue val, const char* name, JS::Rooted<R>* ret, const Ts&... params) const
 {
-	JSContext* cx = GetContext();
-	JSAutoRequest rq(cx);
+	ScriptInterface::Request rq(this);
 	JS::MutableHandle<R> jsRet(ret);
-	JS::AutoValueVector argv(cx);
+	JS::AutoValueVector argv(rq.cx);
 	argv.resize(sizeof...(Ts));
-	AssignOrToJSValHelper<0>(cx, argv, params...);
+	AssignOrToJSValHelper<0>(rq.cx, argv, params...);
 	return CallFunction_(val, name, argv, jsRet);
 }
 
 template<typename R, typename... Ts>
 bool ScriptInterface::CallFunction(JS::HandleValue val, const char* name, JS::MutableHandle<R> ret, const Ts&... params) const
 {
-	JSContext* cx = GetContext();
-	JSAutoRequest rq(cx);
-	JS::AutoValueVector argv(cx);
+	ScriptInterface::Request rq(this);
+	JS::AutoValueVector argv(rq.cx);
 	argv.resize(sizeof...(Ts));
-	AssignOrToJSValHelper<0>(cx, argv, params...);
+	AssignOrToJSValHelper<0>(rq.cx, argv, params...);
 	return CallFunction_(val, name, argv, ret);
 }
 
@@ -215,12 +212,11 @@ bool ScriptInterface::CallFunction(JS::HandleValue val, const char* name, JS::Mu
 template<typename... Ts>
 bool ScriptInterface::CallFunctionVoid(JS::HandleValue val, const char* name, const Ts&... params) const
 {
-	JSContext* cx = GetContext();
-	JSAutoRequest rq(cx);
-	JS::RootedValue jsRet(cx);
-	JS::AutoValueVector argv(cx);
+	ScriptInterface::Request rq(this);
+	JS::RootedValue jsRet(rq.cx);
+	JS::AutoValueVector argv(rq.cx);
 	argv.resize(sizeof...(Ts));
-	AssignOrToJSValHelper<0>(cx, argv, params...);
+	AssignOrToJSValHelper<0>(rq.cx, argv, params...);
 	return CallFunction_(val, name, argv, &jsRet);
 }
 

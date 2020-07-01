@@ -91,9 +91,28 @@ public:
 	void SetCallbackData(void* pCBData);
 	static CxPrivate* GetScriptInterfaceAndCBData(JSContext* cx);
 
-	JSContext* GetContext() const;
 	JSRuntime* GetJSRuntime() const;
 	shared_ptr<ScriptRuntime> GetRuntime() const;
+
+	/**
+	 * RAII structure which encapsulates an access to the context of a ScriptInterface.
+	 * This struct provides a pointer to the context, and it acts like JSAutoRequest. This
+	 * way, getting the context is safe with respect to the GC.
+	 */
+	struct Request
+	{
+		Request() = delete;
+		Request(const Request& rq) = delete;
+		Request& operator=(const Request& rq) = delete;
+		Request(const ScriptInterface& scriptInterface);
+		Request(const ScriptInterface* scriptInterface) : Request(*scriptInterface) {}
+		Request(shared_ptr<ScriptInterface> scriptInterface) : Request(*scriptInterface) {}
+		Request(const CxPrivate* cxPrivate) : Request(cxPrivate->pScriptInterface) {}
+		~Request();
+
+		JSContext* cx;
+	};
+	friend struct Request;
 
 	/**
 	 * Load global scripts that most script contexts need,
@@ -525,58 +544,57 @@ inline JS::HandleValue ScriptInterface::AssignOrFromJSVal<JS::HandleValue>(JSCon
 template<typename T>
 bool ScriptInterface::SetGlobal(const char* name, const T& value, bool replace, bool constant, bool enumerate)
 {
-	JSAutoRequest rq(GetContext());
-	JS::RootedValue val(GetContext());
-	AssignOrToJSVal(GetContext(), &val, value);
+	Request rq(this);
+	JS::RootedValue val(rq.cx);
+	AssignOrToJSVal(rq.cx, &val, value);
 	return SetGlobal_(name, val, replace, constant, enumerate);
 }
 
 template<typename T>
 bool ScriptInterface::SetProperty(JS::HandleValue obj, const char* name, const T& value, bool constant, bool enumerate) const
 {
-	JSAutoRequest rq(GetContext());
-	JS::RootedValue val(GetContext());
-	AssignOrToJSVal(GetContext(), &val, value);
+	Request rq(this);
+	JS::RootedValue val(rq.cx);
+	AssignOrToJSVal(rq.cx, &val, value);
 	return SetProperty_(obj, name, val, constant, enumerate);
 }
 
 template<typename T>
 bool ScriptInterface::SetProperty(JS::HandleValue obj, const wchar_t* name, const T& value, bool constant, bool enumerate) const
 {
-	JSAutoRequest rq(GetContext());
-	JS::RootedValue val(GetContext());
-	AssignOrToJSVal(GetContext(), &val, value);
+	Request rq(this);
+	JS::RootedValue val(rq.cx);
+	AssignOrToJSVal(rq.cx, &val, value);
 	return SetProperty_(obj, name, val, constant, enumerate);
 }
 
 template<typename T>
 bool ScriptInterface::SetPropertyInt(JS::HandleValue obj, int name, const T& value, bool constant, bool enumerate) const
 {
-	JSAutoRequest rq(GetContext());
-	JS::RootedValue val(GetContext());
-	AssignOrToJSVal(GetContext(), &val, value);
+	Request rq(this);
+	JS::RootedValue val(rq.cx);
+	AssignOrToJSVal(rq.cx, &val, value);
 	return SetPropertyInt_(obj, name, val, constant, enumerate);
 }
 
 template<typename T>
 bool ScriptInterface::GetProperty(JS::HandleValue obj, const char* name, T& out) const
 {
-	JSContext* cx = GetContext();
-	JSAutoRequest rq(cx);
-	JS::RootedValue val(cx);
+	Request rq(this);
+	JS::RootedValue val(rq.cx);
 	if (!GetProperty_(obj, name, &val))
 		return false;
-	return FromJSVal(cx, val, out);
+	return FromJSVal(rq.cx, val, out);
 }
 
 template<typename T>
 bool ScriptInterface::GetPropertyInt(JS::HandleValue obj, int name, T& out) const
 {
-	JSAutoRequest rq(GetContext());
-	JS::RootedValue val(GetContext());
+	Request rq(this);
+	JS::RootedValue val(rq.cx);
 	if (!GetPropertyInt_(obj, name, &val))
 		return false;
-	return FromJSVal(GetContext(), val, out);
+	return FromJSVal(rq.cx, val, out);
 }
 
 template<typename CHAR>
@@ -590,11 +608,11 @@ bool ScriptInterface::Eval(const CHAR* code, JS::MutableHandleValue ret) const
 template<typename T, typename CHAR>
 bool ScriptInterface::Eval(const CHAR* code, T& ret) const
 {
-	JSAutoRequest rq(GetContext());
-	JS::RootedValue rval(GetContext());
+	Request rq(this);
+	JS::RootedValue rval(rq.cx);
 	if (!Eval_(code, &rval))
 		return false;
-	return FromJSVal(GetContext(), rval, ret);
+	return FromJSVal(rq.cx, rval, ret);
 }
 
 #endif // INCLUDED_SCRIPTINTERFACE
