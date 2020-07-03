@@ -1,4 +1,4 @@
-/* Copyright (C) 2019 Wildfire Games.
+/* Copyright (C) 2020 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -156,11 +156,10 @@ public:
 	template<typename... Args>
 	void PushGuiMessage(Args const&... args)
 	{
-		JSContext* cx = GetScriptInterface().GetContext();
-		JSAutoRequest rq(cx);
+		ScriptInterface::Request rq(GetScriptInterface());
 
-		JS::RootedValue message(cx);
-		ScriptInterface::CreateObject(cx, &message, args...);
+		JS::RootedValue message(rq.cx);
+		ScriptInterface::CreateObject(rq.cx, &message, args...);
 		m_GuiMessageQueue.push_back(JS::Heap<JS::Value>(message));
 	}
 
