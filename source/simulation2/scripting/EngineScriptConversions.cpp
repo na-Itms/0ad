@@ -166,8 +166,8 @@ template<> void ScriptInterface::ToJSVal<CFixedVector3D>(JSContext* cx, JS::Muta
 {
 	JSAutoRequest rq(cx);
 
- 	ScriptInterface::CxPrivate* pCxPrivate = ScriptInterface::GetScriptInterfaceAndCBData(cx);
-	JS::RootedObject global(cx, &pCxPrivate->pScriptInterface->GetGlobalObject().toObject());
+ 	ScriptInterface::CmptPrivate* pCmptPrivate = ScriptInterface::GetScriptInterfaceAndCBData(cx);
+	JS::RootedObject global(cx, &pCmptPrivate->pScriptInterface->GetGlobalObject().toObject());
 	JS::RootedValue valueVector3D(cx);
 	if (!JS_GetProperty(cx, global, "Vector3D", &valueVector3D))
 		FAIL_VOID("Failed to get Vector3D constructor");
@@ -203,8 +203,8 @@ template<> void ScriptInterface::ToJSVal<CFixedVector2D>(JSContext* cx, JS::Muta
 {
 	JSAutoRequest rq(cx);
 
- 	ScriptInterface::CxPrivate* pCxPrivate = ScriptInterface::GetScriptInterfaceAndCBData(cx);
-	JS::RootedObject global(cx, &pCxPrivate->pScriptInterface->GetGlobalObject().toObject());
+ 	ScriptInterface::CmptPrivate* pCmptPrivate = ScriptInterface::GetScriptInterfaceAndCBData(cx);
+	JS::RootedObject global(cx, &pCmptPrivate->pScriptInterface->GetGlobalObject().toObject());
 	JS::RootedValue valueVector2D(cx);
 	if (!JS_GetProperty(cx, global, "Vector2D", &valueVector2D))
 		FAIL_VOID("Failed to get Vector2D constructor");
