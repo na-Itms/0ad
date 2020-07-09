@@ -1611,7 +1611,7 @@ void CancelLoad(const CStrW& message)
 	shared_ptr<ScriptInterface> pScriptInterface = g_GUI->GetActiveGUI()->GetScriptInterface();
 	ScriptInterface::Request rq(pScriptInterface);
 
-	JS::RootedValue global(rq.cx, pScriptInterface->GetGlobalObject());
+	JS::RootedValue global(rq.cx, rq.globalValue());
 
 	LDR_Cancel();
 

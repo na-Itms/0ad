@@ -1,4 +1,4 @@
-/* Copyright (C) 2019 Wildfire Games.
+/* Copyright (C) 2020 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -164,20 +164,20 @@ template<> bool ScriptInterface::FromJSVal<CFixedVector3D>(JSContext* cx, JS::Ha
 
 template<> void ScriptInterface::ToJSVal<CFixedVector3D>(JSContext* cx, JS::MutableHandleValue ret, const CFixedVector3D& val)
 {
-	JSAutoRequest rq(cx);
-
  	ScriptInterface::CmptPrivate* pCmptPrivate = ScriptInterface::GetScriptInterfaceAndCBData(cx);
-	JS::RootedObject global(cx, &pCmptPrivate->pScriptInterface->GetGlobalObject().toObject());
-	JS::RootedValue valueVector3D(cx);
-	if (!JS_GetProperty(cx, global, "Vector3D", &valueVector3D))
+	ScriptInterface::Request rq(pCmptPrivate);
+
+	JS::RootedObject global(rq.cx, rq.glob);
+	JS::RootedValue valueVector3D(rq.cx);
+	if (!JS_GetProperty(rq.cx, global, "Vector3D", &valueVector3D))
 		FAIL_VOID("Failed to get Vector3D constructor");
 
-	JS::AutoValueArray<3> args(cx);
+	JS::AutoValueArray<3> args(rq.cx);
 	args[0].setNumber(val.X.ToDouble());
 	args[1].setNumber(val.Y.ToDouble());
 	args[2].setNumber(val.Z.ToDouble());
 
-	if (!JS::Construct(cx, valueVector3D, args, ret))
+	if (!JS::Construct(rq.cx, valueVector3D, args, ret))
 		FAIL_VOID("Failed to construct Vector3D object");
 }
 
@@ -201,19 +201,19 @@ template<> bool ScriptInterface::FromJSVal<CFixedVector2D>(JSContext* cx, JS::Ha
 
 template<> void ScriptInterface::ToJSVal<CFixedVector2D>(JSContext* cx, JS::MutableHandleValue ret, const CFixedVector2D& val)
 {
-	JSAutoRequest rq(cx);
+	ScriptInterface::CmptPrivate* pCmptPrivate = ScriptInterface::GetScriptInterfaceAndCBData(cx);
+	ScriptInterface::Request rq(pCmptPrivate);
 
- 	ScriptInterface::CmptPrivate* pCmptPrivate = ScriptInterface::GetScriptInterfaceAndCBData(cx);
-	JS::RootedObject global(cx, &pCmptPrivate->pScriptInterface->GetGlobalObject().toObject());
-	JS::RootedValue valueVector2D(cx);
-	if (!JS_GetProperty(cx, global, "Vector2D", &valueVector2D))
+	JS::RootedObject global(rq.cx, rq.glob);
+	JS::RootedValue valueVector2D(rq.cx);
+	if (!JS_GetProperty(rq.cx, global, "Vector2D", &valueVector2D))
 		FAIL_VOID("Failed to get Vector2D constructor");
 
-	JS::AutoValueArray<2> args(cx);
+	JS::AutoValueArray<2> args(rq.cx);
 	args[0].setNumber(val.X.ToDouble());
 	args[1].setNumber(val.Y.ToDouble());
 
-	if (!JS::Construct(cx, valueVector2D, args, ret))
+	if (!JS::Construct(rq.cx, valueVector2D, args, ret))
 		FAIL_VOID("Failed to construct Vector2D object");
 }
 
