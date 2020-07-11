@@ -161,8 +161,6 @@ ScriptRuntime::ScriptRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtim
 	// We disable it to make it more clear if full GCs happen triggered by this JSAPI internal mechanism.
 	JS_SetGCParameter(m_rt, JSGC_DYNAMIC_HEAP_GROWTH, false);
 
-	ScriptEngine::GetSingleton().RegisterRuntime(m_rt);
-
 
 	m_cx = JS_NewContext(m_rt, STACK_CHUNK_SIZE);
 	ENSURE(m_cx); // TODO: error handling
@@ -183,14 +181,17 @@ ScriptRuntime::ScriptRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtim
 		.setExtraWarnings(true)
 		.setWerror(false)
 		.setStrictMode(true);
+
+	ScriptEngine::GetSingleton().RegisterContext(m_cx);
 }
 
 ScriptRuntime::~ScriptRuntime()
 {
+	ENSURE(ScriptEngine::IsInitialised() && "The ScriptEngine must be active (initialized and not yet shut down) when destroying a ScriptRuntime!");
+
 	JS_DestroyContext(m_cx);
 	JS_DestroyRuntime(m_rt);
 
-	ENSURE(ScriptEngine::IsInitialised() && "The ScriptEngine must be active (initialized and not yet shut down) when destroying a ScriptRuntime!");
 	ScriptEngine::GetSingleton().UnRegisterRuntime(m_rt);
 }
 
