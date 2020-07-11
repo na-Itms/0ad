@@ -17,7 +17,7 @@
 
 #include "precompiled.h"
 
-#include "ScriptRuntime.h"
+#include "ScriptContext.h"
 
 #include "ps/GameSetup/Config.h"
 #include "ps/Profile.h"
@@ -90,9 +90,9 @@ void GCSliceCallbackHook(JSRuntime* UNUSED(rt), JS::GCProgress progress, const J
 	#endif
 }
 
-shared_ptr<ScriptRuntime> ScriptRuntime::CreateRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtimeSize, int heapGrowthBytesGCTrigger)
+shared_ptr<ScriptContext> ScriptContext::CreateContext(shared_ptr<ScriptContext> parentContext, int contextSize, int heapGrowthBytesGCTrigger)
 {
-	return shared_ptr<ScriptRuntime>(new ScriptRuntime(parentRuntime, runtimeSize, heapGrowthBytesGCTrigger));
+	return shared_ptr<ScriptContext>(new ScriptContext(parentContext, contextSize, heapGrowthBytesGCTrigger));
 }
 
 namespace {
@@ -139,22 +139,22 @@ void ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
 
 } // anonymous namespace
 
-ScriptRuntime::ScriptRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtimeSize, int heapGrowthBytesGCTrigger):
+ScriptContext::ScriptContext(shared_ptr<ScriptContext> parentContext, int contextSize, int heapGrowthBytesGCTrigger):
 	m_LastGCBytes(0),
 	m_LastGCCheck(0.0f),
 	m_HeapGrowthBytesGCTrigger(heapGrowthBytesGCTrigger),
-	m_RuntimeSize(runtimeSize)
+	m_ContextSize(contextSize)
 {
-	ENSURE(ScriptEngine::IsInitialised() && "The ScriptEngine must be initialized before constructing any ScriptRuntimes!");
+	ENSURE(ScriptEngine::IsInitialised() && "The ScriptEngine must be initialized before constructing any ScriptContexts!");
 
-	JSRuntime* parentJSRuntime = parentRuntime ? parentRuntime->m_rt : nullptr;
-	m_rt = JS_NewRuntime(runtimeSize, JS::DefaultNurseryBytes, parentJSRuntime);
+	JSRuntime* parentJSRuntime = parentContext ? parentContext->m_rt : nullptr;
+	m_rt = JS_NewRuntime(contextSize, JS::DefaultNurseryBytes, parentJSRuntime);
 	ENSURE(m_rt); // TODO: error handling
 
 	JS::SetGCSliceCallback(m_rt, GCSliceCallbackHook);
 
-	JS_SetGCParameter(m_rt, JSGC_MAX_MALLOC_BYTES, m_RuntimeSize);
-	JS_SetGCParameter(m_rt, JSGC_MAX_BYTES, m_RuntimeSize);
+	JS_SetGCParameter(m_rt, JSGC_MAX_MALLOC_BYTES, m_ContextSize);
+	JS_SetGCParameter(m_rt, JSGC_MAX_BYTES, m_ContextSize);
 	JS_SetGCParameter(m_rt, JSGC_MODE, JSGC_MODE_INCREMENTAL);
 
 	// The whole heap-growth mechanism seems to work only for non-incremental GCs.
@@ -185,29 +185,29 @@ ScriptRuntime::ScriptRuntime(shared_ptr<ScriptRuntime> parentRuntime, int runtim
 	ScriptEngine::GetSingleton().RegisterContext(m_cx);
 }
 
-ScriptRuntime::~ScriptRuntime()
+ScriptContext::~ScriptContext()
 {
-	ENSURE(ScriptEngine::IsInitialised() && "The ScriptEngine must be active (initialized and not yet shut down) when destroying a ScriptRuntime!");
+	ENSURE(ScriptEngine::IsInitialised() && "The ScriptEngine must be active (initialized and not yet shut down) when destroying a ScriptContext!");
 
 	JS_DestroyContext(m_cx);
 	JS_DestroyRuntime(m_rt);
 
-	ScriptEngine::GetSingleton().UnRegisterRuntime(m_rt);
+	ScriptEngine::GetSingleton().UnRegisterContext(m_cx);
 }
 
-void ScriptRuntime::RegisterCompartment(JSCompartment* cmpt)
+void ScriptContext::RegisterCompartment(JSCompartment* cmpt)
 {
 	ENSURE(cmpt);
 	m_Compartments.push_back(cmpt);
 }
 
-void ScriptRuntime::UnRegisterCompartment(JSCompartment* cmpt)
+void ScriptContext::UnRegisterCompartment(JSCompartment* cmpt)
 {
 	m_Compartments.remove(cmpt);
 }
 
 #define GC_DEBUG_PRINT 0
-void ScriptRuntime::MaybeIncrementalGC(double delay)
+void ScriptContext::MaybeIncrementalGC(double delay)
 {
 	PROFILE2("MaybeIncrementalGC");
 
@@ -260,31 +260,31 @@ void ScriptRuntime::MaybeIncrementalGC(double delay)
 					m_HeapGrowthBytesGCTrigger / 1024);
 #endif
 
-			// A hack to make sure we never exceed the runtime size because we can't collect the memory
+			// A hack to make sure we never exceed the context size because we can't collect the memory
 			// fast enough.
-			if (gcBytes > m_RuntimeSize / 2)
+			if (gcBytes > m_ContextSize / 2)
 			{
 				if (JS::IsIncrementalGCInProgress(m_rt))
 				{
 #if GC_DEBUG_PRINT
-					printf("Finishing incremental GC because gcBytes > m_RuntimeSize / 2. \n");
+					printf("Finishing incremental GC because gcBytes > m_ContextSize / 2. \n");
 #endif
 					PrepareCompartmentsForIncrementalGC();
 					JS::FinishIncrementalGC(m_rt, JS::gcreason::REFRESH_FRAME);
 				}
 				else
 				{
-					if (gcBytes > m_RuntimeSize * 0.75)
+					if (gcBytes > m_ContextSize * 0.75)
 					{
 						ShrinkingGC();
 #if GC_DEBUG_PRINT
-						printf("Running shrinking GC because gcBytes > m_RuntimeSize * 0.75. \n");
+						printf("Running shrinking GC because gcBytes > m_ContextSize * 0.75. \n");
 #endif
 					}
 					else
 					{
 #if GC_DEBUG_PRINT
-						printf("Running full GC because gcBytes > m_RuntimeSize / 2. \n");
+						printf("Running full GC because gcBytes > m_ContextSize / 2. \n");
 #endif
 						JS_GC(m_rt);
 					}
@@ -309,7 +309,7 @@ void ScriptRuntime::MaybeIncrementalGC(double delay)
 	}
 }
 
-void ScriptRuntime::ShrinkingGC()
+void ScriptContext::ShrinkingGC()
 {
 	JS_SetGCParameter(m_rt, JSGC_MODE, JSGC_MODE_COMPARTMENT);
 	JS::PrepareForFullGC(m_rt);
@@ -317,7 +317,7 @@ void ScriptRuntime::ShrinkingGC()
 	JS_SetGCParameter(m_rt, JSGC_MODE, JSGC_MODE_INCREMENTAL);
 }
 
-void ScriptRuntime::PrepareCompartmentsForIncrementalGC() const
+void ScriptContext::PrepareCompartmentsForIncrementalGC() const
 {
 	for (JSCompartment* const& cmpt : m_Compartments)
 		JS::PrepareZoneForGC(js::GetCompartmentZone(cmpt));
