@@ -27,8 +27,8 @@
  * A class using the RAII (Resource Acquisition Is Initialization) idiom to manage initialization
  * and shutdown of the SpiderMonkey script engine. It also keeps a count of active script contexts
  * in order to validate the following constraints:
- *  1. JS_Init must be called before any ScriptRuntimes are initialized
- *  2. JS_Shutdown must be called after all ScriptRuntimes have been destroyed
+ *  1. JS_Init must be called before any ScriptContexts are initialized
+ *  2. JS_Shutdown must be called after all ScriptContexts have been destroyed
  */
 
 class ScriptEngine : public Singleton<ScriptEngine>

@@ -139,7 +139,7 @@ void RunHardwareDetection()
 {
 	TIMER(L"RunHardwareDetection");
 
-	ScriptInterface scriptInterface("Engine", "HWDetect", g_ScriptRuntime);
+	ScriptInterface scriptInterface("Engine", "HWDetect", g_ScriptContext);
 
 	ScriptInterface::Request rq(scriptInterface);
 
