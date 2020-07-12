@@ -48,12 +48,12 @@ MINIUPNPC_VERSION="miniupnpc-2.0.20180222"
 SODIUM_VERSION="libsodium-1.0.18"
 # --------------------------------------------------------------
 # Bundled with the game:
-# * SpiderMonkey 45
+# * SpiderMonkey 52
 # * NVTT
 # * FCollada
 # --------------------------------------------------------------
 # We use suffixes here in order to force rebuilding when patching these libs
-SPIDERMONKEY_VERSION="mozjs-45.0.2+wildfiregames.2"
+SPIDERMONKEY_VERSION="mozjs-52.9.1+wildfiregames.1"
 NVTT_VERSION="nvtt-2.1.1+wildfiregames.1"
 FCOLLADA_VERSION="fcollada-3.05+wildfiregames.1"
 # --------------------------------------------------------------
@@ -914,7 +914,7 @@ popd > /dev/null
 echo -e "Building SpiderMonkey..."
 
 LIB_VERSION="${SPIDERMONKEY_VERSION}"
-LIB_DIRECTORY="mozjs-45.0.2"
+LIB_DIRECTORY="mozjs-52.9.1pre1"
 LIB_ARCHIVE="$LIB_DIRECTORY.tar.bz2"
 
 pushd ../source/spidermonkey/ > /dev/null
@@ -945,8 +945,6 @@ then
     --disable-shared-js
     --disable-jemalloc
     --without-intl-api"
-  # Change the default location where the tracelogger should store its output, which is /tmp/ on OSX.
-  TLCXXFLAGS='-DTRACE_LOG_DIR="\"../../source/tools/tracelogger/\""'
   if [[ $MIN_OSX_VERSION && ${MIN_OSX_VERSION-_} ]]; then
     CONF_OPTS="$CONF_OPTS --enable-macos-target=$MIN_OSX_VERSION"
   fi
@@ -955,10 +953,10 @@ then
   fi
 
   # We want separate debug/release versions of the library, so change their install name in the Makefile
-  perl -i.bak -pe 's/(^STATIC_LIBRARY_NAME\s+=).*/$1'\''mozjs45-ps-debug'\''/' moz.build
+  perl -i.bak -pe 's/(^STATIC_LIBRARY_NAME\s+=).*/$1'\''mozjs52-ps-debug'\''/' moz.build
   mkdir -p build-debug
   pushd build-debug
-  (CC="clang" CXX="clang++" CXXFLAGS="${TLCXXFLAGS}" AR=ar CROSS_COMPILE=1 \
+  (CC="clang" CXX="clang++" AR=ar CROSS_COMPILE=1 \
     ../configure $CONF_OPTS \
         --enable-debug \
         --disable-optimize \
@@ -973,10 +971,10 @@ then
   popd
   mv moz.build.bak moz.build
 
-  perl -i.bak -pe 's/(^STATIC_LIBRARY_NAME\s+=).*/$1'\''mozjs45-ps-release'\''/' moz.build
+  perl -i.bak -pe 's/(^STATIC_LIBRARY_NAME\s+=).*/$1'\''mozjs52-ps-release'\''/' moz.build
   mkdir -p build-release
   pushd build-release
-  (CC="clang" CXX="clang++" CXXFLAGS="${TLCXXFLAGS}" AR=ar CROSS_COMPILE=1 \
+  (CC="clang" CXX="clang++" AR=ar CROSS_COMPILE=1 \
     ../configure $CONF_OPTS \
         --enable-optimize \
     && make ${JOBS}) || die "SpiderMonkey build failed"
@@ -987,7 +985,7 @@ then
   cp js/src/*.a $INSTALL_DIR/lib
   popd
   mv moz.build.bak moz.build
-  
+
   popd
   echo "$LIB_VERSION" > .already-built
 else

@@ -27,37 +27,17 @@ fi
 
 MAKE_OPTS="${JOBS}"
 
-# jemalloc is outdated on SM45, do not use it
+# Standalone SpiderMonkey can not use jemalloc (see https://bugzilla.mozilla.org/show_bug.cgi?id=1465038)
 CONF_OPTS="--disable-tests --disable-jemalloc --enable-shared-js --without-intl-api"
 
-# Bug 1269319
-# When compiled with GCC 6 (or later), SpiderMonkey 45 (and versions up to 49) is
-# subject to segfaults. Disabling a few optimizations fixes that.
-# See also #4053
-if [ "${OS}" != "Windows_NT" ]
-then
-  if [ "`${CXX:=g++} -dumpversion | cut -f1 -d.`" -ge "6" ]
-  then
-    CXXFLAGS="${CXXFLAGS} -fno-schedule-insns2 -fno-delete-null-pointer-checks"
-  fi
-fi
-
-# Change the default location where the tracelogger should store its output.
-# The default location is . on Windows and /tmp/ on *nix.
-TLCXXFLAGS='-DTRACE_LOG_DIR="\"../../source/tools/tracelogger/\""'
-
 # NSPR is needed on Windows for POSIX emulation.
-# If you want to build on Windows, check README.txt and edit the absolute paths 
+# If you want to build on Windows, check README.txt and edit the absolute paths
 # to match your environment.
 if [ "${OS}" = "Windows_NT" ]
 then
-  NSPR_INCLUDES="-ID:/nspr-4.12/nspr/dist/include/nspr"
-  NSPR_LIBS=" \
-  D:/nspr-4.12/nspr/dist/lib/nspr4 \
-  D:/nspr-4.12/nspr/dist/lib/plds4 \
-  D:/nspr-4.12/nspr/dist/lib/plc4"
+  NSPR_PREFIX="D:/nspr-4.21/nspr/"
 else
-   CONF_OPTS="${CONF_OPTS} --enable-posix-nspr-emulation"
+  CONF_OPTS="${CONF_OPTS} --enable-posix-nspr-emulation"
 fi
 
 # If Valgrind looks like it's installed, then set up SM to support it
@@ -76,11 +56,11 @@ CONF_OPTS="${CONF_OPTS} \
 echo "SpiderMonkey build options: ${CONF_OPTS}"
 echo ${CONF_OPTS}
 
-FOLDER=mozjs-45.0.2
+FOLDER=mozjs-52.9.1pre1
 
 # Delete the existing directory to avoid conflicts and extract the tarball
 rm -rf $FOLDER
-tar xjf mozjs-45.0.2.tar.bz2
+tar xjf mozjs-52.9.1pre1.tar.bz2
 
 # Clean up header files that may be left over by earlier versions of SpiderMonkey
 rm -rf include-unix-*
@@ -100,39 +80,37 @@ rm -rf build-release
 # the LIBRARY_NAME for each build.
 # (We use perl instead of sed so that it works with MozillaBuild on Windows,
 # which has an ancient sed.)
-perl -i.bak -pe 's/(SHARED_LIBRARY_NAME\s+=).*/$1 '\''mozjs45-ps-debug'\''/' moz.build
+perl -i.bak -pe 's/(SHARED_LIBRARY_NAME\s+=).*/$1 '\''mozjs52-ps-debug'\''/' moz.build
 mkdir -p build-debug
 cd build-debug
 if [ "${OS}" = "Windows_NT" ]
 then
-  CXXFLAGS="${CXXFLAGS} ${TLCXXFLAGS}" ../configure ${CONF_OPTS} \
-    --with-nspr-cflags="${NSPR_INCLUDES}" --with-nspr-libs="${NSPR_LIBS}" \
+  CXXFLAGS="${CXXFLAGS}" ../configure ${CONF_OPTS} \
+    --with-nspr-prefix="{NSPR_PREFIX}" \
     --enable-debug \
     --disable-optimize \
-    --enable-js-diagnostics \
     --enable-gczeal
 else
-  CXXFLAGS="${CXXFLAGS} ${TLCXXFLAGS}" ../configure ${CONF_OPTS} \
+  CXXFLAGS="${CXXFLAGS}" ../configure ${CONF_OPTS} \
     --enable-debug \
     --disable-optimize \
-    --enable-js-diagnostics \
     --enable-gczeal
 fi
 ${MAKE} ${MAKE_OPTS}
 cd ..
 
-perl -i.bak -pe 's/(SHARED_LIBRARY_NAME\s+=).*/$1 '\''mozjs45-ps-release'\''/' moz.build
+perl -i.bak -pe 's/(SHARED_LIBRARY_NAME\s+=).*/$1 '\''mozjs52-ps-release'\''/' moz.build
 mkdir -p build-release
 cd build-release
 if [ "${OS}" = "Windows_NT" ]
 then
-  CXXFLAGS="${CXXFLAGS} ${TLCXXFLAGS}" ../configure ${CONF_OPTS} \
-    --with-nspr-cflags="${NSPR_INCLUDES}" --with-nspr-libs="${NSPR_LIBS}" \
+  CXXFLAGS="${CXXFLAGS}" ../configure ${CONF_OPTS} \
+    --with-nspr-prefix="${NSPR_PREFIX}" \
     --enable-optimize \
     #--enable-gczeal \
     #--enable-debug-symbols
 else
-  CXXFLAGS="${CXXFLAGS} ${TLCXXFLAGS}" ../configure ${CONF_OPTS} \
+  CXXFLAGS="${CXXFLAGS}" ../configure ${CONF_OPTS} \
     --enable-optimize \
     #--enable-gczeal \
     #--enable-debug-symbols
@@ -190,16 +168,16 @@ cp -R -L ${FOLDER}/js/src/build-release/dist/include/* ${INCLUDE_DIR_RELEASE}/
 cp -R -L ${FOLDER}/js/src/build-debug/dist/include/* ${INCLUDE_DIR_DEBUG}/
 
 mkdir -p lib/
-cp -L ${FOLDER}/js/src/build-debug/dist/sdk/lib/${LIB_PREFIX}mozjs45-ps-debug${LIB_SRC_SUFFIX} lib/${LIB_PREFIX}mozjs45-ps-debug${LIB_DST_SUFFIX}
-cp -L ${FOLDER}/js/src/build-release/dist/sdk/lib/${LIB_PREFIX}mozjs45-ps-release${LIB_SRC_SUFFIX} lib/${LIB_PREFIX}mozjs45-ps-release${LIB_DST_SUFFIX}
-cp -L ${FOLDER}/js/src/build-debug/dist/bin/${LIB_PREFIX}mozjs45-ps-debug${DLL_SRC_SUFFIX} ../../../binaries/system/${LIB_PREFIX}mozjs45-ps-debug${DLL_DST_SUFFIX}
-cp -L ${FOLDER}/js/src/build-release/dist/bin/${LIB_PREFIX}mozjs45-ps-release${DLL_SRC_SUFFIX} ../../../binaries/system/${LIB_PREFIX}mozjs45-ps-release${DLL_DST_SUFFIX}
+cp -L ${FOLDER}/js/src/build-debug/dist/sdk/lib/${LIB_PREFIX}mozjs52-ps-debug${LIB_SRC_SUFFIX} lib/${LIB_PREFIX}mozjs52-ps-debug${LIB_DST_SUFFIX}
+cp -L ${FOLDER}/js/src/build-release/dist/sdk/lib/${LIB_PREFIX}mozjs52-ps-release${LIB_SRC_SUFFIX} lib/${LIB_PREFIX}mozjs52-ps-release${LIB_DST_SUFFIX}
+cp -L ${FOLDER}/js/src/build-debug/dist/bin/${LIB_PREFIX}mozjs52-ps-debug${DLL_SRC_SUFFIX} ../../../binaries/system/${LIB_PREFIX}mozjs52-ps-debug${DLL_DST_SUFFIX}
+cp -L ${FOLDER}/js/src/build-release/dist/bin/${LIB_PREFIX}mozjs52-ps-release${DLL_SRC_SUFFIX} ../../../binaries/system/${LIB_PREFIX}mozjs52-ps-release${DLL_DST_SUFFIX}
 
 # On Windows, also copy debugging symbols files
 if [ "${OS}" = "Windows_NT" ]
 then
-  cp -L ${FOLDER}/js/src/build-debug/js/src/${LIB_PREFIX}mozjs45-ps-debug-vc140.pdb ../../../binaries/system/${LIB_PREFIX}mozjs45-ps-debug-vc140.pdb
-  cp -L ${FOLDER}/js/src/build-release/js/src/${LIB_PREFIX}mozjs45-ps-release-vc140.pdb ../../../binaries/system/${LIB_PREFIX}mozjs45-ps-release-vc140.pdb
+  cp -L ${FOLDER}/js/src/build-debug/js/src/${LIB_PREFIX}mozjs52-ps-debug.pdb binaries/system/${LIB_PREFIX}mozjs52-ps-debug.pdb
+  cp -L ${FOLDER}/js/src/build-release/js/src/${LIB_PREFIX}mozjs52-ps-release.pdb binaries/system/${LIB_PREFIX}mozjs52-ps-release.pdb
 fi
 
 # Flag that it's already been built successfully so we can skip it next time
