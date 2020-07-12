@@ -23,7 +23,6 @@
 #include "ps/CLogger.h"
 #include "ps/CStr.h"
 #include "ps/Filesystem.h"
-#include "scriptinterface/ScriptVal.h"
 #include "scriptinterface/ScriptInterface.h"
 
 #include <sstream>

@@ -24,7 +24,7 @@
 #define NETMESSAGES_H
 
 #include "ps/CStr.h"
-#include "scriptinterface/ScriptVal.h"
+#include "scriptinterface/ScriptTypes.h"
 
 #define PS_PROTOCOL_MAGIC                         0x5073013f	// 'P', 's', 0x01, '?'
 #define PS_PROTOCOL_MAGIC_RESPONSE                0x50630121	// 'P', 'c', 0x01, '!'

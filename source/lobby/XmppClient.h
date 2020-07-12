@@ -23,7 +23,6 @@
 #include <deque>
 
 #include "glooxwrapper/glooxwrapper.h"
-#include "scriptinterface/ScriptVal.h"
 
 class ScriptInterface;
 

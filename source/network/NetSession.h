@@ -22,7 +22,6 @@
 #include "network/NetFileTransfer.h"
 #include "network/NetHost.h"
 #include "ps/CStr.h"
-#include "scriptinterface/ScriptVal.h"
 
 /**
  * Report the peer if we didn't receive a packet after this time (milliseconds).
