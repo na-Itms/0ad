@@ -21,7 +21,6 @@
 #include "network/fsm.h"
 #include "network/NetFileTransfer.h"
 #include "network/NetHost.h"
-#include "scriptinterface/ScriptVal.h"
 #include "scriptinterface/ScriptInterface.h"
 
 #include "ps/CStr.h"

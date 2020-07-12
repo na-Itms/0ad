@@ -19,7 +19,6 @@
 #define INCLUDED_MESSAGE
 
 #include "scriptinterface/ScriptTypes.h"
-#include "scriptinterface/ScriptVal.h"
 
 class CMessage
 {
