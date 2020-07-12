@@ -313,7 +313,7 @@ bool ScriptInterface::MathRandom(double& nbr)
 }
 
 ScriptInterface_impl::ScriptInterface_impl(const char* nativeScopeName, const shared_ptr<ScriptContext>& context) :
-	m_context(context), m_cx(context->GetGeneralJSContext()), m_glob(context->GetJSRuntime()), m_nativeScope(context->GetJSRuntime())
+	m_context(context), m_cx(context->GetGeneralJSContext()), m_glob(context->GetGeneralJSContext()), m_nativeScope(context->GetGeneralJSContext())
 {
 	JS::CompartmentOptions opt;
 	opt.setVersion(JSVERSION_LATEST);
@@ -439,9 +439,9 @@ void ScriptInterface::Register(const char* name, JSNative fptr, size_t nargs) co
 	m->Register(name, fptr, (uint)nargs);
 }
 
-JSRuntime* ScriptInterface::GetJSRuntime() const
+JSContext* ScriptInterface::GetGeneralJSContext() const
 {
-	return m->m_context->GetJSRuntime();
+	return m->m_context->GetGeneralJSContext();
 }
 
 shared_ptr<ScriptContext> ScriptInterface::GetContext() const

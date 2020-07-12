@@ -86,7 +86,7 @@ private:
 		CAIPlayer(CAIWorker& worker, const std::wstring& aiName, player_id_t player, u8 difficulty, const std::wstring& behavior,
 				shared_ptr<ScriptInterface> scriptInterface) :
 			m_Worker(worker), m_AIName(aiName), m_Player(player), m_Difficulty(difficulty), m_Behavior(behavior),
-			m_ScriptInterface(scriptInterface), m_Obj(scriptInterface->GetJSRuntime())
+			m_ScriptInterface(scriptInterface), m_Obj(scriptInterface->GetGeneralJSContext())
 		{
 		}
 
@@ -216,17 +216,17 @@ public:
 		m_CommandsComputed(true),
 		m_HasLoadedEntityTemplates(false),
 		m_HasSharedComponent(false),
-		m_EntityTemplates(g_ScriptContext->GetJSRuntime()),
-		m_SharedAIObj(g_ScriptContext->GetJSRuntime()),
-		m_PassabilityMapVal(g_ScriptContext->GetJSRuntime()),
-		m_TerritoryMapVal(g_ScriptContext->GetJSRuntime())
+		m_EntityTemplates(g_ScriptContext->GetGeneralJSContext()),
+		m_SharedAIObj(g_ScriptContext->GetGeneralJSContext()),
+		m_PassabilityMapVal(g_ScriptContext->GetGeneralJSContext()),
+		m_TerritoryMapVal(g_ScriptContext->GetGeneralJSContext())
 	{
 
 		m_ScriptInterface->ReplaceNondeterministicRNG(m_RNG);
 
 		m_ScriptInterface->SetCallbackData(static_cast<void*> (this));
 
-		JS_AddExtraGCRootsTracer(m_ScriptInterface->GetJSRuntime(), Trace, this);
+		JS_AddExtraGCRootsTracer(m_ScriptInterface->GetGeneralJSContext(), Trace, this);
 
 		m_ScriptInterface->RegisterFunction<void, int, JS::HandleValue, CAIWorker::PostCommand>("PostCommand");
 		m_ScriptInterface->RegisterFunction<void, std::wstring, CAIWorker::IncludeModule>("IncludeModule");
@@ -245,7 +245,7 @@ public:
 
 	~CAIWorker()
 	{
-		JS_RemoveExtraGCRootsTracer(m_ScriptInterface->GetJSRuntime(), Trace, this);
+		JS_RemoveExtraGCRootsTracer(m_ScriptInterface->GetGeneralJSContext(), Trace, this);
 	}
 
 	bool HasLoadedEntityTemplates() const { return m_HasLoadedEntityTemplates; }

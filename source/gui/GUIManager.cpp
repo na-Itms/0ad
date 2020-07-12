@@ -232,7 +232,7 @@ void CGUIManager::SGUIPage::SetCallbackFunction(ScriptInterface& scriptInterface
 		return;
 	}
 
-	callbackFunction = std::make_shared<JS::PersistentRootedValue>(scriptInterface.GetJSRuntime(), callbackFunc);
+	callbackFunction = std::make_shared<JS::PersistentRootedValue>(scriptInterface.GetGeneralJSContext(), callbackFunc);
 }
 
 void CGUIManager::SGUIPage::PerformCallbackFunction(shared_ptr<ScriptInterface::StructuredClone> args)

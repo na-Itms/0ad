@@ -75,7 +75,7 @@ IGUIObject::~IGUIObject()
 		delete p.second;
 
 	if (!m_ScriptHandlers.empty())
-		JS_RemoveExtraGCRootsTracer(m_pGUI.GetScriptInterface()->GetJSRuntime(), Trace, this);
+		JS_RemoveExtraGCRootsTracer(m_pGUI.GetScriptInterface()->GetGeneralJSContext(), Trace, this);
 
 	// m_Children is deleted along all other GUI Objects in the CGUI destructor
 }
@@ -331,7 +331,7 @@ void IGUIObject::RegisterScriptHandler(const CStr& eventName, const CStr& Code, 
 void IGUIObject::SetScriptHandler(const CStr& eventName, JS::HandleObject Function)
 {
 	if (m_ScriptHandlers.empty())
-		JS_AddExtraGCRootsTracer(m_pGUI.GetScriptInterface()->GetJSRuntime(), Trace, this);
+		JS_AddExtraGCRootsTracer(m_pGUI.GetScriptInterface()->GetGeneralJSContext(), Trace, this);
 
 	m_ScriptHandlers[eventName] = JS::Heap<JSObject*>(Function);
 }
@@ -346,7 +346,7 @@ void IGUIObject::UnsetScriptHandler(const CStr& eventName)
 	m_ScriptHandlers.erase(it);
 
 	if (m_ScriptHandlers.empty())
-		JS_RemoveExtraGCRootsTracer(m_pGUI.GetScriptInterface()->GetJSRuntime(), Trace, this);
+		JS_RemoveExtraGCRootsTracer(m_pGUI.GetScriptInterface()->GetGeneralJSContext(), Trace, this);
 }
 
 InReaction IGUIObject::SendEvent(EGUIMessageType type, const CStr& eventName)

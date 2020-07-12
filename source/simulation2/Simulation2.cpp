@@ -49,11 +49,11 @@
 class CSimulation2Impl
 {
 public:
-	CSimulation2Impl(CUnitManager* unitManager, shared_ptr<ScriptContext> rt, CTerrain* terrain) :
-		m_SimContext(), m_ComponentManager(m_SimContext, rt),
+	CSimulation2Impl(CUnitManager* unitManager, shared_ptr<ScriptContext> cx, CTerrain* terrain) :
+		m_SimContext(), m_ComponentManager(m_SimContext, cx),
 		m_EnableOOSLog(false), m_EnableSerializationTest(false), m_RejoinTestTurn(-1), m_TestingRejoin(false),
 		m_SecondaryTerrain(nullptr), m_SecondaryContext(nullptr), m_SecondaryComponentManager(nullptr), m_SecondaryLoadedScripts(nullptr),
-		m_MapSettings(rt->GetJSRuntime()), m_InitAttributes(rt->GetJSRuntime())
+		m_MapSettings(cx->GetGeneralJSContext()), m_InitAttributes(cx->GetGeneralJSContext())
 	{
 		m_SimContext.m_UnitManager = unitManager;
 		m_SimContext.m_Terrain = terrain;
@@ -446,7 +446,7 @@ void CSimulation2Impl::Update(int turnLength, const std::vector<SimulationComman
 			scriptInterface.GetProperty(m_InitAttributes, "map", mapFile);
 
 			VfsPath mapfilename = VfsPath(mapFile).ChangeExtension(L".pmp");
-			mapReader->LoadMap(mapfilename, scriptInterface.GetJSRuntime(), JS::UndefinedHandleValue,
+			mapReader->LoadMap(mapfilename, *scriptInterface.GetContext(), JS::UndefinedHandleValue,
 				m_SecondaryTerrain, NULL, NULL, NULL, NULL, NULL, NULL,
 				NULL, NULL, m_SecondaryContext, INVALID_PLAYER, true); // throws exception on failure
 		}
@@ -638,8 +638,8 @@ void CSimulation2Impl::DumpState()
 
 ////////////////////////////////////////////////////////////////
 
-CSimulation2::CSimulation2(CUnitManager* unitManager, shared_ptr<ScriptContext> rt, CTerrain* terrain) :
-	m(new CSimulation2Impl(unitManager, rt, terrain))
+CSimulation2::CSimulation2(CUnitManager* unitManager, shared_ptr<ScriptContext> cx, CTerrain* terrain) :
+	m(new CSimulation2Impl(unitManager, cx, terrain))
 {
 }
 

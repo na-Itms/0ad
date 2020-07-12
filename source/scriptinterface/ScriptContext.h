@@ -23,16 +23,14 @@
 
 #include <sstream>
 
-#define STACK_CHUNK_SIZE 8192
-
 // Those are minimal defaults. The context for the main game is larger and GCs upon a larger growth.
 #define DEFAULT_CONTEXT_SIZE 16 * 1024 * 1024
 #define DEFAULT_HEAP_GROWTH_BYTES_GCTRIGGER 2 * 1024 * 1024
 
 /**
- * Abstraction around a SpiderMonkey JSRuntime/JSContext.
+ * Abstraction around a SpiderMonkey JSContext.
  *
- * A single ScriptContext, with the associated runtime and context,
+ * A single ScriptContext, with the associated context,
  * should only be used on a single thread.
  *
  * (One means to share data between threads and contexts is to create
@@ -76,12 +74,10 @@ public:
 	void RegisterCompartment(JSCompartment* cmpt);
 	void UnRegisterCompartment(JSCompartment* cmpt);
 
-	JSRuntime* GetJSRuntime() const { return m_rt; }
-
 	/**
 	 * GetGeneralJSContext returns the context without starting a GC request and without
 	 * entering any compartment. It should only be used in specific situations, such as
-	 * creating a new compartment, or as an unsafe alternative to GetJSRuntime.
+	 * creating a new compartment, or when initializing a persistent rooted.
 	 * If you need the compartmented context of a ScriptInterface, you should create a
 	 * ScriptInterface::Request and use the context from that.
 	 */
@@ -89,7 +85,6 @@ public:
 
 private:
 
-	JSRuntime* m_rt;
 	JSContext* m_cx;
 
 	void PrepareCompartmentsForIncrementalGC() const;

@@ -91,7 +91,14 @@ public:
 	void SetCallbackData(void* pCBData);
 	static CmptPrivate* GetScriptInterfaceAndCBData(JSContext* cx);
 
-	JSRuntime* GetJSRuntime() const;
+	/**
+	 * GetGeneralJSContext returns the context without starting a GC request and without
+	 * entering the ScriptInterface compartment. It should only be used in specific situations,
+	 * for instance when initializing a persistent rooted.
+	 * If you need the compartmented context of the ScriptInterface, you should create a
+	 * ScriptInterface::Request and use the context from that.
+	 */
+	JSContext* GetGeneralJSContext() const;
 	shared_ptr<ScriptContext> GetContext() const;
 
 	/**
