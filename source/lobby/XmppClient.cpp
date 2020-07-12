@@ -94,7 +94,7 @@ XmppClient::XmppClient(const ScriptInterface* scriptInterface, const std::string
 	  m_PlayerMapUpdate(false)
 {
 	if (m_ScriptInterface)
-		JS_AddExtraGCRootsTracer(m_ScriptInterface->GetJSRuntime(), XmppClient::Trace, this);
+		JS_AddExtraGCRootsTracer(m_ScriptInterface->GetGeneralJSContext(), XmppClient::Trace, this);
 
 	// Read lobby configuration from default.cfg
 	std::string sXpartamupp;
@@ -192,7 +192,7 @@ XmppClient::~XmppClient()
 		glooxwrapper::Tag::free(t);
 
 	if (m_ScriptInterface)
-		JS_RemoveExtraGCRootsTracer(m_ScriptInterface->GetJSRuntime(), XmppClient::Trace, this);
+		JS_RemoveExtraGCRootsTracer(m_ScriptInterface->GetGeneralJSContext(), XmppClient::Trace, this);
 }
 
 void XmppClient::TraceMember(JSTracer* trc)

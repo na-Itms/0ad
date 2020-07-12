@@ -28,6 +28,7 @@
 #include "lib/tex/tex.h"
 #include "ps/Loader.h"
 #include "ps/Pyrogenesis.h"
+#include "scriptinterface/ScriptContext.h"
 #include "simulation2/Simulation2.h"
 
 class TestCmpPathfinder : public CxxTest::TestSuite
@@ -147,7 +148,7 @@ public:
 
 		LDR_BeginRegistering();
 		mapReader->LoadMap(L"maps/skirmishes/Median Oasis (2).pmp",
-			sim2.GetScriptInterface().GetJSRuntime(), JS::UndefinedHandleValue,
+			*sim2.GetScriptInterface().GetContext(), JS::UndefinedHandleValue,
 			&terrain, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			&sim2, &sim2.GetSimContext(), -1, false);
 		LDR_EndRegistering();
@@ -258,7 +259,7 @@ public:
 
 		LDR_BeginRegistering();
 		mapReader->LoadMap(L"maps/scenarios/Peloponnese.pmp",
-			sim2.GetScriptInterface().GetJSRuntime(), JS::UndefinedHandleValue,
+			*sim2.GetScriptInterface().GetContext(), JS::UndefinedHandleValue,
 			&terrain, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			&sim2, &sim2.GetSimContext(), -1, false);
 		LDR_EndRegistering();
@@ -315,7 +316,7 @@ public:
 
 		LDR_BeginRegistering();
 		mapReader->LoadMap(L"maps/scenarios/Peloponnese.pmp",
-			sim2.GetScriptInterface().GetJSRuntime(), JS::UndefinedHandleValue,
+			*sim2.GetScriptInterface().GetContext(), JS::UndefinedHandleValue,
 			&terrain, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 			&sim2, &sim2.GetSimContext(), -1, false);
 		LDR_EndRegistering();

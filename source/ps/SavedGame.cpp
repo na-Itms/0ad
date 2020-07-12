@@ -161,7 +161,7 @@ public:
 	 */
 	CGameLoader(const ScriptInterface& scriptInterface, std::string* savedState) :
 		m_ScriptInterface(scriptInterface),
-		m_Metadata(scriptInterface.GetJSRuntime()),
+		m_Metadata(scriptInterface.GetGeneralJSContext()),
 		m_SavedState(savedState)
 	{
 	}

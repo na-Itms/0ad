@@ -92,7 +92,7 @@ void* CMapGeneratorWorker::RunThread(CMapGeneratorWorker* self)
 	shared_ptr<ScriptContext> mapgenContext = ScriptContext::CreateContext(g_ScriptContext, RMS_CONTEXT_SIZE);
 
 	// Enable the script to be aborted
-	JS_SetInterruptCallback(mapgenContext->GetJSRuntime(), MapGeneratorInterruptCallback);
+	JS_AddInterruptCallback(mapgenContext->GetGeneralJSContext(), MapGeneratorInterruptCallback);
 
 	self->m_ScriptInterface = new ScriptInterface("Engine", "MapGenerator", mapgenContext);
 
