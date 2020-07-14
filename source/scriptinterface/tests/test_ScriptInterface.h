@@ -125,8 +125,8 @@ public:
 			TS_ASSERT(prop_a.isObject());
 			TS_ASSERT(prop_b.isObject());
 			TS_ASSERT(script2.GetProperty(prop_a, "0", &prop_x1));
-			TS_ASSERT_EQUALS(prop_x1.get(), prop_a.get());
-			TS_ASSERT_EQUALS(prop_x1.get(), prop_b.get());
+			TS_ASSERT(prop_x1.get() == prop_a.get());
+			TS_ASSERT(prop_x1.get() == prop_b.get());
 		}
 	}
 
