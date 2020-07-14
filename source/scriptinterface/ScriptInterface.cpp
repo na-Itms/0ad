@@ -315,10 +315,13 @@ bool ScriptInterface::MathRandom(double& nbr)
 ScriptInterface_impl::ScriptInterface_impl(const char* nativeScopeName, const shared_ptr<ScriptContext>& context) :
 	m_context(context), m_cx(context->GetGeneralJSContext()), m_glob(context->GetGeneralJSContext()), m_nativeScope(context->GetGeneralJSContext())
 {
-	JS::CompartmentOptions opt;
-	opt.setVersion(JSVERSION_LATEST);
+	JS::CompartmentCreationOptions creationOpt;
 	// Keep JIT code during non-shrinking GCs. This brings a quite big performance improvement.
-	opt.setPreserveJitCode(true);
+	creationOpt.setPreserveJitCode(true);
+	JS::CompartmentBehaviors behaviors;
+	behaviors.setVersion(JSVERSION_LATEST);
+
+	JS::CompartmentOptions opt(creationOpt, behaviors);
 
 	JSAutoRequest rq(m_cx);
 	m_glob = JS_NewGlobalObject(m_cx, &global_class, nullptr, JS::OnNewGlobalHookOption::FireOnNewGlobalHook, opt);
