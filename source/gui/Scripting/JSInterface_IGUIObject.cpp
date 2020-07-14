@@ -174,7 +174,7 @@ bool JSI_IGUIObject::setProperty(JSContext* cx, JS::HandleObject obj, JS::Handle
 	}
 
 	if (e->SettingExists(propName))
-		return e->m_Settings[propName]->FromJSVal(cx, vp, true) ? result.succeed() : result.fail(JSMSG_TYPE_ERR_BAD_ARGS);
+		return e->m_Settings[propName]->FromJSVal(cx, vp, true) ? result.succeed() : result.fail(JSMSG_INCOMPATIBLE_METHOD);
 
 	LOGERROR("Property '%s' does not exist!", propName.c_str());
 	return result.fail(JSMSG_UNDEFINED_PROP);
