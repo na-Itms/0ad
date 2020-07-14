@@ -550,7 +550,7 @@ bool ScriptInterface::SetGlobal_(const char* name, JS::HandleValue value, bool r
 		return false;
 	if (found)
 	{
-		JS::Rooted<JSPropertyDescriptor> desc(rq.cx);
+		JS::Rooted<JS::PropertyDescriptor> desc(rq.cx);
 		if (!JS_GetOwnPropertyDescriptor(rq.cx, global, name, &desc))
 			return false;
 
