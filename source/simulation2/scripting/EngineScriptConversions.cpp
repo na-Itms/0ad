@@ -177,8 +177,11 @@ template<> void ScriptInterface::ToJSVal<CFixedVector3D>(JSContext* cx, JS::Muta
 	args[1].setNumber(val.Y.ToDouble());
 	args[2].setNumber(val.Z.ToDouble());
 
-	if (!JS::Construct(rq.cx, valueVector3D, args, ret))
+	JS::RootedObject objVec(rq.cx);
+	if (!JS::Construct(rq.cx, valueVector3D, args, &objVec))
 		FAIL_VOID("Failed to construct Vector3D object");
+
+	ret.setObject(*objVec);
 }
 
 template<> bool ScriptInterface::FromJSVal<CFixedVector2D>(JSContext* cx, JS::HandleValue v, CFixedVector2D& out)
@@ -213,8 +216,11 @@ template<> void ScriptInterface::ToJSVal<CFixedVector2D>(JSContext* cx, JS::Muta
 	args[0].setNumber(val.X.ToDouble());
 	args[1].setNumber(val.Y.ToDouble());
 
-	if (!JS::Construct(rq.cx, valueVector2D, args, ret))
+	JS::RootedObject objVec(rq.cx);
+	if (!JS::Construct(rq.cx, valueVector2D, args, &objVec))
 		FAIL_VOID("Failed to construct Vector2D object");
+
+	ret.setObject(*objVec);
 }
 
 template<> void ScriptInterface::ToJSVal<Grid<u8> >(JSContext* cx, JS::MutableHandleValue ret, const Grid<u8>& val)
