@@ -67,7 +67,7 @@ public:
 	 *
 	 * @return StructuredClone containing map data
 	 */
-	shared_ptr<ScriptInterface::StructuredClone> GetResults();
+	shared_ptr<JSStructuredCloneData> GetResults();
 
 private:
 	CMapGeneratorWorker* m_Worker;
@@ -110,7 +110,7 @@ public:
 	 *
 	 * @return StructuredClone containing map data
 	 */
-	shared_ptr<ScriptInterface::StructuredClone> GetResults();
+	shared_ptr<JSStructuredCloneData> GetResults();
 
 	/**
 	 * Set initial seed, callback data.
@@ -201,7 +201,7 @@ private:
 	/**
 	 * Result of the mapscript generation including terrain, entities and environment settings.
 	 */
-	shared_ptr<ScriptInterface::StructuredClone> m_MapData;
+	shared_ptr<JSStructuredCloneData> m_MapData;
 
 	/**
 	 * Deterministic random number generator.

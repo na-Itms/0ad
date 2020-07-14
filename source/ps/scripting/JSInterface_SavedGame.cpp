@@ -40,14 +40,14 @@ bool JSI_SavedGame::DeleteSavedGame(ScriptInterface::CmptPrivate* UNUSED(pCmptPr
 
 void JSI_SavedGame::SaveGame(ScriptInterface::CmptPrivate* pCmptPrivate, const std::wstring& filename, const std::wstring& description, JS::HandleValue GUIMetadata)
 {
-	shared_ptr<ScriptInterface::StructuredClone> GUIMetadataClone = pCmptPrivate->pScriptInterface->WriteStructuredClone(GUIMetadata);
+	shared_ptr<JSStructuredCloneData> GUIMetadataClone = pCmptPrivate->pScriptInterface->WriteStructuredClone(GUIMetadata, JS::StructuredCloneScope::DifferentProcess);
 	if (SavedGames::Save(filename, description, *g_Game->GetSimulation2(), GUIMetadataClone) < 0)
 		LOGERROR("Failed to save game");
 }
 
 void JSI_SavedGame::SaveGamePrefix(ScriptInterface::CmptPrivate* pCmptPrivate, const std::wstring& prefix, const std::wstring& description, JS::HandleValue GUIMetadata)
 {
-	shared_ptr<ScriptInterface::StructuredClone> GUIMetadataClone = pCmptPrivate->pScriptInterface->WriteStructuredClone(GUIMetadata);
+	shared_ptr<JSStructuredCloneData> GUIMetadataClone = pCmptPrivate->pScriptInterface->WriteStructuredClone(GUIMetadata, JS::StructuredCloneScope::DifferentProcess);
 	if (SavedGames::SavePrefix(prefix, description, *g_Game->GetSimulation2(), GUIMetadataClone) < 0)
 		LOGERROR("Failed to save game");
 }
@@ -99,7 +99,7 @@ JS::Value JSI_SavedGame::StartSavedGame(ScriptInterface::CmptPrivate* pCmptPriva
 		ScriptInterface::Request rqGame(sim->GetScriptInterface());
 
 		JS::RootedValue gameContextMetadata(rqGame.cx,
-			sim->GetScriptInterface().CloneValueFromOtherCompartment(*(pCmptPrivate->pScriptInterface), guiContextMetadata));
+			sim->GetScriptInterface().CloneValueFromOtherCompartment(*(pCmptPrivate->pScriptInterface), guiContextMetadata, JS::StructuredCloneScope::SameProcessDifferentThread));
 		JS::RootedValue gameInitAttributes(rqGame.cx);
 		sim->GetScriptInterface().GetProperty(gameContextMetadata, "initAttributes", &gameInitAttributes);
 

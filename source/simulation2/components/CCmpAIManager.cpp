@@ -200,14 +200,14 @@ private:
 		shared_ptr<ScriptInterface> m_ScriptInterface;
 
 		JS::PersistentRootedValue m_Obj;
-		std::vector<shared_ptr<ScriptInterface::StructuredClone> > m_Commands;
+		std::vector<shared_ptr<JSStructuredCloneData> > m_Commands;
 	};
 
 public:
 	struct SCommandSets
 	{
 		player_id_t player;
-		std::vector<shared_ptr<ScriptInterface::StructuredClone> > commands;
+		std::vector<shared_ptr<JSStructuredCloneData> > commands;
 	};
 
 	CAIWorker() :
@@ -299,7 +299,7 @@ public:
 		{
 			if (m_Players[i]->m_Player == playerid)
 			{
-				m_Players[i]->m_Commands.push_back(m_ScriptInterface->WriteStructuredClone(cmd));
+				m_Players[i]->m_Commands.push_back(m_ScriptInterface->WriteStructuredClone(cmd, JS::StructuredCloneScope::SameProcessDifferentThread));
 				return;
 			}
 		}
@@ -485,7 +485,7 @@ public:
 		return true;
 	}
 
-	bool RunGamestateInit(const shared_ptr<ScriptInterface::StructuredClone>& gameState, const Grid<NavcellData>& passabilityMap, const Grid<u8>& territoryMap,
+	bool RunGamestateInit(const shared_ptr<JSStructuredCloneData>& gameState, const Grid<NavcellData>& passabilityMap, const Grid<u8>& territoryMap,
 		const std::map<std::string, pass_class_t>& nonPathfindingPassClassMasks, const std::map<std::string, pass_class_t>& pathfindingPassClassMasks)
 	{
 		// this will be run last by InitGame.js, passing the full game representation.
@@ -521,7 +521,7 @@ public:
 		return true;
 	}
 
-	void UpdateGameState(const shared_ptr<ScriptInterface::StructuredClone>& gameState)
+	void UpdateGameState(const shared_ptr<JSStructuredCloneData>& gameState)
 	{
 		ENSURE(m_CommandsComputed);
 		m_GameState = gameState;
@@ -765,7 +765,7 @@ public:
 			{
 				JS::RootedValue val(rq.cx);
 				deserializer.ScriptVal("command", &val);
-				m_Players.back()->m_Commands.push_back(m_ScriptInterface->WriteStructuredClone(val));
+				m_Players.back()->m_Commands.push_back(m_ScriptInterface->WriteStructuredClone(val, JS::StructuredCloneScope::SameProcessDifferentThread));
 			}
 
 			bool hasCustomDeserialize = m_ScriptInterface->HasProperty(m_Players.back()->m_Obj, "Deserialize");
@@ -888,7 +888,7 @@ private:
 
 	std::set<std::wstring> m_LoadedModules;
 
-	shared_ptr<ScriptInterface::StructuredClone> m_GameState;
+	shared_ptr<JSStructuredCloneData> m_GameState;
 	Grid<NavcellData> m_PassabilityMap;
 	JS::PersistentRootedValue m_PassabilityMapVal;
 	Grid<u8> m_TerritoryMap;
@@ -1016,7 +1016,8 @@ public:
 		if (cmpPathfinder)
 			cmpPathfinder->GetPassabilityClasses(nonPathfindingPassClassMasks, pathfindingPassClassMasks);
 
-		m_Worker.RunGamestateInit(scriptInterface.WriteStructuredClone(state), *passabilityMap, *territoryMap, nonPathfindingPassClassMasks, pathfindingPassClassMasks);
+		m_Worker.RunGamestateInit(scriptInterface.WriteStructuredClone(state, JS::StructuredCloneScope::SameProcessDifferentThread), 
+			*passabilityMap, *territoryMap, nonPathfindingPassClassMasks, pathfindingPassClassMasks);
 	}
 
 	virtual void StartComputation()
@@ -1041,7 +1042,7 @@ public:
 		LoadPathfinderClasses(state); // add the pathfinding classes to it
 
 		// Update the game state
-		m_Worker.UpdateGameState(scriptInterface.WriteStructuredClone(state));
+		m_Worker.UpdateGameState(scriptInterface.WriteStructuredClone(state, JS::StructuredCloneScope::SameProcessDifferentThread));
 
 		// Update the pathfinding data
 		CmpPtr<ICmpPathfinder> cmpPathfinder(GetSystemEntity());

@@ -164,7 +164,7 @@ public:
 	void InitRNGSeedSimulation();
 	void InitRNGSeedAI();
 
-	static std::vector<SimulationCommand> CloneCommandsFromOtherContext(const ScriptInterface& oldScript, const ScriptInterface& newScript,
+	static std::vector<SimulationCommand> CloneCommandsFromOtherCompartment(const ScriptInterface& oldScript, const ScriptInterface& newScript,
 		const std::vector<SimulationCommand>& commands)
 	{
 		std::vector<SimulationCommand> newCommands;
@@ -173,7 +173,7 @@ public:
 		ScriptInterface::Request rqNew(newScript);
 		for (const SimulationCommand& command : commands)
 		{
-			JS::RootedValue tmpCommand(rqNew.cx, newScript.CloneValueFromOtherCompartment(oldScript, command.data));
+			JS::RootedValue tmpCommand(rqNew.cx, newScript.CloneValueFromOtherCompartment(oldScript, command.data, JS::StructuredCloneScope::SameProcessSameThread));
 			newScript.FreezeObject(tmpCommand, true);
 			SimulationCommand cmd(command.player, rqNew.cx, tmpCommand);
 			newCommands.emplace_back(std::move(cmd));
@@ -424,7 +424,7 @@ void CSimulation2Impl::Update(int turnLength, const std::vector<SimulationComman
 			ScriptInterface::Request rq2(m_SecondaryComponentManager->GetScriptInterface());
 			JS::RootedValue mapSettingsCloned(rq2.cx,
 				m_SecondaryComponentManager->GetScriptInterface().CloneValueFromOtherCompartment(
-					scriptInterface, m_MapSettings));
+					scriptInterface, m_MapSettings, JS::StructuredCloneScope::SameProcessSameThread));
 			ENSURE(LoadTriggerScripts(*m_SecondaryComponentManager, mapSettingsCloned, m_SecondaryLoadedScripts));
 		}
 
@@ -477,7 +477,7 @@ void CSimulation2Impl::Update(int turnLength, const std::vector<SimulationComman
 			ENSURE(m_ComponentManager.ComputeStateHash(primaryStateAfter.hash, false));
 
 		UpdateComponents(*m_SecondaryContext, turnLengthFixed,
-			CloneCommandsFromOtherContext(scriptInterface, m_SecondaryComponentManager->GetScriptInterface(), commands));
+			CloneCommandsFromOtherCompartment(scriptInterface, m_SecondaryComponentManager->GetScriptInterface(), commands));
 		SerializationTestState secondaryStateAfter;
 		ENSURE(m_SecondaryComponentManager->SerializeState(secondaryStateAfter.state));
 		if (serializationTestHash)

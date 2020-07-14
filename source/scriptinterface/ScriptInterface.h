@@ -310,7 +310,7 @@ public:
 	 * Complex values (functions, XML, etc) won't be cloned correctly, but basic
 	 * types and cyclic references should be fine.
 	 */
-	JS::Value CloneValueFromOtherCompartment(const ScriptInterface& otherCompartment, JS::HandleValue val) const;
+	JS::Value CloneValueFromOtherCompartment(const ScriptInterface& otherCompartment, JS::HandleValue val, JS::StructuredCloneScope scope) const;
 
 	/**
 	 * Convert a JS::Value to a C++ type. (This might trigger GC.)
@@ -346,18 +346,8 @@ public:
 	 * We wrap them in shared_ptr so memory management is automatic and
 	 * thread-safe.
 	 */
-	class StructuredClone
-	{
-		NONCOPYABLE(StructuredClone);
-	public:
-		StructuredClone();
-		~StructuredClone();
-		u64* m_Data;
-		size_t m_Size;
-	};
-
-	shared_ptr<StructuredClone> WriteStructuredClone(JS::HandleValue v) const;
-	void ReadStructuredClone(const shared_ptr<StructuredClone>& ptr, JS::MutableHandleValue ret) const;
+	shared_ptr<JSStructuredCloneData> WriteStructuredClone(JS::HandleValue v, JS::StructuredCloneScope scope) const;
+	void ReadStructuredClone(const shared_ptr<JSStructuredCloneData>& ptr, JS::MutableHandleValue ret) const;
 
 	/**
 	 * Retrieve the private data field of a JSObject that is an instance of the given JSClass.

@@ -1266,7 +1266,7 @@ int CMapReader::GenerateMap()
 	else if (progress == 0)
 	{
 		// Finished, get results as StructuredClone object, which must be read to obtain the JS::Value
-		shared_ptr<ScriptInterface::StructuredClone> results = m_MapGen->GetResults();
+		shared_ptr<JSStructuredCloneData> results = m_MapGen->GetResults();
 
 		// Parse data into simulation context
 		JS::RootedValue data(rq.cx);
