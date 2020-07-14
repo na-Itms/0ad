@@ -1012,46 +1012,34 @@ void ScriptInterface::ReportError(const char* msg) const
 	// TODO: Why doesn't JS_ReportPendingException(cx); work?
 }
 
-JS::Value ScriptInterface::CloneValueFromOtherCompartment(const ScriptInterface& otherCompartment, JS::HandleValue val) const
+JS::Value ScriptInterface::CloneValueFromOtherCompartment(const ScriptInterface& otherCompartment, JS::HandleValue val, JS::StructuredCloneScope scope) const
 {
 	PROFILE("CloneValueFromOtherCompartment");
 	Request rq(this);
 	JS::RootedValue out(rq.cx);
-	shared_ptr<StructuredClone> structuredClone = otherCompartment.WriteStructuredClone(val);
+	shared_ptr<JSStructuredCloneData> structuredClone = otherCompartment.WriteStructuredClone(val, scope);
 	ReadStructuredClone(structuredClone, &out);
 	return out.get();
 }
 
-ScriptInterface::StructuredClone::StructuredClone() :
-	m_Data(NULL), m_Size(0)
-{
-}
-
-ScriptInterface::StructuredClone::~StructuredClone()
-{
-	if (m_Data)
-		JS_ClearStructuredClone(m_Data, m_Size, NULL, NULL);
-}
-
-shared_ptr<ScriptInterface::StructuredClone> ScriptInterface::WriteStructuredClone(JS::HandleValue v) const
+shared_ptr<JSStructuredCloneData> ScriptInterface::WriteStructuredClone(JS::HandleValue v, JS::StructuredCloneScope scope) const
 {
 	Request rq(this);
-	u64* data = NULL;
-	size_t nbytes = 0;
-	if (!JS_WriteStructuredClone(rq.cx, v, &data, &nbytes, NULL, NULL, JS::UndefinedHandleValue))
+
+	shared_ptr<JSStructuredCloneData> ret(new JSStructuredCloneData(scope));
+	JS::CloneDataPolicy policy;
+
+	if (!JS_WriteStructuredClone(rq.cx, v, ret.get(), scope, policy, nullptr, nullptr, JS::UndefinedHandleValue))
 	{
 		debug_warn(L"Writing a structured clone with JS_WriteStructuredClone failed!");
-		return shared_ptr<StructuredClone>();
+		return shared_ptr<JSStructuredCloneData>();
 	}
 
-	shared_ptr<StructuredClone> ret(new StructuredClone);
-	ret->m_Data = data;
-	ret->m_Size = nbytes;
 	return ret;
 }
 
-void ScriptInterface::ReadStructuredClone(const shared_ptr<ScriptInterface::StructuredClone>& ptr, JS::MutableHandleValue ret) const
+void ScriptInterface::ReadStructuredClone(const shared_ptr<JSStructuredCloneData>& ptr, JS::MutableHandleValue ret) const
 {
 	Request rq(this);
-	JS_ReadStructuredClone(rq.cx, ptr->m_Data, ptr->m_Size, JS_STRUCTURED_CLONE_VERSION, ret, NULL, NULL);
+	JS_ReadStructuredClone(rq.cx, *ptr, JS_STRUCTURED_CLONE_VERSION, ptr->scope(), ret, nullptr, nullptr);
 }

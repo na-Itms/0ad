@@ -88,16 +88,16 @@ void CGUIManager::SwitchPage(const CStrW& pageName, ScriptInterface* srcScriptIn
 	// The page stack is cleared (including the script context where initData came from),
 	// therefore we have to clone initData.
 
-	shared_ptr<ScriptInterface::StructuredClone> initDataClone;
+	shared_ptr<JSStructuredCloneData> initDataClone;
 	if (!initData.isUndefined())
-		initDataClone = srcScriptInterface->WriteStructuredClone(initData);
+		initDataClone = srcScriptInterface->WriteStructuredClone(initData, JS::StructuredCloneScope::SameProcessSameThread);
 
 	m_PageStack.clear();
 
 	PushPage(pageName, initDataClone, JS::UndefinedHandleValue);
 }
 
-void CGUIManager::PushPage(const CStrW& pageName, shared_ptr<ScriptInterface::StructuredClone> initData, JS::HandleValue callbackFunction)
+void CGUIManager::PushPage(const CStrW& pageName, shared_ptr<JSStructuredCloneData> initData, JS::HandleValue callbackFunction)
 {
 	// Store the callback handler in the current GUI page before opening the new one
 	if (!m_PageStack.empty() && !callbackFunction.isUndefined())
@@ -109,7 +109,7 @@ void CGUIManager::PushPage(const CStrW& pageName, shared_ptr<ScriptInterface::St
 	m_PageStack.back().LoadPage(m_ScriptContext);
 }
 
-void CGUIManager::PopPage(shared_ptr<ScriptInterface::StructuredClone> args)
+void CGUIManager::PopPage(shared_ptr<JSStructuredCloneData> args)
 {
 	if (m_PageStack.size() < 2)
 	{
@@ -121,7 +121,7 @@ void CGUIManager::PopPage(shared_ptr<ScriptInterface::StructuredClone> args)
 	m_PageStack.back().PerformCallbackFunction(args);
 }
 
-CGUIManager::SGUIPage::SGUIPage(const CStrW& pageName, const shared_ptr<ScriptInterface::StructuredClone> initData)
+CGUIManager::SGUIPage::SGUIPage(const CStrW& pageName, const shared_ptr<JSStructuredCloneData> initData)
 	: name(pageName), initData(initData), inputs(), gui(), callbackFunction()
 {
 }
@@ -129,7 +129,7 @@ CGUIManager::SGUIPage::SGUIPage(const CStrW& pageName, const shared_ptr<ScriptIn
 void CGUIManager::SGUIPage::LoadPage(shared_ptr<ScriptContext> scriptContext)
 {
 	// If we're hotloading then try to grab some data from the previous page
-	shared_ptr<ScriptInterface::StructuredClone> hotloadData;
+	shared_ptr<JSStructuredCloneData> hotloadData;
 	if (gui)
 	{
 		shared_ptr<ScriptInterface> scriptInterface = gui->GetScriptInterface();
@@ -138,7 +138,7 @@ void CGUIManager::SGUIPage::LoadPage(shared_ptr<ScriptContext> scriptContext)
 		JS::RootedValue global(rq.cx, rq.globalValue());
 		JS::RootedValue hotloadDataVal(rq.cx);
 		scriptInterface->CallFunction(global, "getHotloadData", &hotloadDataVal);
-		hotloadData = scriptInterface->WriteStructuredClone(hotloadDataVal);
+		hotloadData = scriptInterface->WriteStructuredClone(hotloadDataVal, JS::StructuredCloneScope::SameProcessSameThread);
 	}
 
 	g_CursorName = g_DefaultCursor;
@@ -235,7 +235,7 @@ void CGUIManager::SGUIPage::SetCallbackFunction(ScriptInterface& scriptInterface
 	callbackFunction = std::make_shared<JS::PersistentRootedValue>(scriptInterface.GetGeneralJSContext(), callbackFunc);
 }
 
-void CGUIManager::SGUIPage::PerformCallbackFunction(shared_ptr<ScriptInterface::StructuredClone> args)
+void CGUIManager::SGUIPage::PerformCallbackFunction(shared_ptr<JSStructuredCloneData> args)
 {
 	if (!callbackFunction)
 		return;
