@@ -23,7 +23,10 @@
 #include "scriptinterface/ScriptInterface.h"
 
 JSClass JSI_GUISize::JSI_class = {
-	"GUISize", 0,
+	"GUISize", 0, &JSI_GUISize::JSI_classops
+};
+
+JSClassOps JSI_GUISize::JSI_classops = {
 	nullptr, nullptr,
 	nullptr, nullptr,
 	nullptr, nullptr, nullptr, nullptr,

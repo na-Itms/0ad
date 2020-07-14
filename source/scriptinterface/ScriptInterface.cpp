@@ -94,13 +94,16 @@ ScriptInterface::Request::~Request()
 namespace
 {
 
-JSClass global_class = {
-	"global", JSCLASS_GLOBAL_FLAGS,
+JSClassOps global_classops = {
 	nullptr, nullptr,
 	nullptr, nullptr,
 	nullptr, nullptr, nullptr,
 	nullptr, nullptr, nullptr, nullptr,
 	JS_GlobalObjectTraceHook
+};
+
+JSClass global_class = {
+	"global", JSCLASS_GLOBAL_FLAGS, &global_classops
 };
 
 // Functions in the global namespace:

@@ -23,6 +23,7 @@
 namespace JSI_IGUIObject
 {
 	extern JSClass JSI_class;
+	extern JSClassOps JSI_classops;
 	extern JSFunctionSpec JSI_methods[];
 
 	void RegisterScriptClass(ScriptInterface& scriptInterface);

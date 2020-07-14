@@ -24,6 +24,7 @@
 namespace JSI_GUISize
 {
 	extern JSClass JSI_class;
+	extern JSClassOps JSI_classops;
 	extern JSPropertySpec JSI_props[];
 	extern JSFunctionSpec JSI_methods[];
 
