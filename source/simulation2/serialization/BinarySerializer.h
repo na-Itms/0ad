@@ -91,9 +91,9 @@ private:
 	const ScriptInterface& m_ScriptInterface;
 	ISerializer& m_Serializer;
 
-	ObjectIdCache<u32> m_ScriptBackrefs;
-	u32 m_ScriptBackrefsNext;
-	u32 GetScriptBackrefTag(JS::HandleObject obj);
+	JS::PersistentRootedSymbol m_ScriptBackrefSymbol;
+	i32 m_ScriptBackrefsNext;
+	i32 GetScriptBackrefTag(JS::HandleObject obj);
 };
 
 /**
