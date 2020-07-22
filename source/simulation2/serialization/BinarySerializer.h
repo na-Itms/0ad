@@ -20,8 +20,6 @@
 
 #include "ISerializer.h"
 
-#include "scriptinterface/third_party/ObjectToIDMap.h"
-
 #include "lib/byte_order.h"
 #include "lib/allocators/arena.h"
 
