@@ -119,7 +119,7 @@ struct ScriptInterface_NativeMethodWrapper<void, TC>
 		JS::RootedValue rval(cx); \
 		ScriptInterface_NativeWrapper<R>::template call<R( ScriptInterface::CmptPrivate* T0_TAIL_MAYBE_REF(z,i))  T0_TAIL(z,i)>(cx, &rval, fptr  A0_TAIL(z,i)); \
 		args.rval().set(rval); \
-		return !ScriptInterface::IsExceptionPending(cx); \
+		return !JS_IsExceptionPending(cx); \
 	}
 BOOST_PP_REPEAT(SCRIPT_INTERFACE_MAX_ARGS, OVERLOADS, ~)
 #undef OVERLOADS
@@ -137,7 +137,7 @@ BOOST_PP_REPEAT(SCRIPT_INTERFACE_MAX_ARGS, OVERLOADS, ~)
 		JS::RootedValue rval(cx); \
 		ScriptInterface_NativeMethodWrapper<R, TC>::template call<R (TC::*)(T0_MAYBE_REF(z,i))  T0_TAIL(z,i)>(cx, &rval, c, fptr A0_TAIL(z,i)); \
 		args.rval().set(rval); \
-		return !ScriptInterface::IsExceptionPending(cx); \
+		return !JS_IsExceptionPending(cx); \
 	}
 BOOST_PP_REPEAT(SCRIPT_INTERFACE_MAX_ARGS, OVERLOADS, ~)
 #undef OVERLOADS
@@ -155,7 +155,7 @@ BOOST_PP_REPEAT(SCRIPT_INTERFACE_MAX_ARGS, OVERLOADS, ~)
 		JS::RootedValue rval(cx); \
 		ScriptInterface_NativeMethodWrapper<R, TC>::template call<R (TC::*)(T0_MAYBE_REF(z,i)) const  T0_TAIL(z,i)>(cx, &rval, c, fptr A0_TAIL(z,i)); \
 		args.rval().set(rval); \
-		return !ScriptInterface::IsExceptionPending(cx); \
+		return !JS_IsExceptionPending(cx); \
 	}
 BOOST_PP_REPEAT(SCRIPT_INTERFACE_MAX_ARGS, OVERLOADS, ~)
 #undef OVERLOADS
