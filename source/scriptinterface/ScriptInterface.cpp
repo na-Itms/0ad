@@ -1009,12 +1009,6 @@ void ScriptInterface::ReportError(const char* msg) const
 	// TODO: Why doesn't JS_ReportPendingException(cx); work?
 }
 
-bool ScriptInterface::IsExceptionPending(JSContext* cx)
-{
-	JSAutoRequest rq(cx);
-	return JS_IsExceptionPending(cx) ? true : false;
-}
-
 JS::Value ScriptInterface::CloneValueFromOtherCompartment(const ScriptInterface& otherCompartment, JS::HandleValue val) const
 {
 	PROFILE("CloneValueFromOtherCompartment");
