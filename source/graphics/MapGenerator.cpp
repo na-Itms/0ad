@@ -339,9 +339,7 @@ JS::Value CMapGeneratorWorker::LoadMapTerrain(ScriptInterface::CmptPrivate* pCmp
 
 	if (!VfsFileExists(filename))
 	{
-		self->m_ScriptInterface->ReportError(
-			("Terrain file \"" +  filename.string8() +  "\" does not exist!").c_str());
-
+		JS_ReportErrorUTF8(rq.cx, "Terrain file \"%s\" does not exist!", filename.string8().c_str());
 		return JS::UndefinedValue();
 	}
 
@@ -350,9 +348,7 @@ JS::Value CMapGeneratorWorker::LoadMapTerrain(ScriptInterface::CmptPrivate* pCmp
 
 	if (unpacker.GetVersion() < CMapIO::FILE_READ_VERSION)
 	{
-		self->m_ScriptInterface->ReportError(
-			("Could not load terrain file \"" +  filename.string8() +  "\" too old version!").c_str());
-
+		JS_ReportErrorUTF8(rq.cx, "Could not load terrain file \"%s\" too old version!", filename.string8().c_str());
 		return JS::UndefinedValue();
 	}
 

@@ -200,7 +200,7 @@ bool deepfreeze(JSContext* cx, uint argc, JS::Value* vp)
 	if (args.length() != 1 || !args.get(0).isObject())
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "deepfreeze requires exactly one object as an argument.");
+		JS_ReportErrorUTF8(cx, "deepfreeze requires exactly one object as an argument.");
 		return false;
 	}
 
@@ -436,6 +436,7 @@ bool ScriptInterface::ReplaceNondeterministicRNG(boost::rand48& rng)
 		}
 	}
 
+	ScriptContext::CatchPendingException(rq.cx);
 	LOGERROR("ReplaceNondeterministicRNG: failed to replace Math.random");
 	return false;
 }
@@ -488,7 +489,10 @@ void ScriptInterface::DefineCustomObjectType(JSClass *clasp, JSNative constructo
 	                                           static_ps, static_fs));   // Constructor properties, methods
 
 	if (obj == NULL)
+	{
+		ScriptContext::CatchPendingException(rq.cx);
 		throw PSERROR_Scripting_DefineType_CreationFailed();
+	}
 
 	CustomType& type = m_CustomObjectTypes[typeName];
 
@@ -522,7 +526,11 @@ bool ScriptInterface::CallFunction_(JS::HandleValue val, const char* name, JS::H
 	if (!JS_HasProperty(rq.cx, obj, name, &found) || !found)
 		return false;
 
-	return(JS_CallFunctionName(rq.cx, obj, name, argv, ret));
+	if (JS_CallFunctionName(rq.cx, obj, name, argv, ret))
+		return true;
+
+	ScriptContext::CatchPendingException(rq.cx);
+	return false;
 }
 
 bool ScriptInterface::CreateObject_(JSContext* cx, JS::MutableHandleObject object)
@@ -564,7 +572,7 @@ bool ScriptInterface::SetGlobal_(const char* name, JS::HandleValue value, bool r
 		{
 			if (!replace)
 			{
-				JS_ReportError(rq.cx, "SetGlobal \"%s\" called multiple times", name);
+				JS_ReportErrorUTF8(rq.cx, "SetGlobal \"%s\" called multiple times", name);
 				return false;
 			}
 
@@ -572,7 +580,7 @@ bool ScriptInterface::SetGlobal_(const char* name, JS::HandleValue value, bool r
 			// instead of using SetGlobal.
 			if (!desc.configurable())
 			{
-				JS_ReportError(rq.cx, "The global \"%s\" is permanent and cannot be hotloaded", name);
+				JS_ReportErrorUTF8(rq.cx, "The global \"%s\" is permanent and cannot be hotloaded", name);
 				return false;
 			}
 
@@ -603,9 +611,7 @@ bool ScriptInterface::SetProperty_(JS::HandleValue obj, const char* name, JS::Ha
 		return false;
 	JS::RootedObject object(rq.cx, &obj.toObject());
 
-	if (!JS_DefineProperty(rq.cx, object, name, value, attrs))
-		return false;
-	return true;
+	return JS_DefineProperty(rq.cx, object, name, value, attrs);
 }
 
 bool ScriptInterface::SetProperty_(JS::HandleValue obj, const wchar_t* name, JS::HandleValue value, bool constant, bool enumerate) const
@@ -622,9 +628,7 @@ bool ScriptInterface::SetProperty_(JS::HandleValue obj, const wchar_t* name, JS:
 	JS::RootedObject object(rq.cx, &obj.toObject());
 
 	utf16string name16(name, name + wcslen(name));
-	if (!JS_DefineUCProperty(rq.cx, object, reinterpret_cast<const char16_t*>(name16.c_str()), name16.length(), value, attrs))
-		return false;
-	return true;
+	return JS_DefineUCProperty(rq.cx, object, reinterpret_cast<const char16_t*>(name16.c_str()), name16.length(), value, attrs);
 }
 
 bool ScriptInterface::SetPropertyInt_(JS::HandleValue obj, int name, JS::HandleValue value, bool constant, bool enumerate) const
@@ -641,9 +645,7 @@ bool ScriptInterface::SetPropertyInt_(JS::HandleValue obj, int name, JS::HandleV
 	JS::RootedObject object(rq.cx, &obj.toObject());
 
 	JS::RootedId id(rq.cx, INT_TO_JSID(name));
-	if (!JS_DefinePropertyById(rq.cx, object, id, value, attrs))
-		return false;
-	return true;
+	return JS_DefinePropertyById(rq.cx, object, id, value, attrs);
 }
 
 bool ScriptInterface::GetProperty(JS::HandleValue obj, const char* name, JS::MutableHandleValue out) const
@@ -679,9 +681,7 @@ bool ScriptInterface::GetProperty_(JS::HandleValue obj, const char* name, JS::Mu
 		return false;
 	JS::RootedObject object(rq.cx, &obj.toObject());
 
-	if (!JS_GetProperty(rq.cx, object, name, out))
-		return false;
-	return true;
+	return JS_GetProperty(rq.cx, object, name, out);
 }
 
 bool ScriptInterface::GetPropertyInt_(JS::HandleValue obj, int name, JS::MutableHandleValue out) const
@@ -692,14 +692,11 @@ bool ScriptInterface::GetPropertyInt_(JS::HandleValue obj, int name, JS::Mutable
 		return false;
 	JS::RootedObject object(rq.cx, &obj.toObject());
 
-	if (!JS_GetPropertyById(rq.cx, object, nameId, out))
-		return false;
-	return true;
+	return JS_GetPropertyById(rq.cx, object, nameId, out);
 }
 
 bool ScriptInterface::HasProperty(JS::HandleValue obj, const char* name) const
 {
-	// TODO: proper errorhandling
 	Request rq(this);
 	if (!obj.isObject())
 		return false;
@@ -792,10 +789,17 @@ bool ScriptInterface::LoadScript(const VfsPath& filename, const std::string& cod
 	JS::AutoObjectVector emptyScopeChain(rq.cx);
 	if (!JS::CompileFunction(rq.cx, emptyScopeChain, options, NULL, 0, NULL,
 	                         reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)(codeUtf16.length()), &func))
+	{
+		ScriptContext::CatchPendingException(rq.cx);
 		return false;
+	}
 
 	JS::RootedValue rval(rq.cx);
-	return JS_CallFunction(rq.cx, nullptr, func, JS::HandleValueArray::empty(), &rval);
+	if (JS_CallFunction(rq.cx, nullptr, func, JS::HandleValueArray::empty(), &rval))
+		return true;
+
+	ScriptContext::CatchPendingException(rq.cx);
+	return false;
 }
 
 bool ScriptInterface::LoadGlobalScript(const VfsPath& filename, const std::wstring& code) const
@@ -810,8 +814,11 @@ bool ScriptInterface::LoadGlobalScript(const VfsPath& filename, const std::wstri
 	JS::RootedValue rval(rq.cx);
 	JS::CompileOptions opts(rq.cx);
 	opts.setFileAndLine(filenameStr.c_str(), lineNo);
-	return JS::Evaluate(rq.cx, opts,
-			reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)(codeUtf16.length()), &rval);
+	if (JS::Evaluate(rq.cx, opts, reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)(codeUtf16.length()), &rval))
+		return true;
+
+	ScriptContext::CatchPendingException(rq.cx);
+	return false;
 }
 
 bool ScriptInterface::LoadGlobalScriptFile(const VfsPath& path) const
@@ -844,8 +851,11 @@ bool ScriptInterface::LoadGlobalScriptFile(const VfsPath& path) const
 	JS::RootedValue rval(rq.cx);
 	JS::CompileOptions opts(rq.cx);
 	opts.setFileAndLine(filenameStr.c_str(), lineNo);
-	return JS::Evaluate(rq.cx, opts,
-			reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)(codeUtf16.length()), &rval);
+	if (JS::Evaluate(rq.cx, opts, reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)(codeUtf16.length()), &rval))
+		return true;
+
+	ScriptContext::CatchPendingException(rq.cx);
+	return false;
 }
 
 bool ScriptInterface::Eval(const char* code) const
@@ -862,7 +872,11 @@ bool ScriptInterface::Eval_(const char* code, JS::MutableHandleValue rval) const
 
 	JS::CompileOptions opts(rq.cx);
 	opts.setFileAndLine("(eval)", 1);
-	return JS::Evaluate(rq.cx, opts, reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)codeUtf16.length(), rval);
+	if (JS::Evaluate(rq.cx, opts, reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)codeUtf16.length(), rval))
+		return true;
+
+	ScriptContext::CatchPendingException(rq.cx);
+	return false;
 }
 
 bool ScriptInterface::Eval_(const wchar_t* code, JS::MutableHandleValue rval) const
@@ -872,7 +886,11 @@ bool ScriptInterface::Eval_(const wchar_t* code, JS::MutableHandleValue rval) co
 
 	JS::CompileOptions opts(rq.cx);
 	opts.setFileAndLine("(eval)", 1);
-	return JS::Evaluate(rq.cx, opts, reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)codeUtf16.length(), rval);
+	if (JS::Evaluate(rq.cx, opts, reinterpret_cast<const char16_t*>(codeUtf16.c_str()), (uint)codeUtf16.length(), rval))
+		return true;
+
+	ScriptContext::CatchPendingException(rq.cx);
+	return false;
 }
 
 bool ScriptInterface::ParseJSON(const std::string& string_utf8, JS::MutableHandleValue out) const
@@ -883,27 +901,7 @@ bool ScriptInterface::ParseJSON(const std::string& string_utf8, JS::MutableHandl
 	if (JS_ParseJSON(rq.cx, reinterpret_cast<const char16_t*>(string.c_str()), (u32)string.size(), out))
 		return true;
 
-	LOGERROR("JS_ParseJSON failed!");
-	if (!JS_IsExceptionPending(rq.cx))
-		return false;
-
-	JS::RootedValue exc(rq.cx);
-	if (!JS_GetPendingException(rq.cx, &exc))
-		return false;
-
-	JS_ClearPendingException(rq.cx);
-	// We expect an object of type SyntaxError
-	if (!exc.isObject())
-		return false;
-
-	JS::RootedValue rval(rq.cx);
-	JS::RootedObject excObj(rq.cx, &exc.toObject());
-	if (!JS_CallFunctionName(rq.cx, excObj, "toString", JS::HandleValueArray::empty(), &rval))
-		return false;
-
-	std::wstring error;
-	ScriptInterface::FromJSVal(rq.cx, rval, error);
-	LOGERROR("%s", utf8_from_wstring(error));
+	ScriptContext::CatchPendingException(rq.cx);
 	return false;
 }
 
@@ -955,8 +953,7 @@ std::string ScriptInterface::StringifyJSON(JS::MutableHandleValue obj, bool inde
 	JS::RootedValue indentVal(rq.cx, indent ? JS::Int32Value(2) : JS::UndefinedValue());
 	if (!JS_Stringify(rq.cx, obj, nullptr, indentVal, &Stringifier::callback, &str))
 	{
-		JS_ClearPendingException(rq.cx);
-		LOGERROR("StringifyJSON failed");
+		ScriptContext::CatchPendingException(rq.cx);
 		return std::string();
 	}
 
@@ -978,18 +975,10 @@ std::string ScriptInterface::ToString(JS::MutableHandleValue obj, bool pretty) c
 		Stringifier str;
 		JS::RootedValue indentVal(rq.cx, JS::Int32Value(2));
 
-		// Temporary disable the error reporter, so we don't print complaints about cyclic values
-		JSErrorReporter er = JS_SetErrorReporter(GetJSRuntime(), nullptr);
-
-		bool ok = JS_Stringify(rq.cx, obj, nullptr, indentVal, &Stringifier::callback, &str);
-
-		// Restore error reporter
-		JS_SetErrorReporter(GetJSRuntime(), er);
-
-		if (ok)
+		if (JS_Stringify(rq.cx, obj, nullptr, indentVal, &Stringifier::callback, &str))
 			return str.stream.str();
 
-		// Clear the exception set when Stringify failed
+		// Drop exceptions raised by cyclic values before trying something else
 		JS_ClearPendingException(rq.cx);
 	}
 
@@ -1001,19 +990,6 @@ std::string ScriptInterface::ToString(JS::MutableHandleValue obj, bool pretty) c
 	return utf8_from_wstring(source);
 }
 
-void ScriptInterface::ReportError(const char* msg) const
-{
-	Request rq(this);
-	// JS_ReportError by itself doesn't seem to set a JS-style exception, and so
-	// script callers will be unable to catch anything. So use JS_SetPendingException
-	// to make sure there really is a script-level exception. But just set it to undefined
-	// because there's not much value yet in throwing a real exception object.
-	JS_SetPendingException(rq.cx, JS::UndefinedHandleValue);
-	// And report the actual error
-	JS_ReportError(rq.cx, "%s", msg);
-
-	// TODO: Why doesn't JS_ReportPendingException(cx); work?
-}
 
 JS::Value ScriptInterface::CloneValueFromOtherCompartment(const ScriptInterface& otherCompartment, JS::HandleValue val, JS::StructuredCloneScope scope) const
 {
@@ -1034,7 +1010,7 @@ shared_ptr<JSStructuredCloneData> ScriptInterface::WriteStructuredClone(JS::Hand
 
 	if (!JS_WriteStructuredClone(rq.cx, v, ret.get(), scope, policy, nullptr, nullptr, JS::UndefinedHandleValue))
 	{
-		debug_warn(L"Writing a structured clone with JS_WriteStructuredClone failed!");
+		ScriptContext::CatchPendingException(rq.cx);
 		return shared_ptr<JSStructuredCloneData>();
 	}
 
@@ -1044,5 +1020,6 @@ shared_ptr<JSStructuredCloneData> ScriptInterface::WriteStructuredClone(JS::Hand
 void ScriptInterface::ReadStructuredClone(const shared_ptr<JSStructuredCloneData>& ptr, JS::MutableHandleValue ret) const
 {
 	Request rq(this);
-	JS_ReadStructuredClone(rq.cx, *ptr, JS_STRUCTURED_CLONE_VERSION, ptr->scope(), ret, nullptr, nullptr);
+	if (!JS_ReadStructuredClone(rq.cx, *ptr, JS_STRUCTURED_CLONE_VERSION, ptr->scope(), ret, nullptr, nullptr))
+		ScriptContext::CatchPendingException(rq.cx);
 }

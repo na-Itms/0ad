@@ -167,21 +167,21 @@ template<> bool ScriptInterface::FromJSVal<CSize>(JSContext* cx, JS::HandleValue
 	if (!v.isObject())
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "CSize value must be an object!");
+		JS_ReportErrorUTF8(cx, "CSize value must be an object!");
 		return false;
 	}
 
 	if (!FromJSProperty(cx, v, "width", out.cx))
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Failed to get CSize.cx property");
+		JS_ReportErrorUTF8(cx, "Failed to get CSize.cx property");
 		return false;
 	}
 
 	if (!FromJSProperty(cx, v, "height", out.cy))
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Failed to get CSize.cy property");
+		JS_ReportErrorUTF8(cx, "Failed to get CSize.cy property");
 		return false;
 	}
 
@@ -198,21 +198,21 @@ template<> bool ScriptInterface::FromJSVal<CPos>(JSContext* cx, JS::HandleValue 
 	if (!v.isObject())
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "CPos value must be an object!");
+		JS_ReportErrorUTF8(cx, "CPos value must be an object!");
 		return false;
 	}
 
 	if (!FromJSProperty(cx, v, "x", out.x))
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Failed to get CPos.x property");
+		JS_ReportErrorUTF8(cx, "Failed to get CPos.x property");
 		return false;
 	}
 
 	if (!FromJSProperty(cx, v, "y", out.y))
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Failed to get CPos.y property");
+		JS_ReportErrorUTF8(cx, "Failed to get CPos.y property");
 		return false;
 	}
 
@@ -280,7 +280,7 @@ template<> void ScriptInterface::ToJSVal<EVAlign>(JSContext* cx, JS::MutableHand
 	default:
 		word = "error";
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Invalid EVAlign");
+		JS_ReportErrorUTF8(cx, "Invalid EVAlign");
 		break;
 	}
 	ToJSVal(cx, ret, word);
@@ -301,7 +301,7 @@ template<> bool ScriptInterface::FromJSVal<EVAlign>(JSContext* cx, JS::HandleVal
 	{
 		out = EVAlign_Top;
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Invalid alignment (should be 'left', 'right' or 'center')");
+		JS_ReportErrorUTF8(cx, "Invalid alignment (should be 'left', 'right' or 'center')");
 		return false;
 	}
 	return true;
@@ -324,7 +324,7 @@ template<> void ScriptInterface::ToJSVal<EAlign>(JSContext* cx, JS::MutableHandl
 	default:
 		word = "error";
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Invalid alignment (should be 'left', 'right' or 'center')");
+		JS_ReportErrorUTF8(cx, "Invalid alignment (should be 'left', 'right' or 'center')");
 		break;
 	}
 	ToJSVal(cx, ret, word);
@@ -345,7 +345,7 @@ template<> bool ScriptInterface::FromJSVal<EAlign>(JSContext* cx, JS::HandleValu
 	{
 		out = EAlign_Left;
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "Invalid alignment (should be 'left', 'right' or 'center')");
+		JS_ReportErrorUTF8(cx, "Invalid alignment (should be 'left', 'right' or 'center')");
 		return false;
 	}
 	return true;

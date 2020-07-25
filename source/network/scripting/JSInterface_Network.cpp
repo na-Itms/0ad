@@ -61,7 +61,8 @@ void JSI_Network::StartNetworkHost(ScriptInterface::CmptPrivate* pCmptPrivate, c
 	g_NetServer = new CNetServer(static_cast<bool>(g_XmppClient));
 	if (!g_NetServer->SetupConnection(serverPort))
 	{
-		pCmptPrivate->pScriptInterface->ReportError("Failed to start server");
+		ScriptInterface::Request rq(pCmptPrivate);
+		JS_ReportErrorUTF8(rq.cx, "Failed to start server");
 		SAFE_DELETE(g_NetServer);
 		return;
 	}
@@ -73,7 +74,8 @@ void JSI_Network::StartNetworkHost(ScriptInterface::CmptPrivate* pCmptPrivate, c
 
 	if (!g_NetClient->SetupConnection("127.0.0.1", serverPort, nullptr))
 	{
-		pCmptPrivate->pScriptInterface->ReportError("Failed to connect to server");
+		ScriptInterface::Request rq(pCmptPrivate);
+		JS_ReportErrorUTF8(rq.cx, "Failed to connect to server");
 		SAFE_DELETE(g_NetClient);
 		SAFE_DELETE(g_Game);
 	}
@@ -100,14 +102,16 @@ void JSI_Network::StartNetworkJoin(ScriptInterface::CmptPrivate* pCmptPrivate, c
 
 		if (!enetClient)
 		{
-			pCmptPrivate->pScriptInterface->ReportError("Could not find an unused port for the enet STUN client");
+			ScriptInterface::Request rq(pCmptPrivate);
+			JS_ReportErrorUTF8(rq.cx, "Could not find an unused port for the enet STUN client");
 			return;
 		}
 
 		StunClient::StunEndpoint stunEndpoint;
 		if (!StunClient::FindStunEndpointJoin(*enetClient, stunEndpoint))
 		{
-			pCmptPrivate->pScriptInterface->ReportError("Could not find the STUN endpoint");
+			ScriptInterface::Request rq(pCmptPrivate);
+			JS_ReportErrorUTF8(rq.cx, "Could not find the STUN endpoint");
 			return;
 		}
 
@@ -126,7 +130,8 @@ void JSI_Network::StartNetworkJoin(ScriptInterface::CmptPrivate* pCmptPrivate, c
 
 	if (!g_NetClient->SetupConnection(serverAddress, serverPort, enetClient))
 	{
-		pCmptPrivate->pScriptInterface->ReportError("Failed to connect to server");
+		ScriptInterface::Request rq(pCmptPrivate);
+		JS_ReportErrorUTF8(rq.cx, "Failed to connect to server");
 		SAFE_DELETE(g_NetClient);
 		SAFE_DELETE(g_Game);
 	}

@@ -101,7 +101,7 @@ bool JSI_Game::IsPaused(ScriptInterface::CmptPrivate* pCmptPrivate)
 	if (!g_Game)
 	{
 		ScriptInterface::Request rq(pCmptPrivate);
-		JS_ReportError(rq.cx, "Game is not started");
+		JS_ReportErrorUTF8(rq.cx, "Game is not started");
 		return false;
 	}
 
@@ -113,7 +113,7 @@ void JSI_Game::SetPaused(ScriptInterface::CmptPrivate* pCmptPrivate, bool pause,
 	if (!g_Game)
 	{
 		ScriptInterface::Request rq(pCmptPrivate);
-		JS_ReportError(rq.cx, "Game is not started");
+		JS_ReportErrorUTF8(rq.cx, "Game is not started");
 		return;
 	}
 

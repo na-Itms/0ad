@@ -95,31 +95,41 @@ shared_ptr<ScriptContext> ScriptContext::CreateContext(shared_ptr<ScriptContext>
 	return shared_ptr<ScriptContext>(new ScriptContext(parentContext, contextSize, heapGrowthBytesGCTrigger));
 }
 
-namespace {
-
-void ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
+void ScriptContext::CatchPendingException(JSContext* cx)
 {
+	if (!JS_IsExceptionPending(cx))
+		return;
+
 	JSAutoRequest rq(cx);
 
+	JS::RootedValue excn(cx);
+	ENSURE(JS_GetPendingException(cx, &excn));
+
+	if (excn.isUndefined())
+	{
+		LOGERROR("JavaScript error: (undefined)");
+		JS_ClearPendingException(cx);
+		return;
+	}
+
+	ENSURE(excn.isObject());
+	JS::RootedObject excnObj(cx, &excn.toObject());
+	JSErrorReport* report = JS_ErrorFromException(cx, excnObj);
+
 	std::stringstream msg;
-	bool isWarning = JSREPORT_IS_WARNING(report->flags);
-	msg << (isWarning ? "JavaScript warning: " : "JavaScript error: ");
+	msg << (JSREPORT_IS_EXCEPTION(report->flags) ? "JavaScript exception: " : "JavaScript error: ");
 	if (report->filename)
 	{
 		msg << report->filename;
 		msg << " line " << report->lineno << "\n";
 	}
 
-	msg << message;
+	msg << report->message().c_str();
 
-	// If there is an exception, then print its stack trace
-	JS::RootedValue excn(cx);
-	if (JS_GetPendingException(cx, &excn) && excn.isObject())
+	JS::RootedObject stackObj(cx, ExceptionStackOrNull(excnObj));
+	JS::RootedValue stackVal(cx, JS::ObjectOrNullValue(stackObj));
+	if (!stackVal.isNull())
 	{
-		JS::RootedValue stackVal(cx);
-		JS::RootedObject excnObj(cx, &excn.toObject());
-		JS_GetProperty(cx, excnObj, "stack", &stackVal);
-
 		std::string stackText;
 		ScriptInterface::FromJSVal(cx, stackVal, stackText);
 
@@ -128,10 +138,32 @@ void ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
 			msg << "\n  " << line;
 	}
 
-	if (isWarning)
-		LOGWARNING("%s", msg.str().c_str());
-	else
-		LOGERROR("%s", msg.str().c_str());
+	LOGERROR("%s", msg.str().c_str());
+
+	// When running under Valgrind, print more information in the error message
+//	VALGRIND_PRINTF_BACKTRACE("->");
+
+	JS_ClearPendingException(cx);
+}
+
+namespace {
+
+void WarningReporter(JSContext* cx, JSErrorReport* report)
+{
+	JSAutoRequest rq(cx);
+
+	std::stringstream msg;
+	ENSURE(JSREPORT_IS_WARNING(report->flags));
+	msg << "JavaScript warning: ";
+	if (report->filename)
+	{
+		msg << report->filename;
+		msg << " line " << report->lineno << "\n";
+	}
+
+	msg << report->message().c_str();
+
+	LOGWARNING("%s", msg.str().c_str());
 
 	// When running under Valgrind, print more information in the error message
 //	VALGRIND_PRINTF_BACKTRACE("->");
@@ -170,7 +202,7 @@ ScriptContext::ScriptContext(shared_ptr<ScriptContext> parentContext, int contex
 
 	JS_SetContextPrivate(m_cx, nullptr);
 
-	JS_SetErrorReporter(m_cx, ErrorReporter);
+	JS::SetWarningReporter(m_cx, WarningReporter);
 
 	JS_SetGlobalJitCompilerOption(m_cx, JSJITCOMPILER_ION_ENABLE, 1);
 	JS_SetGlobalJitCompilerOption(m_cx, JSJITCOMPILER_BASELINE_ENABLE, 1);

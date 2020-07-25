@@ -25,6 +25,7 @@
 #include "ps/CLogger.h"
 #include "ps/GameSetup/Config.h"
 #include "ps/Profile.h"
+#include "scriptinterface/ScriptContext.h"
 #include "scriptinterface/ScriptInterface.h"
 #include "soundmanager/ISoundManager.h"
 
@@ -426,6 +427,7 @@ bool IGUIObject::ScriptEventWithReturn(const CStr& eventName, const JS::HandleVa
 	if (!JS_CallFunctionValue(rq.cx, obj, handlerVal, paramData, &result))
 	{
 		LOGERROR("Errors executing script event \"%s\"", eventName.c_str());
+		ScriptContext::CatchPendingException(rq.cx);
 		return false;
 	}
 	return JS::ToBoolean(result);

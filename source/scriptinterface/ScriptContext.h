@@ -56,6 +56,13 @@ public:
 		int heapGrowthBytesGCTrigger = DEFAULT_HEAP_GROWTH_BYTES_GCTRIGGER);
 
 	/**
+	 * Log and then clear the current pending exception. This function should always be called after calling a
+	 * JS script, in case that script doesn't catch an exception thrown during its execution.
+	 * If no exception is pending, this does nothing.
+	 */
+	static void CatchPendingException(JSContext* cx);
+
+	/**
 	 * MaybeIncrementalGC tries to determine whether a context-wide garbage collection would free up enough memory to
 	 * be worth the amount of time it would take. It does this with our own logic and NOT some predefined JSAPI logic because
 	 * such functionality currently isn't available out of the box.

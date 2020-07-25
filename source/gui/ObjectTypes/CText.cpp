@@ -272,7 +272,7 @@ bool CText::GetTextSize(JSContext* cx, uint argc, JS::Value* vp)
 	if (!thisObj)
 	{
 		JSAutoRequest rq(cx);
-		JS_ReportError(cx, "This is not a CText object!");
+		JS_ReportErrorUTF8(cx, "This is not a CText object!");
 		return false;
 	}
 
