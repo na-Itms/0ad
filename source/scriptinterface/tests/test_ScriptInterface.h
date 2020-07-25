@@ -40,7 +40,7 @@ public:
 		ScriptInterface script("Test", "Test", g_ScriptContext);
 		TestLogger logger;
 		TS_ASSERT(!script.LoadScript(L"test.js", "1+"));
-		TS_ASSERT_STR_CONTAINS(logger.GetOutput(), "JavaScript error: test.js line 1\nSyntaxError: expected expression, got end of script");
+		TS_ASSERT_STR_CONTAINS(logger.GetOutput(), "ERROR: JavaScript error: test.js line 1\nexpected expression, got end of script");
 	}
 
 	void test_loadscript_strict_warning()
@@ -57,7 +57,7 @@ public:
 		ScriptInterface script("Test", "Test", g_ScriptContext);
 		TestLogger logger;
 		TS_ASSERT(!script.LoadScript(L"test.js", "with(1){}"));
-		TS_ASSERT_STR_CONTAINS(logger.GetOutput(), "JavaScript error: test.js line 1\nSyntaxError: strict mode code may not contain \'with\' statements");
+		TS_ASSERT_STR_CONTAINS(logger.GetOutput(), "ERROR: JavaScript error: test.js line 1\nstrict mode code may not contain \'with\' statements");
 	}
 
 	void test_clone_basic()

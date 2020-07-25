@@ -31,8 +31,8 @@
 #include "simulation2/system/IComponent.h"
 #include "simulation2/system/ParamNode.h"
 
-#define FAIL(msg) STMT(JS_ReportError(cx, msg); return false)
-#define FAIL_VOID(msg) STMT(JS_ReportError(cx, msg); return)
+#define FAIL(msg) STMT(JS_ReportErrorUTF8(cx, msg); return false)
+#define FAIL_VOID(msg) STMT(JS_ReportErrorUTF8(cx, msg); return)
 
 template<> void ScriptInterface::ToJSVal<IComponent*>(JSContext* cx, JS::MutableHandleValue ret, IComponent* const& val)
 {

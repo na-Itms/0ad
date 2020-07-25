@@ -276,13 +276,6 @@ public:
 	std::string StringifyJSON(JS::MutableHandleValue obj, bool indent = true) const;
 
 	/**
-	 * Report the given error message through the JS error reporting mechanism,
-	 * and throw a JS exception. (Callers can check IsPendingException, and must
-	 * return false in that case to propagate the exception.)
-	 */
-	void ReportError(const char* msg) const;
-
-	/**
 	 * Load and execute the given script in a new function scope.
 	 * @param filename Name for debugging purposes (not used to load the file)
 	 * @param code JS code to execute
@@ -357,8 +350,10 @@ public:
 	{
 		JSAutoRequest rq(cx);
 		T* value = static_cast<T*>(JS_GetInstancePrivate(cx, thisobj, jsClass, nullptr));
-		if (value == nullptr && !JS_IsExceptionPending(cx))
-			JS_ReportError(cx, "Private data of the given object is null!");
+
+		if (value == nullptr)
+			JS_ReportErrorUTF8(cx, "Private data of the given object is null!");
+
 		return value;
 	}
 
@@ -372,13 +367,16 @@ public:
 		JSAutoRequest rq(cx);
 		if (!callArgs.thisv().isObject())
 		{
-			JS_ReportError(cx, "Cannot retrieve private JS class data because from a non-object value!");
+			JS_ReportErrorUTF8(cx, "Cannot retrieve private JS class data because from a non-object value!");
 			return nullptr;
 		}
+
 		JS::RootedObject thisObj(cx, &callArgs.thisv().toObject());
 		T* value = static_cast<T*>(JS_GetInstancePrivate(cx, thisObj, jsClass, &callArgs));
-		if (value == nullptr && !JS_IsExceptionPending(cx))
-			JS_ReportError(cx, "Private data of the given object is null!");
+
+		if (value == nullptr)
+			JS_ReportErrorUTF8(cx, "Private data of the given object is null!");
+
 		return value;
 	}
 

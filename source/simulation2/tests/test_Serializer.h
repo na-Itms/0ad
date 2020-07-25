@@ -766,6 +766,7 @@ public:
 
 		TS_ASSERT(script.Eval("([1, 2, function () { }])", &obj));
 		TS_ASSERT_THROWS(serialize.ScriptVal("script", &obj), const PSERROR_Serialize_InvalidScriptValue&);
+		TS_ASSERT_STR_CONTAINS(logger.GetOutput(), "ERROR: Cannot serialise JS objects of type 'function': (unnamed)");
 	}
 
 	void test_script_splice()

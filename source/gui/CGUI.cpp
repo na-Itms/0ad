@@ -37,6 +37,7 @@
 #include "ps/Pyrogenesis.h"
 #include "ps/XML/Xeromyces.h"
 #include "renderer/Renderer.h"
+#include "scriptinterface/ScriptContext.h"
 #include "scriptinterface/ScriptInterface.h"
 
 #include <string>
@@ -100,7 +101,8 @@ InReaction CGUI::HandleEvent(const SDL_Event_* ev)
 			ScriptInterface::Request rq(m_ScriptInterface);
 			JS::RootedObject globalObj(rq.cx, rq.glob);
 			JS::RootedValue result(rq.cx);
-			JS_CallFunctionValue(rq.cx, globalObj, m_GlobalHotkeys[hotkey][eventName], JS::HandleValueArray::empty(), &result);
+			if (!JS_CallFunctionValue(rq.cx, globalObj, m_GlobalHotkeys[hotkey][eventName], JS::HandleValueArray::empty(), &result))
+				ScriptContext::CatchPendingException(rq.cx);
 		}
 
 		std::map<CStr, std::vector<IGUIObject*> >::iterator it = m_HotkeyObjects.find(hotkey);
@@ -410,20 +412,20 @@ void CGUI::SetGlobalHotkey(const CStr& hotkeyTag, const CStr& eventName, JS::Han
 
 	if (hotkeyTag.empty())
 	{
-		JS_ReportError(rq.cx, "Cannot assign a function to an empty hotkey identifier!");
+		JS_ReportErrorUTF8(rq.cx, "Cannot assign a function to an empty hotkey identifier!");
 		return;
 	}
 
 	// Only support "Press", "Keydown" and "Release" events.
 	if (eventName != EventNamePress && eventName != EventNameKeyDown && eventName != EventNameRelease)
 	{
-		JS_ReportError(rq.cx, "Cannot assign a function to an unsupported event!");
+		JS_ReportErrorUTF8(rq.cx, "Cannot assign a function to an unsupported event!");
 		return;
 	}
 
 	if (!function.isObject() || !JS_ObjectIsFunction(rq.cx, &function.toObject()))
 	{
-		JS_ReportError(rq.cx, "Cannot assign non-function value to global hotkey '%s'", hotkeyTag.c_str());
+		JS_ReportErrorUTF8(rq.cx, "Cannot assign non-function value to global hotkey '%s'", hotkeyTag.c_str());
 		return;
 	}
 

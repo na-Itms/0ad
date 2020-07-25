@@ -42,7 +42,7 @@ void JSI_GUIManager::PopGuiPage(ScriptInterface::CmptPrivate* pCmptPrivate, JS::
 	if (g_GUI->GetPageCount() < 2)
 	{
 		ScriptInterface::Request rq(pCmptPrivate);
-		JS_ReportError(rq.cx, "Can't pop GUI pages when less than two pages are opened!");
+		JS_ReportErrorUTF8(rq.cx, "Can't pop GUI pages when less than two pages are opened!");
 		return;
 	}
 

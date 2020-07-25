@@ -224,7 +224,7 @@ bool JSI_VFS::PathRestrictionMet(ScriptInterface::CmptPrivate* pCmptPrivate, con
 	}
 
 	ScriptInterface::Request rq(pCmptPrivate);
-	JS_ReportError(rq.cx, "This part of the engine may only read from %s!", utf8_from_wstring(allowedPaths).c_str());
+	JS_ReportErrorUTF8(rq.cx, "This part of the engine may only read from %s!", utf8_from_wstring(allowedPaths).c_str());
 
 	return false;
 }

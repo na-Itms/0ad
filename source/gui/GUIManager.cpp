@@ -259,7 +259,8 @@ void CGUIManager::SGUIPage::PerformCallbackFunction(shared_ptr<JSStructuredClone
 
 	JS::RootedValue result(rq.cx);
 
-	JS_CallFunctionValue(rq.cx, globalObj, funcVal, paramData, &result);
+	if(!JS_CallFunctionValue(rq.cx, globalObj, funcVal, paramData, &result))
+		ScriptContext::CatchPendingException(rq.cx);
 }
 
 Status CGUIManager::ReloadChangedFile(const VfsPath& path)
