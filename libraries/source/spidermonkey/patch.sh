@@ -12,8 +12,8 @@ patch -p0 < ../FixpsutilFreeBSD.diff
 # https://bugzilla.mozilla.org/show_bug.cgi?id=1176787
 patch -p1 < ../FixMozglueStatic.diff
 pushd js/src
-  autoconf-2.13 old-configure.in > old-configure
-  autoconf-2.13 configure.in > configure
+  autoconf213 old-configure.in > old-configure
+  autoconf213 configure.in > configure
 popd
 
 # After https://bugzilla.mozilla.org/show_bug.cgi?id=1289934 landed in
