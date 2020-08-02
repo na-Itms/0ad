@@ -59,7 +59,7 @@ private:
 
 public:
 	// Basic
-	XmppClient(const ScriptInterface* scriptInterface, const std::string& sUsername, const std::string& sPassword, const std::string& sRoom, const std::string& sNick, const int historyRequestSize = 0, const bool regOpt = false);
+	XmppClient(const std::shared_ptr<ScriptInterface>& scriptInterface, const std::string& sUsername, const std::string& sPassword, const std::string& sRoom, const std::string& sNick, const int historyRequestSize = 0, const bool regOpt = false);
 	virtual ~XmppClient();
 
 	// JS::Heap is better for GC performance than JS::PersistentRooted
@@ -186,7 +186,7 @@ private:
 	/// Profile data
 	std::vector<const glooxwrapper::Tag*> m_Profile;
 	/// ScriptInterface to root the values
-	const ScriptInterface* m_ScriptInterface;
+	std::shared_ptr<ScriptInterface> m_ScriptInterface;
 	/// Queue of messages for the GUI
 	std::deque<JS::Heap<JS::Value> > m_GuiMessageQueue;
 	/// Cache of all GUI messages received since the login

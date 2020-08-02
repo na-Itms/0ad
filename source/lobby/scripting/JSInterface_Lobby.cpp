@@ -19,6 +19,7 @@
 
 #include "JSInterface_Lobby.h"
 
+#include "gui/CGUI.h"
 #include "gui/GUIManager.h"
 #include "lib/utf8.h"
 #include "lobby/IXmppClient.h"
@@ -94,7 +95,7 @@ void JSI_Lobby::StartXmppClient(ScriptInterface::CmptPrivate* pCmptPrivate, cons
 
 	g_XmppClient =
 		IXmppClient::create(
-			g_GUI->GetScriptInterface().get(),
+			g_GUI->GetActiveGUI()->GetScriptInterface(),
 			utf8_from_wstring(username),
 			utf8_from_wstring(password),
 			utf8_from_wstring(room),
@@ -115,7 +116,7 @@ void JSI_Lobby::StartRegisterXmppClient(ScriptInterface::CmptPrivate* pCmptPriva
 
 	g_XmppClient =
 		IXmppClient::create(
-			g_GUI->GetScriptInterface().get(),
+			g_GUI->GetScriptInterface(),
 			utf8_from_wstring(username),
 			utf8_from_wstring(password),
 			std::string(),

@@ -61,7 +61,7 @@ static std::string tag_name(const glooxwrapper::IQ& iq)
 	return ret;
 }
 
-IXmppClient* IXmppClient::create(const ScriptInterface* scriptInterface, const std::string& sUsername, const std::string& sPassword, const std::string& sRoom, const std::string& sNick, const int historyRequestSize,bool regOpt)
+IXmppClient* IXmppClient::create(const std::shared_ptr<ScriptInterface>& scriptInterface, const std::string& sUsername, const std::string& sPassword, const std::string& sRoom, const std::string& sNick, const int historyRequestSize,bool regOpt)
 {
 	return new XmppClient(scriptInterface, sUsername, sPassword, sRoom, sNick, historyRequestSize, regOpt);
 }
@@ -78,7 +78,7 @@ IXmppClient* IXmppClient::create(const ScriptInterface* scriptInterface, const s
  * @param historyRequestSize Number of stanzas of room history to request.
  * @param regOpt If we are just registering or not.
  */
-XmppClient::XmppClient(const ScriptInterface* scriptInterface, const std::string& sUsername, const std::string& sPassword, const std::string& sRoom, const std::string& sNick, const int historyRequestSize, bool regOpt)
+XmppClient::XmppClient(const std::shared_ptr<ScriptInterface>& scriptInterface, const std::string& sUsername, const std::string& sPassword, const std::string& sRoom, const std::string& sNick, const int historyRequestSize, bool regOpt)
 	: m_ScriptInterface(scriptInterface),
 	  m_client(nullptr),
 	  m_mucRoom(nullptr),
@@ -698,19 +698,22 @@ JS::Value XmppClient::GuiPollNewMessages(const ScriptInterface& scriptInterface)
 	if ((m_isConnected && !m_initialLoadComplete) || m_GuiMessageQueue.empty())
 		return JS::UndefinedValue();
 
-	ScriptInterface::Request rq(scriptInterface);
+	ScriptInterface::Request m_rq(m_ScriptInterface);
 
 	// Optimize for batch message processing that is more
 	// performance demanding than processing a lone message.
-	JS::RootedValue messages(rq.cx);
-	ScriptInterface::CreateArray(rq.cx, &messages);
+	JS::RootedValue messages_temp(m_rq.cx);
+	ScriptInterface::CreateArray(m_rq.cx, &messages_temp);
 
 	int j = 0;
-
 	for (const JS::Heap<JS::Value>& message : m_GuiMessageQueue)
-	{
-		scriptInterface.SetPropertyInt(messages, j++, message);
+		m_ScriptInterface->SetPropertyInt(messages_temp, j++, message);
 
+	ScriptInterface::Request rq(scriptInterface);
+
+	JS::RootedValue messages(rq.cx, scriptInterface.CloneValueFromOtherCompartment(*m_ScriptInterface, messages_temp, JS::StructuredCloneScope::SameProcessDifferentThread));
+
+	/*
 		// Store historic chat messages.
 		// Only store relevant messages to minimize memory footprint.
 		JS::RootedValue rootedMessage(rq.cx, message);
@@ -733,7 +736,7 @@ JS::Value XmppClient::GuiPollNewMessages(const ScriptInterface& scriptInterface)
 		}
 		else
 			LOGERROR("Could not clone historic lobby GUI message!");
-	}
+	}*/
 
 	m_GuiMessageQueue.clear();
 	return messages;
@@ -741,6 +744,7 @@ JS::Value XmppClient::GuiPollNewMessages(const ScriptInterface& scriptInterface)
 
 JS::Value XmppClient::GuiPollHistoricMessages(const ScriptInterface& scriptInterface)
 {
+	return JS::UndefinedValue();
 	if (m_HistoricGuiMessages.empty())
 		return JS::UndefinedValue();
 
