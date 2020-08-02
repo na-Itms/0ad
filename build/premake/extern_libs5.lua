@@ -569,6 +569,9 @@ extern_lib_defs = {
 					links { "mozjs52-ps-debug" }
 				filter { "Release", "action:not vs*" }
 					links { "mozjs52-ps-release" }
+				if os.istarget("macosx") then
+					links { "mozglue" }
+				end
 				filter { }
 				add_source_lib_paths("spidermonkey")
 			end
